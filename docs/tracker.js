@@ -416,7 +416,13 @@
         const recent = state.feed.filter((f) => f.kid === e.kid && f.k === 'bust' && now - f.t <= 900).length;
         return { kid: e.kid, num: e.num, name: e.name, phase: e.phase, start: e.start, regClose: e.regClose, buyin: e.buyin,
           entries: e.entries, remaining: e.remaining, seated: e.seated, unique: ps.filter((p) => !p.carry).length,
-          reentriesSeen: re, untracked: e.entries == null ? null : (isLaterDay(e.name) || sibs.length > 1) ? (fullyTracked ? Math.max(0, e.entries - seenAll) : null) : Math.max(0, e.entries - seen),
+          reentriesSeen: re,
+          // A flight's entry count covers that flight only; a later day's (Day 2, Final Day) covers every flight.
+          // Missed = entries - every bullet we saw = players seen + re-entries seen, subtracted from the official count.
+          untracked: e.entries == null ? null : isLaterDay(e.name) ? (fullyTracked ? Math.max(0, e.entries - seenAll) : null) : Math.max(0, e.entries - seen),
+          laterDay: isLaterDay(e.name),
+          // Bullets we counted beyond the official number (the site lowers it when a registration is cancelled)
+          over: e.entries == null || isLaterDay(e.name) ? 0 : Math.max(0, seen - e.entries),
           trackedFromStart: !!(e.firstPoll && e.start && e.firstPoll - e.start < 900),
           bustsLast15: recent, firstPoll: e.firstPoll, lastPoll: e.lastPoll, sat: e.sat };
       })

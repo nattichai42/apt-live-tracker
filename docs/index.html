@@ -202,7 +202,7 @@ details.notes li { margin: 5px 0; }
 
     <section id="view-events" class="panel" role="tabpanel" aria-label="Live events" hidden>
       <div class="ph"><h2>Live events</h2></div>
-      <p class="legend">Tap an event to see its players: who is seated, who busted and when, and who re-entered. Untracked = official entries minus bullets we saw.</p>
+      <p class="legend">Tap an event to see its players. Entries = players seen + re-entries + missed. Missed bullets were never seen seated: busted before tracking began, or entered and busted between two polls.</p>
       <div class="cards" id="events"></div>
       <div class="ph"><h2>Starting soon</h2></div>
       <ul class="soon" id="soon"></ul>
@@ -450,15 +450,24 @@ details.notes li { margin: 5px 0; }
       add('Busts 15m', nf.format(e.bustsLast15));
       add('Players seen', nf.format(e.unique));
       add('Re-entries', nf.format(e.reentriesSeen));
-      add('Untracked', e.untracked == null ? '—' : nf.format(e.untracked), e.untracked ? 'warn' : '');
+      add('Missed', e.untracked == null ? '—' : nf.format(e.untracked), e.untracked ? 'warn' : '');
       c.appendChild(kv);
       if (e.entries) { const b = el('div', 'bar'); const i = el('i'); i.style.width = Math.min(100, (e.remaining || 0) / e.entries * 100) + '%'; b.appendChild(i); c.appendChild(b); }
       const foot = el('div', 'sub'); foot.style.marginTop = '8px';
-      foot.textContent = e.trackedFromStart ? 'Tracked from the start' : `Tracking since ${fTime.format(new Date(e.firstPoll * 1000))}`;
+      foot.textContent = explainEntries(e) + ' · ' + (e.trackedFromStart ? 'tracked from the start' : `tracking since ${fTime.format(new Date(e.firstPoll * 1000))}`);
       c.appendChild(foot);
       c.addEventListener('click', () => showEvent(e.kid));
       box.appendChild(c);
     }
+  }
+
+  // "83 entries = 65 players + 14 re-entries + 4 missed"
+  function explainEntries(e) {
+    const pl = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
+    if (e.entries == null) return '';
+    if (e.untracked == null) return e.laterDay ? 'Missed unknown: earlier flights were not watched from the start' : '';
+    if (e.over) return `${pl(e.unique, 'player', 'players')} + ${pl(e.reentriesSeen, 're-entry', 're-entries')} = ${nf.format(e.entries + e.over)}, ${nf.format(e.over)} more than the ${pl(e.entries, 'official entry', 'official entries')} (registrations cancelled after seating)`;
+    return `${pl(e.entries, 'entry', 'entries')} = ${pl(e.unique, 'player', 'players')} + ${pl(e.reentriesSeen, 're-entry', 're-entries')} + ${nf.format(e.untracked)} missed`;
   }
 
   function renderSoon() {
@@ -494,8 +503,8 @@ details.notes li { margin: 5px 0; }
     const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
     const ps = T.eventPlayers(state, e.kid);
     add('Entries', e.entries != null ? nf.format(e.entries) : '—'); add('Left', e.remaining != null ? nf.format(e.remaining) : '—'); add('Seated', nf.format(ps.filter((p) => p.status === 'seated').length));
-    add('Busts seen', nf.format(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', nf.format(info.reentriesSeen || 0)); add('Untracked', info.untracked == null ? '—' : nf.format(info.untracked), info.untracked ? 'warn' : '');
-    $('#sheet-hint').textContent = info.trackedFromStart ? '' : 'Tracking began after this event started, so earlier busts and re-entries are not listed.';
+    add('Busts seen', nf.format(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', nf.format(info.reentriesSeen || 0)); add('Missed', info.untracked == null ? '—' : nf.format(info.untracked), info.untracked ? 'warn' : '');
+    $('#sheet-hint').textContent = explainEntries(info) + '. ' + (info.trackedFromStart ? '' : 'Tracking began after this event started, so earlier busts and re-entries are not listed.');
     const groups = {
       seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),
       busted: ps.filter((p) => p.status === 'busted').sort((a, b) => (b.lastBust || 0) - (a.lastBust || 0)),
