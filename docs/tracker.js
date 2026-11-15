@@ -574,11 +574,25 @@
       // A later day's entry count already covers every flight; otherwise flights add up
       const entries = later.length ? Math.max(...later.map((e) => e.entries || 0)) : kids.reduce((a, e) => a + (e.entries || 0), 0);
       const win = r.rows.find((x) => x[0] === 1);
-      out.push({ kid: last.kid, num, name: baseName(last.name), buyin: last.buyin, sat: kids.some((e) => e.sat), entries,
+      out.push({ kind: 'event', kid: last.kid, num, name: baseName(last.name), buyin: last.buyin, sat: kids.some((e) => e.sat), entries,
         prizePool: Math.max(...kids.map((e) => e.prizePool || 0)), paid: r.rows.length, final: !!r.final,
         finished: Math.max(...kids.map((e) => e.lastPoll || 0)) || Math.max(...kids.map((e) => e.start || 0)),
         tracked: kids.some((e) => e.polls > 0),
         winner: win ? { name: canon(state, win[1]), cc: win[2], prize: win[3] } : null });
+    }
+    // Finished flights / days of events still in progress: they bag survivors instead of paying out
+    for (const [num, kids] of byNum) {
+      if (kids.length < 2 || kids.every((e) => e.phase === 'Completed')) continue;
+      for (const e of kids) {
+        if (e.phase !== 'Completed') continue;
+        const bagged = Object.values(e.p || {}).filter((p) => p.st === 'end').length;
+        const next = kids.filter((x) => x.phase !== 'Completed' && (x.start || 0) > (e.start || 0)).sort((a, b) => a.start - b.start)[0];
+        const part = (e.name.match(/\b((?:Turbo )?Flight \w+|Day \d+|Final Day)\b/i) || [])[1] || '';
+        out.push({ kind: 'flight', kid: e.kid, num, name: baseName(e.name), part, buyin: e.buyin, sat: e.sat, entries: e.entries || 0,
+          bagged: e.remaining || bagged, tracked: e.polls > 0,
+          finished: e.lastPoll || e.start || 0,
+          next: next ? { kid: next.kid, part: (next.name.match(/\b((?:Turbo )?Flight \w+|Day \d+|Final Day)\b/i) || [])[1] || 'next day', start: next.start } : null });
+      }
     }
     return out.sort((a, b) => b.finished - a.finished || b.num - a.num);
   }

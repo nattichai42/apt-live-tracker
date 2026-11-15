@@ -266,6 +266,7 @@ details.notes li { margin: 5px 0; }
       <button type="button" data-seg="seated" aria-pressed="true">Seated<span class="n"></span></button>
       <button type="button" data-seg="busted" aria-pressed="false">Busted<span class="n"></span></button>
       <button type="button" data-seg="reentered" aria-pressed="false">Re-entered<span class="n"></span></button>
+      <button type="button" data-seg="bagged" aria-pressed="false">Bagged<span class="n"></span></button>
       <button type="button" data-seg="cashed" aria-pressed="false">Cashed<span class="n"></span></button>
       <button type="button" data-seg="all" aria-pressed="false">All<span class="n"></span></button>
     </div>
@@ -275,7 +276,7 @@ details.notes li { margin: 5px 0; }
   <ul class="tl" id="sheet-tl"></ul>
 </aside>
 
-<script src="tracker.js?v=f53ace319a"></script>
+<script src="tracker.js?v=d36ac8c7fd"></script>
 <script>
 (function () {
   'use strict';
@@ -514,9 +515,12 @@ details.notes li { margin: 5px 0; }
       const li = el('li'); li.tabIndex = 0; li.setAttribute('role', 'button');
       li.appendChild(el('span', 'meta', e.finished ? fDay.format(new Date(e.finished * 1000)).replace(/^\w+ /, '') : ''));
       const mid = el('div');
-      mid.appendChild(el('div', 'nm', `#${e.num} ${e.name.replace(/^\[Event \d+\]\s*/, '')}`));
+      mid.appendChild(el('div', 'nm', `#${e.num} ${e.name.replace(/^\[Event \d+\]\s*/, '')}${e.part ? ' · ' + e.part : ''}`));
       const w = el('div', 'win');
-      if (e.winner) { w.append('Won by '); w.appendChild(el('b', '', (flag(e.winner.cc) ? flag(e.winner.cc) + ' ' : '') + e.winner.name)); w.append(` · ${short(e.winner.prize)}`); }
+      if (e.kind === 'flight') {
+        w.appendChild(el('b', '', `${nf.format(e.bagged)} bagged`));
+        if (e.next) w.append(` · ${e.next.part} ${e.next.start ? fFull.format(new Date(e.next.start * 1000)) : ''}`);
+      } else if (e.winner) { w.append('Won by '); w.appendChild(el('b', '', (flag(e.winner.cc) ? flag(e.winner.cc) + ' ' : '') + e.winner.name)); w.append(` · ${short(e.winner.prize)}`); }
       else w.textContent = e.final ? '' : 'Payouts still being posted';
       mid.appendChild(w);
       li.appendChild(mid);
@@ -547,8 +551,11 @@ details.notes li { margin: 5px 0; }
 
   function showEvent(kid) {
     const ev = state.events[kid];
-    if (ev && ev.phase === 'Completed') eventSeg = 'cashed';
-    else if (eventSeg === 'cashed') eventSeg = 'seated';
+    if (ev && ev.phase === 'Completed') {
+      const r = state.results[ev.num];
+      const allDone = Object.values(state.events).filter((x) => x.num === ev.num).every((x) => x.phase === 'Completed');
+      eventSeg = allDone && r && r.rows.length ? 'cashed' : 'bagged';
+    } else if (eventSeg === 'cashed' || eventSeg === 'bagged') eventSeg = 'seated';
     openEvent = kid; openPlayer = null; backToEvent = null;
     $('#sheet-q').value = '';
     renderEventSheet();
@@ -575,6 +582,7 @@ details.notes li { margin: 5px 0; }
       busted: ps.filter((p) => p.status === 'busted').sort((a, b) => (b.lastBust || 0) - (a.lastBust || 0)),
       reentered: ps.filter((p) => p.bullets > 1).sort((a, b) => b.bullets - a.bullets || (b.lastBust || 0) - (a.lastBust || 0)),
       cashed: ps.filter((p) => p.pos != null).sort((a, b) => a.pos - b.pos),
+      bagged: ps.filter((p) => p.status === 'end').sort((a, b) => a.name.localeCompare(b.name)),
       all: ps.slice().sort((a, b) => a.name.localeCompare(b.name)),
     };
     document.querySelectorAll('#sheet-seg button').forEach((b) => {
@@ -585,7 +593,7 @@ details.notes li { margin: 5px 0; }
     let rows = groups[eventSeg] || [];
     if (q) rows = rows.filter((p) => p.name.toLowerCase().includes(q));
     const ul = $('#sheet-list'); ul.replaceChildren();
-    if (!rows.length) ul.appendChild(el('li', 'empty', q ? 'No player matches.' : eventSeg === 'busted' ? 'No busts seen yet.' : eventSeg === 'reentered' ? 'No re-entries seen yet.' : eventSeg === 'cashed' ? 'No payouts yet.' : 'Nobody here.'));
+    if (!rows.length) ul.appendChild(el('li', 'empty', q ? 'No player matches.' : eventSeg === 'busted' ? 'No busts seen yet.' : eventSeg === 'reentered' ? 'No re-entries seen yet.' : eventSeg === 'cashed' ? 'No payouts yet.' : eventSeg === 'bagged' ? 'Nobody has bagged chips here yet.' : 'Nobody here.'));
     for (const p of rows.slice(0, 600)) {
       const li = el('li'); const b = el('button', 'row'); b.type = 'button';
       const left = el('div');
