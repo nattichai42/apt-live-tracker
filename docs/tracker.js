@@ -55,6 +55,37 @@
     return { v: 1, series: SERIES, updatedAt: 0, listAt: 0, events: {}, results: {}, feed: [] };
   }
 
+  // Name edits by the floor ("Kaigorodtsev Andrei" -> "Andrei Kaigorodtsev", "King-Chung Wang" -> "Wang Philip King Chung")
+  const nameTokens = (n) => clean(n).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  function similarNames(a, b) {
+    const A = nameTokens(a), B = nameTokens(b);
+    if (!A.length || !B.length) return false;
+    if (A.join('') === B.join('') || A.slice().sort().join(' ') === B.slice().sort().join(' ')) return true;
+    const setB = new Set(B);
+    const shared = new Set(A.filter((t) => setB.has(t))).size;
+    return shared >= 2 && shared / Math.min(new Set(A).size, setB.size) >= 0.6;
+  }
+  // Follow renames to the current spelling
+  function canon(state, n) {
+    let k = 0; while (state.aliases && state.aliases[n] && k++ < 8) n = state.aliases[n];
+    return n;
+  }
+  function renameInEvent(state, e, from, to) {
+    const a = e.p[from], b = e.p[to];
+    if (!a) return;
+    if (b) {
+      // Both exist (repair of saved history): the new name's first "entry" was not a new bullet
+      b.f = Math.min(a.f, b.f); b.b = (a.b || 0) + Math.max(0, (b.b || 1) - 1);
+      b.x = [...(a.x || []), ...(b.x || [])].sort((x, y) => x - y);
+      if (a.r || b.r) b.r = [...new Set([...(a.r || []), ...(b.r || [])])].sort((x, y) => x - y);
+      if (a.carry && !b.carry) b.carry = a.carry;
+      b.cc = b.cc || a.cc;
+    } else e.p[to] = a;
+    delete e.p[from];
+    for (const f of state.feed) if (f.kid === e.kid && f.n === from) f.n = to;
+    (state.aliases || (state.aliases = {}))[from] = to;
+  }
+
   // "[Event 1] National Cup Championship - Flight A - TWD 20,000,000 GTD" -> "[Event 1] National Cup Championship"
   const baseName = (name) => clean(name).split(/ - (?=(?:Turbo )?Flight\b|Day \d|Final Day|Final Table)/)[0];
   const isLaterDay = (name) => /\b(Day [2-9]|Final Day|Final Table)\b/i.test(name || '');
@@ -98,7 +129,7 @@
   // Core diff. players: [{name, cc, country, table, seat}]
   function applySnapshot(state, kid, players, now, interval) {
     const e = state.events[kid];
-    const prev = e.seats || {};
+    const prev = { ...(e.seats || {}) };
     const prevCount = Object.keys(prev).length;
     const cur = {};
     for (const p of players) { const n = clean(p.name); if (n) cur[n] = [p.tableIndex ?? p.table ?? null, p.seatIndex ?? p.seat ?? null, p.countryCode || p.cc || '']; }
@@ -120,7 +151,16 @@
       }
       e.entriesAtFirst = e.entries;
     } else {
-      const glitchWindow = 1800; // back in the very same seat within 30 min = never left
+      const glitchWindow = 180; // back in the very same seat within 3 min = a data blip (a later same-seat return can be a rebuy)
+      // Renames: a name that left and a similar name that sat down in the very same seat in this poll are one player
+      for (const [y, s] of Object.entries(cur)) {
+        if (prev[y] || e.p[y]) continue;
+        const x = Object.keys(prev).find((n) => !cur[n] && prev[n][0] && prev[n][0] === s[0] && prev[n][1] === s[1] && e.p[n] && e.p[n].st === 's' && similarNames(n, y));
+        if (!x) continue;
+        renameInEvent(state, e, x, y);
+        prev[y] = prev[x]; delete prev[x];
+        res.renames = (res.renames || 0) + 1;
+      }
       for (const n of Object.keys(prev)) {
         if (cur[n]) continue;
         const p = e.p[n];
@@ -198,6 +238,22 @@
   // was a player briefly missing from the seating list, so its bust and re-entry are removed. Idempotent.
   function repair(state) {
     let fixed = 0;
+    // Renames saved as a bust of the old name plus a new entry of a similar name in the same poll
+    for (let i = state.feed.length - 1; i >= 0; i--) {
+      const B = state.feed[i];
+      if (!B || B.k !== 'bust') continue;
+      const j = state.feed.findIndex((E) => E.k === 'entry' && E.kid === B.kid && E.t === B.t && E.n !== B.n && similarNames(E.n, B.n));
+      if (j < 0) continue;
+      const e = state.events[B.kid];
+      const E = state.feed[j];
+      if (!e || !e.p[B.n] || !e.p[E.n] || e.p[B.n].st === 's') continue;
+      const a = e.p[B.n];
+      a.x = (a.x || []).filter((t) => t !== B.t);
+      state.feed.splice(Math.max(i, j), 1); state.feed.splice(Math.min(i, j), 1);
+      renameInEvent(state, e, B.n, E.n);
+      fixed++;
+      i = Math.min(i, state.feed.length);
+    }
     for (let i = state.feed.length - 1; i >= 0; i--) {
       const f = state.feed[i];
       if (f.k !== 'reentry') continue;
@@ -271,7 +327,8 @@
 
   function resultsByName(state) {
     const m = new Map();
-    for (const [num, r] of Object.entries(state.results)) for (const [pos, n, cc, prize] of r.rows) {
+    for (const [num, r] of Object.entries(state.results)) for (const [pos, n0, cc, prize] of r.rows) {
+      const n = canon(state, n0);
       if (!m.has(n)) m.set(n, []);
       m.get(n).push({ num: Number(num), pos, prize, cc, final: r.final });
     }
@@ -294,8 +351,8 @@
     const map = new Map();
     const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], untracked: 0 }), map.get(n));
     for (const e of Object.values(state.events)) {
-      for (const [n, p] of Object.entries(e.p || {})) {
-        const r = get(n); if (p.cc) r.cc = p.cc;
+      for (const [n0, p] of Object.entries(e.p || {})) {
+        const r = get(canon(state, n0)); if (p.cc) r.cc = p.cc;
         const k = r.nums.get(e.num) || { num: e.num, bullets: 0, buyin: e.buyin, tracked: true };
         k.bullets += p.b || 0; r.nums.set(e.num, k);
         r.bullets += p.b || 0; r.busts += (p.x || []).length;
@@ -330,18 +387,27 @@
     return out;
   }
 
+  // A player's record in one event, under whatever spelling that event used
+  function pOf(state, e, name) {
+    if (!e.p) return null;
+    if (e.p[name]) return e.p[name];
+    for (const k of Object.keys(e.p)) if (canon(state, k) === name) return e.p[k];
+    return null;
+  }
+
   // Best estimate of when a player's cash happened (their bust in that event, not when we fetched payouts)
   function cashTime(state, num, name, r, info) {
     const kids = Object.values(state.events).filter((x) => x.num === num);
     let bust = 0, end = 0;
     for (const e of kids) {
-      const p = e.p && e.p[name]; if (!p) continue;
+      const p = pOf(state, e, name); if (!p) continue;
       for (const t of p.x || []) if (t > bust) bust = t;
       if (p.st === 'end' && e.lastPoll > end) end = e.lastPoll;
     }
     if (end && end >= bust) return { t: end };
     if (bust) return { t: bust };
-    if (r.seen && r.seen[name]) return { t: r.seen[name] };
+    const seenKey = r.seen && Object.keys(r.seen).find((k) => canon(state, k) === name);
+    if (seenKey && r.seen[seenKey]) return { t: r.seen[seenKey] };
     const firsts = kids.filter((x) => x.firstPoll).map((x) => x.firstPoll);
     if (firsts.length) return { t: Math.min(...firsts) - 1, before: true }; // paid before we started watching
     return { t: (info.lastStart || r.at) + 1, approx: true };
@@ -363,7 +429,7 @@
       return nums.get(num);
     };
     for (const e of Object.values(state.events)) {
-      const p = e.p && e.p[name]; if (!p) continue;
+      const p = pOf(state, e, name); if (!p) continue;
       const info = numInfo(e.num);
       const base = { num: e.num, kid: e.kid, ev: e.name };
       const bullets = p.b || 0;
@@ -372,14 +438,14 @@
       else items.push({ ...base, t: p.f, k: 'seen', first: e.firstPoll === p.f, b: 1, amt: bullets ? -e.buyin : 0 });
       // Re-entry times: stored on the record, plus any older ones still in the feed
       const times = new Set(p.r || []);
-      for (const f of state.feed) if (f.n === name && f.k === 'reentry' && f.kid === e.kid) times.add(f.t);
+      for (const f of state.feed) if (f.k === 'reentry' && f.kid === e.kid && canon(state, f.n) === name) times.add(f.t);
       const rt = [...times].sort((a, b) => a - b);
       const extra = Math.max(0, bullets - 1);
       for (let i = 0; i < extra; i++) items.push({ ...base, t: rt[i] != null ? rt[i] : p.f, k: 'reentry', b: i + 2, amt: -e.buyin, approxTime: rt[i] == null });
       (p.x || []).forEach((t) => items.push({ ...base, t, k: 'bust' }));
       if (p.st === 'end') items.push({ ...base, t: e.lastPoll, k: 'end' });
     }
-    for (const [numS, r] of Object.entries(state.results)) for (const [pos, n, , prize] of r.rows) if (n === name) {
+    for (const [numS, r] of Object.entries(state.results)) for (const [pos, n, , prize] of r.rows) if (canon(state, n) === name) {
       const num = Number(numS);
       const info = numInfo(num);
       const cashEv = baseName(info.name);
@@ -432,17 +498,17 @@
   // Everyone tracked in one event (flight/day), joined with that event's results
   function eventPlayers(state, kid) {
     const e = state.events[kid]; if (!e) return [];
-    const res = new Map(((state.results[e.num] || {}).rows || []).map(([pos, n, cc, prize]) => [n, { pos, prize, cc }]));
+    const res = new Map(((state.results[e.num] || {}).rows || []).map(([pos, n, cc, prize]) => [canon(state, n), { pos, prize, cc, raw: n }]));
     const out = Object.entries(e.p || {}).map(([n, p]) => {
       const seat = e.seats && e.seats[n];
-      const r = res.get(n);
+      const r = res.get(canon(state, n));
       return { name: n, cc: p.cc || (r && r.cc) || '', status: p.st === 's' ? 'seated' : p.st === 'end' ? 'end' : 'busted',
         table: seat ? seat[0] : null, seat: seat ? seat[1] : null, bullets: p.b || 0, carry: !!p.carry,
         firstSeen: p.f, busts: p.x || [], lastBust: (p.x || [])[(p.x || []).length - 1] || null,
         atStart: p.f === e.firstPoll, pos: r ? r.pos : null, prize: r ? r.prize : null };
     });
     // Cashers we never saw seated (e.g. results from before tracking)
-    for (const [n, r] of res) if (!e.p[n] && Object.values(state.events).filter((x) => x.num === e.num).every((x) => !x.p || !x.p[n]))
+    for (const [n, r] of res) if (!pOf(state, e, n) && Object.values(state.events).filter((x) => x.num === e.num).every((x) => !pOf(state, x, n)))
       out.push({ name: n, cc: r.cc, status: 'cashed', table: null, seat: null, bullets: 0, busts: [], lastBust: null, pos: r.pos, prize: r.prize });
     return out;
   }
@@ -455,5 +521,5 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, repair, baseName, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });

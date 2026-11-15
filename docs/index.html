@@ -707,6 +707,7 @@ details.notes li { margin: 5px 0; }
   }
 
   function openSheet(name) {
+    name = T.canon(state, name);
     openPlayer = name; openEvent = null; backToEvent = null;
     $('#sheet-event').hidden = true; $('#sheet-tl').hidden = false; $('#sheet-back').hidden = true;
     const p = T.players(state).find((x) => x.name === name);
