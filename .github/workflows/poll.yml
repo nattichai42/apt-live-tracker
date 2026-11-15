@@ -1,0 +1,35 @@
+name: Poll APT live seating
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # best effort; runs queue back-to-back via the concurrency group
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apt-poller
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Restore state from the data branch
+        run: |
+          mkdir -p state
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git show origin/data:state.json > state/state.json && echo "restored $(wc -c < state/state.json) bytes"
+          else
+            echo "no previous state, starting fresh"
+          fi
+      - name: Poll for 55 minutes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node poller/poll.js --state state/state.json --minutes 55 --interval 60 --publish-every 3

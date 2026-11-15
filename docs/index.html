@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1513">
+<title>APT Taipei Live Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column on phones, feed + side panel on wide screens. Felt-green neutrals, chip-red for busts. */
+:root {
+  --bg: #f5f7f6; --panel: #ffffff; --line: #dfe5e2; --fg: #14201b; --muted: #5d6b65;
+  --accent: #0d7a5f; --accent-soft: #e2f2ec; --bust: #c8372d; --bust-soft: #fbe9e7;
+  --re: #b26b00; --re-soft: #fdf1dc; --entry: #2f5fb3; --entry-soft: #e6eefb; --ok: #1d8a4e;
+  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 10px; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1513; --panel: #161e1b; --line: #26312d; --fg: #e6ece9; --muted: #93a39c;
+  --accent: #3fc29c; --accent-soft: #15332a; --bust: #ff6b5e; --bust-soft: #3a1c19;
+  --re: #f0ad3c; --re-soft: #3a2b12; --entry: #7aa7ff; --entry-soft: #172540; --ok: #4cc983; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1513; --panel: #161e1b; --line: #26312d; --fg: #e6ece9; --muted: #93a39c;
+  --accent: #3fc29c; --accent-soft: #15332a; --bust: #ff6b5e; --bust-soft: #3a1c19;
+  --re: #f0ad3c; --re-soft: #3a2b12; --entry: #7aa7ff; --entry-soft: #172540; --ok: #4cc983; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
+body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
+.top-row { display: flex; align-items: center; gap: 10px; padding-block: 10px 6px; }
+.top h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -.01em; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top h1 small { color: var(--muted); font-weight: 400; }
+.status { font-size: 12px; color: var(--muted); padding-bottom: 8px; }
+.status .dot { display: inline-block; vertical-align: middle; margin: -2px 6px 0 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.live { background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
+.dot.err { background: var(--bust); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+.ctl { display: flex; gap: 6px; align-items: center; }
+.btn, .sel { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, .sel:focus-visible, .tab:focus-visible, .chip:focus-visible, .row:focus-visible, .card:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tabs { display: flex; gap: 4px; padding-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+.tab { border: 0; background: transparent; padding: 7px 12px; border-radius: 999px; cursor: pointer; color: var(--muted); font-weight: 500; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+.tab .n { font-family: var(--mono); font-size: 11px; opacity: .8; margin-left: 4px; }
+main { padding-block: 14px 40px; }
+.grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) { .grid.two { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; } .tabs .tab[data-tab="events"] { display: none; } .grid.two #view-events { display: block !important; grid-column: 2; grid-row: 1; } #view-feed, #view-players { grid-column: 1; grid-row: 1; } #view-events .cards { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.ph { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
+.ph h2 { font-size: 13px; font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; align-items: center; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+.chip[aria-pressed="true"].bust { background: var(--bust-soft); border-color: var(--bust); color: var(--bust); }
+.chip[aria-pressed="true"].re { background: var(--re-soft); border-color: var(--re); color: var(--re); }
+.chip[aria-pressed="true"].entry { background: var(--entry-soft); border-color: var(--entry); color: var(--entry); }
+.search { flex: 1 1 180px; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 10px; font-size: 16px; }
+@media (min-width: 700px) { .search { font-size: 13px; } }
+.sel.small { padding: 6px 8px; max-width: 100%; }
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); }
+.feed li.day { display: block; padding: 8px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--bg); }
+.feed li.fresh { animation: flash 2.5s ease-out; }
+@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .feed li.fresh { animation: none; } }
+.t { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.who { min-width: 0; }
+.who .nm { font-weight: 500; cursor: pointer; overflow-wrap: anywhere; }
+.who .nm:hover { text-decoration: underline; }
+.who .ev { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; text-align: center; }
+.badge.bust { background: var(--bust-soft); color: var(--bust); }
+.badge.reentry { background: var(--re-soft); color: var(--re); }
+.badge.entry { background: var(--entry-soft); color: var(--entry); }
+.badge.cash { background: var(--accent-soft); color: var(--accent); }
+.badge.seat { background: var(--accent-soft); color: var(--accent); }
+.badge.end { background: var(--accent-soft); color: var(--accent); }
+.empty { padding: 26px 14px; color: var(--muted); text-align: center; }
+.more { display: block; width: calc(100% - 28px); margin: 10px 14px 14px; }
+.cards { display: grid; gap: 10px; padding: 0 14px 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.card { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; cursor: pointer; background: var(--bg); text-align: left; width: 100%; }
+.card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.card h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; line-height: 1.3; }
+.card .sub { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.lr { color: var(--re); border-color: var(--re); }
+.pill.itm { color: var(--accent); border-color: var(--accent); }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; margin-top: 10px; }
+.kv div { min-width: 0; }
+.kv .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.kv .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; }
+.kv .v.warn { color: var(--re); }
+.bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 10px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.plist { list-style: none; margin: 0; padding: 0; }
+.plist li { border-top: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; cursor: pointer; width: 100%; border: 0; background: transparent; text-align: left; }
+.row:hover { background: var(--bg); }
+.row .nm { font-weight: 500; overflow-wrap: anywhere; }
+.row .meta { color: var(--muted); font-size: 12px; }
+.row .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.row .num .big { font-size: 14px; }
+.pos { color: var(--ok); } .neg { color: var(--bust); }
+.legend { padding: 0 14px 12px; font-size: 12px; color: var(--muted); }
+details.notes { margin-top: 16px; color: var(--muted); font-size: 12.5px; }
+details.notes summary { cursor: pointer; color: var(--fg); font-weight: 500; }
+details.notes li { margin: 5px 0; }
+/* Player sheet */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
+.sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: 86vh; overflow: auto; background: var(--panel); border-radius: 16px 16px 0 0; border: 1px solid var(--line);
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 760px) { .sheet { left: auto; top: 0; bottom: 0; width: 440px; max-height: none; border-radius: 0; } }
+.sheet h2 { margin: 0; font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.sheet .close { float: right; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.stats .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.stats .v { font-family: var(--mono); font-size: 15px; }
+.tl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
+.tl li { position: relative; padding: 4px 0 10px 10px; }
+.tl li::before { content: ""; position: absolute; left: -20px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--panel); border: 2px solid var(--muted); }
+.tl li.bust::before { border-color: var(--bust); background: var(--bust); }
+.tl li.reentry::before { border-color: var(--re); background: var(--re); }
+.tl li.cash::before { border-color: var(--accent); background: var(--accent); }
+.tl .when { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <h1>APT Taipei 2026 <small>live tracker</small></h1>
+      <div class="ctl">
+        <label class="sr" for="interval">Poll every</label>
+        <select id="interval" class="sel small" aria-label="Poll interval">
+          <option value="30">30s</option><option value="60" selected>60s</option><option value="120">2 min</option><option value="0">Paused</option>
+        </select>
+        <button id="refresh" class="btn" type="button" aria-label="Poll now">↻</button>
+      </div>
+    </div>
+    <div class="status" aria-live="polite"><span id="dot" class="dot"></span><span id="status-text">Starting…</span></div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" data-tab="feed" aria-selected="true">Bust feed<span class="n" id="n-feed"></span></button>
+      <button class="tab" role="tab" data-tab="events" aria-selected="false">Live events<span class="n" id="n-events"></span></button>
+      <button class="tab" role="tab" data-tab="players" aria-selected="false">Players<span class="n" id="n-players"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid two" id="grid">
+    <section id="view-feed" class="panel" role="tabpanel" aria-label="Bust feed">
+      <div class="ph"><h2>Bust feed</h2><span class="t" id="feed-count"></span></div>
+      <div class="filters">
+        <button class="chip bust" data-kind="bust" aria-pressed="true">Busts</button>
+        <button class="chip re" data-kind="reentry" aria-pressed="true">Re-entries</button>
+        <button class="chip entry" data-kind="entry" aria-pressed="false">New entries</button>
+        <select id="feed-event" class="sel small" aria-label="Event"><option value="">All events</option></select>
+        <input id="feed-q" class="search" type="search" placeholder="Search player" aria-label="Search player" autocomplete="off">
+      </div>
+      <ul class="feed" id="feed"></ul>
+      <button class="btn more" id="feed-more" type="button" hidden>Show more</button>
+    </section>
+
+    <section id="view-events" class="panel" role="tabpanel" aria-label="Live events" hidden>
+      <div class="ph"><h2>Live events</h2></div>
+      <p class="legend">Re-entries seen are busts followed by a return. Untracked = official entries minus bullets we saw: re-entries before tracking began, or faster than one poll.</p>
+      <div class="cards" id="events"></div>
+    </section>
+
+    <section id="view-players" class="panel" role="tabpanel" aria-label="Players" hidden>
+      <div class="ph"><h2>Players</h2><span class="t" id="players-count"></span></div>
+      <div class="filters">
+        <input id="players-q" class="search" type="search" placeholder="Search player or country code" aria-label="Search players" autocomplete="off">
+        <select id="players-sort" class="sel small" aria-label="Sort players">
+          <option value="prizes">Top prizes</option><option value="net">Net</option><option value="bullets">Most bullets</option>
+          <option value="reentries">Most re-entries</option><option value="buyins">Most buy-ins</option><option value="itm">ITM %</option>
+          <option value="lastBust">Latest bust</option><option value="seated">Seated now</option>
+        </select>
+      </div>
+      <p class="legend">Buy-in = bullets seen × buy-in. A ≥ marks players with events we didn't watch from the start; there one bullet is counted.</p>
+      <ul class="plist" id="players"></ul>
+      <button class="btn more" id="players-more" type="button" hidden>Show more</button>
+    </section>
+  </div>
+
+  <details class="notes">
+    <summary>How this works and its limits</summary>
+    <ul>
+      <li>Every 60 seconds (by default) this page reads the APT site's live seating for every running event, straight from your browser. A player whose seat disappears is logged as busted; a busted player who sits down again is a re-entry.</li>
+      <li>History comes from a poller on GitHub Actions that does the same thing around the clock and saves its record every few minutes. This page loads that record on open and then continues live.</li>
+      <li>Times are Taipei time. A bust is stamped at the poll that first saw the seat empty, so it can be up to one poll late.</li>
+      <li>A bust and re-entry inside one poll interval looks like a seat change and is missed. Those show up as untracked bullets on the event card.</li>
+      <li>Results (places and prizes) come from the site's payout pages. Players are matched by name exactly as printed.</li>
+      <li>Chip counts are not live on the site, so they are not shown.</li>
+    </ul>
+  </details>
+</main>
+
+<div id="sheet-bg" class="sheet-bg" hidden></div>
+<aside id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-name" hidden>
+  <button class="btn close" id="sheet-close" type="button" aria-label="Close">✕</button>
+  <h2 id="sheet-name"></h2>
+  <div class="t" id="sheet-sub"></div>
+  <div class="stats" id="sheet-stats"></div>
+  <p class="hint" id="sheet-hint"></p>
+  <ul class="tl" id="sheet-tl"></ul>
+</aside>
+
+<script src="tracker.js"></script>
+<script>
+(function () {
+  'use strict';
+  const T = window.APTTracker;
+  const $ = (s) => document.querySelector(s);
+  const LS_STATE = 'apt-live-state-v1', LS_PREFS = 'apt-live-prefs-v1';
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  };
+
+  // Where the GitHub history lives: ?repo=owner/name, else derived from <owner>.github.io/<repo>/
+  function repoSlug() {
+    const q = new URLSearchParams(location.search).get('repo');
+    if (q && /^[\w.-]+\/[\w.-]+$/.test(q)) return q;
+    const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
+    const seg = location.pathname.split('/').filter(Boolean)[0];
+    if (m && seg) return `${m[1]}/${seg}`;
+    return null;
+  }
+  const REPO = repoSlug();
+  const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/data/state.json` : null;
+
+  let state = T.emptyState();
+  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) state = s; } catch {}
+  const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'feed', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
+  const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
+
+  let ghAt = 0, lastErr = null, polling = false, nextAt = 0, timer = null, freshSince = 0;
+  let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null;
+
+  /* ---------- formatting ---------- */
+  const tz = 'Asia/Taipei';
+  const fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+  const fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
+  const fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const dayKey = (t) => fDay.format(new Date(t * 1000));
+  const nf = new Intl.NumberFormat('en-US');
+  const money = (v) => 'TWD ' + nf.format(Math.round(v || 0));
+  const short = (v) => { const a = Math.abs(v), s = v < 0 ? '−' : ''; if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M'; if (a >= 1e3) return s + Math.round(a / 1e3) + 'K'; return s + Math.round(a); };
+  const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + short(Math.abs(v));
+  const ord = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+  const flag = (cc) => (cc && /^[A-Z]{2}$/.test(cc)) ? String.fromCodePoint(...[...cc].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65)) : '';
+  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const evShort = (e) => e ? `#${e.num} ${e.name.replace(/^\[Event \d+\]\s*/, '')}` : '';
+
+  /* ---------- data plumbing ---------- */
+  function persist() {
+    if (!store.set(LS_STATE, JSON.stringify(state))) {
+      // Too big for this browser's storage: keep a trimmed copy
+      const slim = { ...state, feed: state.feed.slice(-1500) };
+      store.set(LS_STATE, JSON.stringify(slim));
+    }
+  }
+  async function loadGitHub() {
+    if (!STATE_URL) return;
+    try {
+      const r = await fetch(STATE_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const s = await r.json();
+      ghAt = s.updatedAt || 0;
+      if (s && s.v === 1 && (s.updatedAt || 0) > (state.updatedAt || 0)) { state = s; persist(); render(); }
+    } catch (e) { console.warn('GitHub history unavailable', e); }
+  }
+  async function poll() {
+    if (polling) return;
+    polling = true; setStatus();
+    const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
+    try {
+      const s = await T.pollOnce(state, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 300, concurrency: 4 });
+      lastErr = s.errors.length && !s.events ? s.errors[0] : null;
+      freshSince = before;
+      persist();
+    } catch (e) { lastErr = String(e.message || e); }
+    polling = false;
+    render();
+    schedule();
+  }
+  function schedule() {
+    clearTimeout(timer);
+    const iv = Number(prefs.interval);
+    if (!iv) { nextAt = 0; setStatus(); return; }
+    nextAt = Date.now() + iv * 1000;
+    timer = setTimeout(poll, iv * 1000);
+    setStatus();
+  }
+  function setStatus() {
+    const dot = $('#dot'), txt = $('#status-text');
+    const iv = Number(prefs.interval);
+    dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
+    const parts = [];
+    if (polling) parts.push('Polling…');
+    else if (lastErr) parts.push('Site unreachable: ' + lastErr);
+    else if (state.updatedAt) parts.push('Updated ' + fTime.format(new Date(state.updatedAt * 1000)) + ' Taipei');
+    if (iv && nextAt && !polling) parts.push('next in ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
+    if (!iv) parts.push('paused');
+    parts.push(STATE_URL ? (ghAt ? 'history ' + ago(ghAt) : 'history loading') : 'no GitHub history (add ?repo=owner/name)');
+    txt.textContent = parts.join(' · ');
+  }
+  setInterval(setStatus, 1000);
+
+  /* ---------- views ---------- */
+  function resultIndex() {
+    const m = new Map();
+    for (const [num, r] of Object.entries(state.results || {})) for (const [pos, n, , prize] of r.rows) m.set(num + '|' + n, { pos, prize });
+    return m;
+  }
+
+  function renderFeed() {
+    const ul = $('#feed');
+    const q = $('#feed-q').value.trim().toLowerCase();
+    const res = resultIndex();
+    const items = [];
+    for (let i = state.feed.length - 1; i >= 0 && items.length < feedLimit + 1; i--) {
+      const f = state.feed[i];
+      if (!prefs.kinds[f.k]) continue;
+      if (eventFilter && String(f.num) !== eventFilter) continue;
+      if (q && !f.n.toLowerCase().includes(q)) continue;
+      items.push(f);
+    }
+    const more = items.length > feedLimit; if (more) items.pop();
+    ul.replaceChildren();
+    if (!items.length) {
+      ul.appendChild(el('li', 'empty', state.feed.length ? 'Nothing matches these filters yet.' : 'Waiting for the first busts. The feed fills as players lose their seats.'));
+    }
+    let lastDay = '';
+    for (const f of items) {
+      const d = dayKey(f.t);
+      if (d !== lastDay) { ul.appendChild(el('li', 'day', d)); lastDay = d; }
+      const li = el('li', f.t > freshSince && freshSince ? 'fresh' : '');
+      li.appendChild(el('span', 't', fTime.format(new Date(f.t * 1000))));
+      const who = el('div', 'who');
+      const nm = el('div', 'nm', (flag(f.cc) ? flag(f.cc) + ' ' : '') + f.n);
+      nm.tabIndex = 0; nm.setAttribute('role', 'button');
+      nm.addEventListener('click', () => openSheet(f.n));
+      nm.addEventListener('keydown', (e) => { if (e.key === 'Enter') openSheet(f.n); });
+      who.appendChild(nm);
+      const e = state.events[f.kid];
+      let extra = '';
+      if (f.k === 'bust') { const r = res.get(f.num + '|' + f.n); if (r) extra = ` · ${ord(r.pos)} for ${short(r.prize)}`; else if (f.b > 1) extra = ` · bullet ${f.b}`; }
+      if (f.k === 'reentry') extra = ` · bullet ${f.b}`;
+      who.appendChild(el('div', 'ev', evShort(e) + extra));
+      li.appendChild(who);
+      const label = f.k === 'bust' ? (res.has(f.num + '|' + f.n) ? 'Cashed out' : 'Busted') : f.k === 'reentry' ? 'Re-entered' : 'Entered';
+      li.appendChild(el('span', 'badge ' + (f.k === 'bust' && res.has(f.num + '|' + f.n) ? 'cash' : f.k), label));
+      ul.appendChild(li);
+    }
+    $('#feed-more').hidden = !more;
+    const busts = state.feed.filter((f) => f.k === 'bust').length;
+    $('#feed-count').textContent = nf.format(busts) + ' busts logged';
+    $('#n-feed').textContent = busts ? nf.format(busts) : '';
+  }
+
+  function renderEvents() {
+    const now = Math.floor(Date.now() / 1000);
+    const evs = T.liveEvents(state, now);
+    const box = $('#events');
+    box.replaceChildren();
+    $('#n-events').textContent = evs.filter((e) => e.phase !== 'Completed').length || '';
+    // event select for feed
+    const sel = $('#feed-event'); const cur = sel.value;
+    const nums = [...new Map(evs.map((e) => [e.num, e])).values()];
+    sel.replaceChildren(new Option('All events', ''), ...nums.map((e) => new Option(evShort(e).slice(0, 48), String(e.num))));
+    sel.value = nums.some((e) => String(e.num) === cur) ? cur : '';
+    if (!evs.length) { box.appendChild(el('div', 'empty', 'No event is running right now. Cards appear when play starts.')); return; }
+    for (const e of evs) {
+      const c = el('button', 'card' + (eventFilter === String(e.num) ? ' on' : ''));
+      c.type = 'button';
+      c.setAttribute('aria-pressed', String(eventFilter === String(e.num)));
+      c.appendChild(el('h3', '', evShort(e)));
+      const sub = el('div', 'sub');
+      const ph = el('span', 'pill' + (e.phase === 'Late Reg' || e.phase === 'Reg Open' ? ' lr' : e.phase === 'In The Money' ? ' itm' : ''), e.phase);
+      sub.appendChild(ph);
+      sub.appendChild(el('span', '', money(e.buyin)));
+      if (e.regClose && e.regClose > now) { const m = Math.round((e.regClose - now) / 60); sub.appendChild(el('span', '', `reg closes ${fTime.format(new Date(e.regClose * 1000))} (${m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'})`)); }
+      else if (e.regClose) sub.appendChild(el('span', '', 'reg closed'));
+      c.appendChild(sub);
+      const kv = el('div', 'kv');
+      const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); kv.appendChild(d); };
+      add('Entries', e.entries != null ? nf.format(e.entries) : '—');
+      add('Left', e.remaining != null ? nf.format(e.remaining) : '—');
+      add('Busts 15m', nf.format(e.bustsLast15));
+      add('Players seen', nf.format(e.unique));
+      add('Re-entries', nf.format(e.reentriesSeen));
+      add('Untracked', e.untracked == null ? '—' : nf.format(e.untracked), e.untracked ? 'warn' : '');
+      c.appendChild(kv);
+      if (e.entries) { const b = el('div', 'bar'); const i = el('i'); i.style.width = Math.min(100, (e.remaining || 0) / e.entries * 100) + '%'; b.appendChild(i); c.appendChild(b); }
+      const foot = el('div', 'sub'); foot.style.marginTop = '8px';
+      foot.textContent = e.trackedFromStart ? 'Tracked from the start' : `Tracking since ${fTime.format(new Date(e.firstPoll * 1000))}`;
+      c.appendChild(foot);
+      c.addEventListener('click', () => {
+        eventFilter = eventFilter === String(e.num) ? '' : String(e.num);
+        $('#feed-event').value = eventFilter;
+        if (window.innerWidth < 980) selectTab('feed');
+        render();
+      });
+      box.appendChild(c);
+    }
+  }
+
+  function renderPlayers() {
+    const all = T.players(state);
+    $('#n-players').textContent = all.length ? nf.format(all.length) : '';
+    const q = $('#players-q').value.trim().toLowerCase();
+    let rows = q ? all.filter((p) => p.name.toLowerCase().includes(q) || (p.cc || '').toLowerCase() === q) : all;
+    const k = prefs.sort;
+    const val = (p) => k === 'seated' ? (p.seatedIn.length ? 1 : 0) : k === 'lastBust' ? (p.lastBust || 0) : p[k];
+    rows = rows.slice().sort((a, b) => (val(b) - val(a)) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));
+    if (k === 'seated') rows = rows.filter((p) => p.seatedIn.length);
+    if (k === 'lastBust') rows = rows.filter((p) => p.lastBust);
+    $('#players-count').textContent = nf.format(rows.length) + ' players';
+    const ul = $('#players'); ul.replaceChildren();
+    if (!rows.length) ul.appendChild(el('li', 'empty', all.length ? 'No players match.' : 'Loading players…'));
+    for (const p of rows.slice(0, playersLimit)) {
+      const li = el('li'); const b = el('button', 'row'); b.type = 'button';
+      const left = el('div');
+      left.appendChild(el('div', 'nm', (flag(p.cc) ? flag(p.cc) + ' ' : '') + p.name));
+      const status = p.seatedIn.length ? 'Seated in #' + p.seatedIn.join(', #') : p.lastBust ? 'Busted ' + fFull.format(new Date(p.lastBust * 1000)) : '';
+      left.appendChild(el('div', 'meta', [`${p.bullets} bullet${p.bullets === 1 ? '' : 's'} in ${p.events} event${p.events === 1 ? '' : 's'}`, p.cashes ? `${p.cashes} cash${p.cashes === 1 ? '' : 'es'} (${Math.round(p.itm * 100)}% ITM)` : 'no cash', status].filter(Boolean).join(' · ')));
+      const right = el('div', 'num');
+      right.appendChild(el('div', 'big', p.prizes ? short(p.prizes) : '—'));
+      const n = el('div', 'meta ' + (p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : ''), 'net ' + signed(p.net));
+      right.appendChild(n);
+      right.appendChild(el('div', 'meta', 'in ' + (p.partial ? '≥' : '') + short(p.buyins)));
+      b.append(left, right);
+      b.addEventListener('click', () => openSheet(p.name));
+      li.appendChild(b); ul.appendChild(li);
+    }
+    $('#players-more').hidden = rows.length <= playersLimit;
+  }
+
+  function openSheet(name) {
+    openPlayer = name;
+    const p = T.players(state).find((x) => x.name === name);
+    $('#sheet-name').textContent = (p && flag(p.cc) ? flag(p.cc) + ' ' : '') + name;
+    $('#sheet-sub').textContent = p ? (p.seatedIn.length ? 'Seated now in #' + p.seatedIn.join(', #') : p.lastBust ? 'Last bust ' + fFull.format(new Date(p.lastBust * 1000)) : '') : '';
+    const st = $('#sheet-stats'); st.replaceChildren();
+    if (p) {
+      const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
+      add('Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); add('Prizes', short(p.prizes)); add('Net', signed(p.net), p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
+      add('Events', String(p.events)); add('Bullets', String(p.bullets)); add('ITM', Math.round(p.itm * 100) + '%');
+    }
+    $('#sheet-hint').textContent = p && p.partial ? 'Some events were not watched from the start, so earlier bullets there may be missing.' : '';
+    const tl = $('#sheet-tl'); tl.replaceChildren();
+    const items = T.playerTimeline(state, name);
+    if (!items.length) tl.appendChild(el('li', '', 'No tracked activity yet.'));
+    for (const it of items.slice().reverse()) {
+      const li = el('li', it.k);
+      li.appendChild(el('div', 'when', it.t ? (it.approx ? fDay.format(new Date(it.t * 1000)) : fFull.format(new Date(it.t * 1000))) : ''));
+      const ev = '#' + it.num + ' ' + String(it.ev || '').replace(/^\[Event \d+\]\s*/, '');
+      const txt = it.k === 'bust' ? `Busted · ${ev}` : it.k === 'reentry' ? `Re-entered (bullet ${it.b}) · ${ev}` : it.k === 'cash' ? `Cashed ${ord(it.pos)} for ${money(it.prize)} · ${ev}` : it.k === 'end' ? `Still in at the end · ${ev}` : it.k === 'carry' ? `Carried over to ${ev}` : (it.first ? `Already seated when tracking began · ${ev}` : `Entered · ${ev}`);
+      li.appendChild(el('div', '', txt));
+      tl.appendChild(li);
+    }
+    $('#sheet').hidden = false; $('#sheet-bg').hidden = false;
+    $('#sheet-close').focus();
+  }
+  function closeSheet() { openPlayer = null; $('#sheet').hidden = true; $('#sheet-bg').hidden = true; }
+  $('#sheet-close').addEventListener('click', closeSheet);
+  $('#sheet-bg').addEventListener('click', closeSheet);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlayer) closeSheet(); });
+
+  function render() {
+    renderEvents(); renderFeed();
+    if (!$('#view-players').hidden) renderPlayers(); else $('#n-players').textContent = '';
+    if (openPlayer) openSheet(openPlayer);
+    setStatus();
+  }
+
+  /* ---------- controls ---------- */
+  function selectTab(tab) {
+    prefs.tab = tab; savePrefs();
+    document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    for (const t of ['feed', 'events', 'players']) $('#view-' + t).hidden = t !== tab;
+    if (tab === 'players') renderPlayers();
+    if (window.innerWidth >= 980 && tab === 'events') selectTab('feed');
+  }
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+  document.querySelectorAll('.chip[data-kind]').forEach((c) => {
+    c.setAttribute('aria-pressed', String(!!prefs.kinds[c.dataset.kind]));
+    c.addEventListener('click', () => { prefs.kinds[c.dataset.kind] = !prefs.kinds[c.dataset.kind]; c.setAttribute('aria-pressed', String(prefs.kinds[c.dataset.kind])); savePrefs(); feedLimit = 150; renderFeed(); });
+  });
+  $('#feed-event').addEventListener('change', (e) => { eventFilter = e.target.value; feedLimit = 150; renderEvents(); renderFeed(); });
+  $('#feed-q').addEventListener('input', () => { feedLimit = 150; renderFeed(); });
+  $('#feed-more').addEventListener('click', () => { feedLimit += 150; renderFeed(); });
+  $('#players-q').addEventListener('input', () => { playersLimit = 60; renderPlayers(); });
+  $('#players-sort').value = prefs.sort;
+  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); playersLimit = 60; renderPlayers(); });
+  $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
+  $('#interval').value = String(prefs.interval);
+  $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
+  $('#refresh').addEventListener('click', () => { clearTimeout(timer); poll(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Number(prefs.interval) && Date.now() > nextAt) { clearTimeout(timer); poll(); } });
+
+  /* ---------- boot ---------- */
+  selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
+  render();
+  (async () => {
+    await loadGitHub();
+    setInterval(loadGitHub, 5 * 60 * 1000);
+    if (Number(prefs.interval)) poll(); else setStatus();
+  })();
+})();
+</script>
+</body>
+</html>
