@@ -35,6 +35,11 @@ began and bust + re-entry faster than one poll. Chip counts on the site are not 
 
 To stop after the series, disable the workflow in the Actions tab.
 
+## Changing the engine
+
+After editing `docs/tracker.js`, run `tools/stamp.sh`. It points `index.html` at `tracker.js?v=<content hash>`,
+so phones never combine a new page with a cached old engine.
+
 ## Local run
 
 ```bash

@@ -264,7 +264,7 @@ details.notes li { margin: 5px 0; }
   <ul class="tl" id="sheet-tl"></ul>
 </aside>
 
-<script src="tracker.js"></script>
+<script src="tracker.js?v=012cb1f3ba"></script>
 <script>
 (function () {
   'use strict';
@@ -303,6 +303,7 @@ details.notes li { margin: 5px 0; }
   const fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const dayKey = (t) => fDay.format(new Date(t * 1000));
   const nf = new Intl.NumberFormat('en-US');
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(v) : '—');
   const money = (v) => 'TWD ' + nf.format(Math.round(v || 0));
   const short = (v) => { const a = Math.abs(v), s = v < 0 ? '−' : ''; if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M'; if (a >= 1e3) return s + Math.round(a / 1e3) + 'K'; return s + Math.round(a); };
   const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + short(Math.abs(v));
@@ -445,12 +446,12 @@ details.notes li { margin: 5px 0; }
       c.appendChild(sub);
       const kv = el('div', 'kv');
       const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); kv.appendChild(d); };
-      add('Entries', e.entries != null ? nf.format(e.entries) : '—');
-      add('Left', e.remaining != null ? nf.format(e.remaining) : '—');
-      add('Busts', nf.format(e.busts));
-      add('Players seen', nf.format(e.unique));
-      add('Re-entries', nf.format(e.reentriesSeen));
-      add('Missed', e.untracked == null ? '—' : nf.format(e.untracked), e.untracked ? 'warn' : '');
+      add('Entries', num(e.entries));
+      add('Left', num(e.remaining));
+      add('Busts', num(e.busts));
+      add('Players seen', num(e.unique));
+      add('Re-entries', num(e.reentriesSeen));
+      add('Missed', num(e.untracked), e.untracked ? 'warn' : '');
       c.appendChild(kv);
       if (e.entries) { const b = el('div', 'bar'); const i = el('i'); i.style.width = Math.min(100, (e.remaining || 0) / e.entries * 100) + '%'; b.appendChild(i); c.appendChild(b); }
       const foot = el('div', 'sub'); foot.style.marginTop = '8px';
@@ -502,8 +503,8 @@ details.notes li { margin: 5px 0; }
     const st = $('#sheet-stats'); st.replaceChildren();
     const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
     const ps = T.eventPlayers(state, e.kid);
-    add('Entries', e.entries != null ? nf.format(e.entries) : '—'); add('Left', e.remaining != null ? nf.format(e.remaining) : '—'); add('Seated', nf.format(ps.filter((p) => p.status === 'seated').length));
-    add('Busts', nf.format(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', nf.format(info.reentriesSeen || 0)); add('Missed', info.untracked == null ? '—' : nf.format(info.untracked), info.untracked ? 'warn' : '');
+    add('Entries', num(e.entries)); add('Left', num(e.remaining)); add('Seated', num(ps.filter((p) => p.status === 'seated').length));
+    add('Busts', num(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', num(info.reentriesSeen || 0)); add('Missed', num(info.untracked), info.untracked ? 'warn' : '');
     $('#sheet-hint').textContent = explainEntries(info) + '. ' + (info.trackedFromStart ? '' : 'Tracking began after this event started, so earlier busts and re-entries are not listed.');
     const groups = {
       seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),
