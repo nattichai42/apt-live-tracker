@@ -219,17 +219,31 @@
     return res;
   }
 
+  const payoutsComplete = (rows) => {
+    const pos = rows.map((r) => r[0]).filter((x) => typeof x === 'number').sort((a, b) => a - b);
+    return pos.length > 0 && pos[0] === 1 && pos.every((x, i) => x === i + 1 || x === pos[i - 1]);
+  };
+  const sameRows = (a, b) => (a || []).length === (b || []).length && (a || []).every((r, i) => r[0] === b[i][0] && r[1] === b[i][1] && r[3] === b[i][3]);
+
   async function fetchResults(fetchFn, state, num, now) {
     const kids = Object.values(state.events).filter((x) => x.num === num).sort((a, b) => (b.start || 0) - (a.start || 0));
     if (!kids.length) return false;
     const d = await getData(fetchFn, `${BASE}/${kids[0].kid}/results/__data.json`);
     const rows = (d.results || []).filter((r) => r && r.name).map((r) => [r.position, clean(r.name), r.countryCode || '', Math.round(r.amount || 0)]);
-    const final = kids.every((x) => x.phase === 'Completed');
+    // Final only once the payout list is complete (1st place listed, no gaps) and unchanged since the last fetch:
+    // the site fills in the top places some time after the event is marked Completed.
+    const done = kids.every((x) => x.phase === 'Completed');
+    const prevR = state.results[num];
+    const same = !!prevR && sameRows(prevR.rows, rows);
+    const stable = same ? (prevR.stable || 0) + 1 : 0; // consecutive unchanged fetches (5 min apart)
+    // Satellites list only some places (seats, cash spots), so they never look "complete": accept 30 min unchanged.
+    const sat = kids.some((x) => x.sat);
+    const final = done && same && (payoutsComplete(rows) || ((sat || !rows.length) && stable >= 6) || stable >= 72);
     // When each paid place first appeared. Rows already there on our first fetch get null (paid before we watched).
     const prev = state.results[num];
     const seen = (prev && prev.seen) || {};
     for (const [, n] of rows) if (!(n in seen)) seen[n] = prev && prev.seen ? now : null;
-    state.results[num] = { at: now, final, rows, seen };
+    state.results[num] = { at: now, final, rows, seen, stable };
     return true;
   }
 
@@ -244,6 +258,12 @@
   // was a player briefly missing from the seating list, so its bust and re-entry are removed. Idempotent.
   function repair(state) {
     let fixed = 0;
+    // Payouts saved as final while the site was still filling them in
+    for (const r of Object.values(state.results || {})) if (r.final && !payoutsComplete(r.rows)) { r.final = false; r.at = 0; fixed++; }
+    // Completed events whose last players were left marked as seated
+    for (const e of Object.values(state.events || {})) if (e.phase === 'Completed' && e.closed && e.p) {
+      for (const p of Object.values(e.p)) if (p.st === 's') { p.st = 'end'; fixed++; }
+    }
     // Renames saved as a bust of the old name plus a new entry of a similar name in the same poll
     for (let i = state.feed.length - 1; i >= 0; i--) {
       const B = state.feed[i];
@@ -320,7 +340,14 @@
       const e = state.events[g.kid];
       if (g.ev) { Object.assign(e, eventMeta({ ...g.ev, startTimeUTC: g.ev.startTimeUTC, regCloseUTC: g.ev.regCloseUTC || (e.regClose ? new Date(e.regClose * 1000).toISOString() : null) })); e.evAt = now; }
       if (g.ev && g.ev.startingStack) e.stack = g.ev.startingStack;
-      if (!g.players) { if (e.phase === 'Completed') e.closed = 1; continue; }
+      if (!g.players || (e.phase === 'Completed' && !g.players.length)) {
+        if (e.phase === 'Completed') {
+          // Seating list is gone at the end: whoever was still seated at our last poll finished the event
+          for (const p of Object.values(e.p || {})) if (p.st === 's') p.st = 'end';
+          e.closed = 1;
+        }
+        continue;
+      }
       const r = applySnapshot(state, g.kid, g.players, now, interval);
       summary.events++; summary.busts += r.busts; summary.reentries += r.reentries; summary.entries += r.entries;
     }
@@ -331,7 +358,7 @@
       const r = state.results[num];
       const anyItm = evs.some((e) => e.phase === 'In The Money' || e.phase === 'Final Table');
       const allDone = evs.every((e) => e.phase === 'Completed');
-      if (allDone) return !r || !r.final;
+      if (allDone) return !r || (!r.final && now - r.at >= (opts.resultsEvery || 300));
       if (anyItm) return !r || now - r.at >= (opts.resultsEvery || 300);
       return false;
     });
