@@ -49,10 +49,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       console.error('round failed:', e);
     }
     if (Date.now() - lastPublish >= publishEvery * 60_000) { publish(); lastPublish = Date.now(); }
-    // Nothing running and nothing starting soon: stop early to save Actions minutes (next scheduled run resumes)
-    const nowS = Math.floor(Date.now() / 1000);
-    const soon = Object.values(state.events).some((e) => e.phase !== 'Completed' && e.start && e.start <= nowS + 900);
-    if (!T.activeKids(state, nowS).length && !soon) { console.log('No live events; exiting early.'); break; }
     const wait = interval * 1000 - (Date.now() - t0);
     if (Date.now() + wait >= end) break;
     if (wait > 0) await sleep(wait);

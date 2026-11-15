@@ -29,8 +29,9 @@ began and bust + re-entry faster than one poll. Chip counts on the site are not 
 2. **Settings → Pages**: Source *Deploy from a branch*, branch `main`, folder `/docs`.
 3. **Settings → Actions → General → Workflow permissions**: *Read and write permissions*.
 4. **Actions** tab → *Poll APT live seating* → *Run workflow* to start the first run.
-   After that it runs on its own: each job polls every 60 s for ~5 h 45 min, and the next run is already
-   queued so it starts as soon as the previous one ends.
+   After that it runs on its own: each job polls every 60 s for ~5 h 45 min and, when it starts, queues the
+   next run, which takes over the moment it ends. The cron schedule is only a backup. Queueing stops once
+   every event in the series is completed.
 5. Open `https://<owner>.github.io/<repo>/`.
 
 To stop after the series, disable the workflow in the Actions tab.

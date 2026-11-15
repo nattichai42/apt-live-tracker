@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write   # lets a run queue the next run of this workflow
 
 concurrency:
   group: apt-poller
@@ -28,6 +29,17 @@ jobs:
             git show origin/data:state.json > state/state.json && echo "restored $(wc -c < state/state.json) bytes"
           else
             echo "no previous state, starting fresh"
+          fi
+      - name: Queue the next run
+        # Each run queues its successor, which waits in the concurrency group and starts the moment this one
+        # ends, so polling continues even when GitHub delays or skips the cron schedule. Stops once the series is over.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f state/state.json ] && node -e 'const s=require("./state/state.json"); const ev=Object.values(s.events||{}); process.exit(ev.length && ev.every(e=>e.phase==="Completed") ? 0 : 1)'; then
+            echo "Every event is completed; not queueing another run."
+          else
+            gh workflow run poll.yml --ref main && echo "Queued the next run." || echo "::warning::Could not queue the next run; the cron schedule is the fallback."
           fi
       - name: Poll for 5 h 45 min
         env:
