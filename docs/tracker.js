@@ -339,5 +339,31 @@
       .sort((a, b) => (a.phase === 'Completed') - (b.phase === 'Completed') || (b.entries || 0) - (a.entries || 0));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  // Everyone tracked in one event (flight/day), joined with that event's results
+  function eventPlayers(state, kid) {
+    const e = state.events[kid]; if (!e) return [];
+    const res = new Map(((state.results[e.num] || {}).rows || []).map(([pos, n, cc, prize]) => [n, { pos, prize, cc }]));
+    const out = Object.entries(e.p || {}).map(([n, p]) => {
+      const seat = e.seats && e.seats[n];
+      const r = res.get(n);
+      return { name: n, cc: p.cc || (r && r.cc) || '', status: p.st === 's' ? 'seated' : p.st === 'end' ? 'end' : 'busted',
+        table: seat ? seat[0] : null, seat: seat ? seat[1] : null, bullets: p.b || 0, carry: !!p.carry,
+        firstSeen: p.f, busts: p.x || [], lastBust: (p.x || [])[(p.x || []).length - 1] || null,
+        atStart: p.f === e.firstPoll, pos: r ? r.pos : null, prize: r ? r.prize : null };
+    });
+    // Cashers we never saw seated (e.g. results from before tracking)
+    for (const [n, r] of res) if (!e.p[n] && Object.values(state.events).filter((x) => x.num === e.num).every((x) => !x.p || !x.p[n]))
+      out.push({ name: n, cc: r.cc, status: 'cashed', table: null, seat: null, bullets: 0, busts: [], lastBust: null, pos: r.pos, prize: r.prize });
+    return out;
+  }
+
+  function upcoming(state, now, hours) {
+    now = now || nowSec();
+    return Object.values(state.events)
+      .filter((e) => e.phase !== 'Completed' && !e.polls && e.start && e.start > now - 300 && e.start <= now + (hours || 12) * 3600)
+      .sort((a, b) => a.start - b.start || a.num - b.num)
+      .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
+  }
+
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });

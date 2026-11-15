@@ -128,6 +128,18 @@ details.notes li { margin: 5px 0; }
 .tl li.cash::before { border-color: var(--accent); background: var(--accent); }
 .tl .when { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
 .hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.seg { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 4px 0 10px; }
+.seg button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 11px; cursor: pointer; font-size: 12.5px; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.seg button .n { font-family: var(--mono); font-size: 11px; opacity: .75; margin-left: 4px; }
+.sheet .plist { margin: 0 -16px; }
+.sheet .row { padding: 9px 16px; }
+.sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.back { margin-right: 8px; }
+.soon { list-style: none; margin: 0; padding: 0 14px 14px; }
+.soon li { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.soon .nm { overflow-wrap: anywhere; }
+.soon .meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -146,8 +158,8 @@ details.notes li { margin: 5px 0; }
     </div>
     <div class="status" aria-live="polite"><span id="dot" class="dot"></span><span id="status-text">Starting…</span></div>
     <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" data-tab="feed" aria-selected="true">Bust feed<span class="n" id="n-feed"></span></button>
       <button class="tab" role="tab" data-tab="events" aria-selected="false">Live events<span class="n" id="n-events"></span></button>
+      <button class="tab" role="tab" data-tab="feed" aria-selected="true">Bust feed<span class="n" id="n-feed"></span></button>
       <button class="tab" role="tab" data-tab="players" aria-selected="false">Players<span class="n" id="n-players"></span></button>
     </nav>
   </div>
@@ -170,8 +182,10 @@ details.notes li { margin: 5px 0; }
 
     <section id="view-events" class="panel" role="tabpanel" aria-label="Live events" hidden>
       <div class="ph"><h2>Live events</h2></div>
-      <p class="legend">Re-entries seen are busts followed by a return. Untracked = official entries minus bullets we saw: re-entries before tracking began, or faster than one poll.</p>
+      <p class="legend">Tap an event to see its players: who is seated, who busted and when, and who re-entered. Untracked = official entries minus bullets we saw.</p>
       <div class="cards" id="events"></div>
+      <div class="ph"><h2>Starting soon</h2></div>
+      <ul class="soon" id="soon"></ul>
     </section>
 
     <section id="view-players" class="panel" role="tabpanel" aria-label="Players" hidden>
@@ -206,10 +220,23 @@ details.notes li { margin: 5px 0; }
 <div id="sheet-bg" class="sheet-bg" hidden></div>
 <aside id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-name" hidden>
   <button class="btn close" id="sheet-close" type="button" aria-label="Close">✕</button>
+  <button class="btn back" id="sheet-back" type="button" hidden>← Event</button>
   <h2 id="sheet-name"></h2>
   <div class="t" id="sheet-sub"></div>
   <div class="stats" id="sheet-stats"></div>
   <p class="hint" id="sheet-hint"></p>
+  <div id="sheet-event" hidden>
+    <div class="sheet-actions"><button class="btn" id="sheet-feed" type="button">Show this event's busts in the feed</button></div>
+    <div class="seg" id="sheet-seg" role="group" aria-label="Player status">
+      <button type="button" data-seg="seated" aria-pressed="true">Seated<span class="n"></span></button>
+      <button type="button" data-seg="busted" aria-pressed="false">Busted<span class="n"></span></button>
+      <button type="button" data-seg="reentered" aria-pressed="false">Re-entered<span class="n"></span></button>
+      <button type="button" data-seg="cashed" aria-pressed="false">Cashed<span class="n"></span></button>
+      <button type="button" data-seg="all" aria-pressed="false">All<span class="n"></span></button>
+    </div>
+    <input id="sheet-q" class="search" type="search" placeholder="Search this event" aria-label="Search players in this event" autocomplete="off" style="width:100%;margin-bottom:6px">
+    <ul class="plist" id="sheet-list"></ul>
+  </div>
   <ul class="tl" id="sheet-tl"></ul>
 </aside>
 
@@ -239,11 +266,11 @@ details.notes li { margin: 5px 0; }
 
   let state = T.emptyState();
   try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) state = s; } catch {}
-  const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'feed', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
+  const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
   const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
 
   let ghAt = 0, lastErr = null, polling = false, nextAt = 0, timer = null, freshSince = 0;
-  let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null;
+  let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null, openEvent = null, eventSeg = 'seated', backToEvent = null;
 
   /* ---------- formatting ---------- */
   const tz = 'Asia/Taipei';
@@ -405,13 +432,80 @@ details.notes li { margin: 5px 0; }
       const foot = el('div', 'sub'); foot.style.marginTop = '8px';
       foot.textContent = e.trackedFromStart ? 'Tracked from the start' : `Tracking since ${fTime.format(new Date(e.firstPoll * 1000))}`;
       c.appendChild(foot);
-      c.addEventListener('click', () => {
-        eventFilter = eventFilter === String(e.num) ? '' : String(e.num);
-        $('#feed-event').value = eventFilter;
-        if (window.innerWidth < 980) selectTab('feed');
-        render();
-      });
+      c.addEventListener('click', () => showEvent(e.kid));
       box.appendChild(c);
+    }
+  }
+
+  function renderSoon() {
+    const ul = $('#soon'); ul.replaceChildren();
+    const list = T.upcoming(state, Math.floor(Date.now() / 1000), 12);
+    if (!list.length) { ul.appendChild(el('li', 'empty', 'Nothing else starts in the next 12 hours.')); return; }
+    for (const e of list.slice(0, 15)) {
+      const li = el('li');
+      li.appendChild(el('span', 'meta', fTime.format(new Date(e.start * 1000))));
+      li.appendChild(el('span', 'nm', evShort(e)));
+      li.appendChild(el('span', 'meta', short(e.buyin)));
+      ul.appendChild(li);
+    }
+  }
+
+  function showEvent(kid) {
+    openEvent = kid; openPlayer = null; backToEvent = null;
+    $('#sheet-q').value = '';
+    renderEventSheet();
+    $('#sheet').hidden = false; $('#sheet-bg').hidden = false; $('#sheet').scrollTop = 0;
+    $('#sheet-close').focus();
+  }
+
+  function renderEventSheet() {
+    const e = state.events[openEvent]; if (!e) return closeSheet();
+    const now = Math.floor(Date.now() / 1000);
+    const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
+    $('#sheet-back').hidden = true;
+    $('#sheet-event').hidden = false; $('#sheet-tl').hidden = true;
+    $('#sheet-name').textContent = evShort(e);
+    $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.regClose ? (e.regClose > now ? 'reg closes ' + fTime.format(new Date(e.regClose * 1000)) : 'reg closed') : '', e.firstPoll ? 'tracking since ' + fTime.format(new Date(e.firstPoll * 1000)) : ''].filter(Boolean).join(' · ');
+    const st = $('#sheet-stats'); st.replaceChildren();
+    const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
+    const ps = T.eventPlayers(state, e.kid);
+    add('Entries', e.entries != null ? nf.format(e.entries) : '—'); add('Left', e.remaining != null ? nf.format(e.remaining) : '—'); add('Seated', nf.format(ps.filter((p) => p.status === 'seated').length));
+    add('Busts seen', nf.format(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', nf.format(info.reentriesSeen || 0)); add('Untracked', info.untracked == null ? '—' : nf.format(info.untracked), info.untracked ? 'warn' : '');
+    $('#sheet-hint').textContent = info.trackedFromStart ? '' : 'Tracking began after this event started, so earlier busts and re-entries are not listed.';
+    const groups = {
+      seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),
+      busted: ps.filter((p) => p.status === 'busted').sort((a, b) => (b.lastBust || 0) - (a.lastBust || 0)),
+      reentered: ps.filter((p) => p.bullets > 1).sort((a, b) => b.bullets - a.bullets || (b.lastBust || 0) - (a.lastBust || 0)),
+      cashed: ps.filter((p) => p.pos != null).sort((a, b) => a.pos - b.pos),
+      all: ps.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    };
+    document.querySelectorAll('#sheet-seg button').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.seg === eventSeg));
+      b.querySelector('.n').textContent = nf.format(groups[b.dataset.seg].length);
+    });
+    const q = $('#sheet-q').value.trim().toLowerCase();
+    let rows = groups[eventSeg] || [];
+    if (q) rows = rows.filter((p) => p.name.toLowerCase().includes(q));
+    const ul = $('#sheet-list'); ul.replaceChildren();
+    if (!rows.length) ul.appendChild(el('li', 'empty', q ? 'No player matches.' : eventSeg === 'busted' ? 'No busts seen yet.' : eventSeg === 'reentered' ? 'No re-entries seen yet.' : eventSeg === 'cashed' ? 'No payouts yet.' : 'Nobody here.'));
+    for (const p of rows.slice(0, 600)) {
+      const li = el('li'); const b = el('button', 'row'); b.type = 'button';
+      const left = el('div');
+      left.appendChild(el('div', 'nm', (flag(p.cc) ? flag(p.cc) + ' ' : '') + p.name));
+      const meta = [];
+      if (p.status === 'seated') meta.push(p.table ? `Table ${p.table} · Seat ${p.seat}` : 'Registered, waiting for a seat');
+      if (p.status === 'end') meta.push('Still in at the end');
+      if (p.lastBust) meta.push((p.status === 'seated' ? 'last bust ' : 'busted ') + fTime.format(new Date(p.lastBust * 1000)));
+      if (p.bullets > 1) meta.push(`bullet ${p.bullets}`);
+      if (p.atStart && p.status !== 'cashed') meta.push('seated before tracking');
+      if (p.status === 'cashed') meta.push('not seen seated');
+      left.appendChild(el('div', 'meta', meta.join(' · ')));
+      const right = el('div', 'num');
+      if (p.pos != null) { right.appendChild(el('div', 'big', ord(p.pos))); right.appendChild(el('div', 'meta', short(p.prize))); }
+      else right.appendChild(el('span', 'badge ' + (p.status === 'seated' ? 'seat' : p.status === 'end' ? 'end' : 'bust'), p.status === 'seated' ? (p.bullets > 1 ? 'Re-entered' : 'Seated') : p.status === 'end' ? 'Bagged' : 'Busted'));
+      b.append(left, right);
+      b.addEventListener('click', () => { const ev = openEvent; openSheet(p.name); backToEvent = ev; $('#sheet-back').hidden = false; });
+      li.appendChild(b); ul.appendChild(li);
     }
   }
 
@@ -447,7 +541,8 @@ details.notes li { margin: 5px 0; }
   }
 
   function openSheet(name) {
-    openPlayer = name;
+    openPlayer = name; openEvent = null; backToEvent = null;
+    $('#sheet-event').hidden = true; $('#sheet-tl').hidden = false; $('#sheet-back').hidden = true;
     const p = T.players(state).find((x) => x.name === name);
     $('#sheet-name').textContent = (p && flag(p.cc) ? flag(p.cc) + ' ' : '') + name;
     $('#sheet-sub').textContent = p ? (p.seatedIn.length ? 'Seated now in #' + p.seatedIn.join(', #') : p.lastBust ? 'Last bust ' + fFull.format(new Date(p.lastBust * 1000)) : '') : '';
@@ -472,15 +567,24 @@ details.notes li { margin: 5px 0; }
     $('#sheet').hidden = false; $('#sheet-bg').hidden = false;
     $('#sheet-close').focus();
   }
-  function closeSheet() { openPlayer = null; $('#sheet').hidden = true; $('#sheet-bg').hidden = true; }
+  function closeSheet() { openPlayer = null; openEvent = null; backToEvent = null; $('#sheet').hidden = true; $('#sheet-bg').hidden = true; }
+  $('#sheet-back').addEventListener('click', () => { if (backToEvent) { const k = backToEvent; showEvent(k); } });
+  $('#sheet-feed').addEventListener('click', () => {
+    const e = state.events[openEvent]; if (!e) return;
+    eventFilter = String(e.num); closeSheet(); selectTab('feed'); render();
+  });
+  document.querySelectorAll('#sheet-seg button').forEach((b) => b.addEventListener('click', () => { eventSeg = b.dataset.seg; renderEventSheet(); }));
+  $('#sheet-q').addEventListener('input', () => renderEventSheet());
   $('#sheet-close').addEventListener('click', closeSheet);
   $('#sheet-bg').addEventListener('click', closeSheet);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openPlayer) closeSheet(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (openPlayer || openEvent)) closeSheet(); });
 
   function render() {
     renderEvents(); renderFeed();
     if (!$('#view-players').hidden) renderPlayers(); else $('#n-players').textContent = '';
-    if (openPlayer) openSheet(openPlayer);
+    renderSoon();
+    if (openEvent) renderEventSheet();
+    else if (openPlayer) { const back = backToEvent; openSheet(openPlayer); if (back) { backToEvent = back; $('#sheet-back').hidden = false; } }
     setStatus();
   }
 
