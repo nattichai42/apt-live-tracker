@@ -137,8 +137,9 @@ details.notes li { margin: 5px 0; }
 .chart .grid { stroke: var(--line); }
 .chart .zero { stroke: var(--muted); stroke-dasharray: 3 3; opacity: .7; }
 .chart .day { stroke: var(--line); stroke-dasharray: 2 3; }
-.chart .ln { fill: none; stroke: var(--accent); stroke-width: 2; }
-.chart .area { fill: var(--accent); opacity: .12; }
+.chart .ln { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.chart .ln.up { stroke: var(--ok); } .chart .ln.down { stroke: var(--bust); }
+.chart .pt-in, .chart .pt-out { stroke: var(--panel); stroke-width: 1.5; }
 .chart .pt-in { fill: var(--bust); } .chart .pt-out { fill: var(--ok); }
 .chart .end { fill: var(--fg); font: 600 11.5px var(--mono); }
 .chart .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 12px; line-height: 1.4; box-shadow: 0 4px 14px rgba(0,0,0,.18); max-width: 230px; z-index: 2; }
@@ -584,7 +585,27 @@ details.notes li { margin: 5px 0; }
     }
   }
 
-  // Step chart of the running bankroll: one step per buy-in or cash, in time order
+  // Monotone cubic interpolation (same idea as d3.curveMonotoneX) as an SVG path
+  function smoothPath(p) {
+    if (p.length < 2) return '';
+    const n = p.length, d = [], m = new Array(n);
+    for (let i = 0; i < n - 1; i++) d.push((p[i + 1][1] - p[i][1]) / ((p[i + 1][0] - p[i][0]) || 1));
+    m[0] = d[0]; m[n - 1] = d[n - 2];
+    for (let i = 1; i < n - 1; i++) {
+      if (d[i - 1] * d[i] <= 0) { m[i] = 0; continue; }
+      const h0 = p[i][0] - p[i - 1][0], h1 = p[i + 1][0] - p[i][0];
+      const s = (d[i - 1] * h1 + d[i] * h0) / (h0 + h1);
+      m[i] = (Math.sign(d[i - 1]) + Math.sign(d[i])) * Math.min(Math.abs(d[i - 1]), Math.abs(d[i]), 0.5 * Math.abs(s));
+    }
+    let out = `M${p[0][0]},${p[0][1]}`;
+    for (let i = 0; i < n - 1; i++) {
+      const h = (p[i + 1][0] - p[i][0]) / 3;
+      out += `C${p[i][0] + h},${p[i][1] + m[i] * h} ${p[i + 1][0] - h},${p[i + 1][1] - m[i + 1] * h} ${p[i + 1][0]},${p[i + 1][1]}`;
+    }
+    return out;
+  }
+
+  // Smooth chart of the running bankroll: one point per buy-in or cash, in time order
   function drawBankroll(box, items) {
     box.replaceChildren();
     const pts = [{ i: 0, bank: 0, it: null }];
@@ -627,12 +648,32 @@ details.notes li { margin: 5px 0; }
         prevDay = d;
       }
     });
-    // Step path
-    let dPath = `M${x(0)},${y(0)}`;
-    for (let k = 1; k < pts.length; k++) dPath += `H${x(pts[k].i)}V${y(pts[k].bank)}`;
-    add('path', { d: dPath + `V${y(0)}Z`, class: 'area' });
-    add('path', { d: dPath, class: 'ln' });
-    for (const p of pts.slice(1)) add('circle', { cx: x(p.i), cy: y(p.bank), r: p.it.amt > 0 ? 4.5 : 3, class: p.it.amt > 0 ? 'pt-out' : 'pt-in' });
+    // Smooth curve through the points (monotone cubic: never overshoots between two values)
+    const xy = pts.map((p) => [x(p.i), y(p.bank)]);
+    const dPath = smoothPath(xy);
+    const z = y(0);
+    const uid = 'bk' + Math.random().toString(36).slice(2, 8);
+    const defs = add('defs', {});
+    const grad = (id, color, from, to) => {
+      const g = document.createElementNS(NS, 'linearGradient');
+      g.setAttribute('id', id); g.setAttribute('gradientUnits', 'userSpaceOnUse');
+      g.setAttribute('x1', 0); g.setAttribute('x2', 0); g.setAttribute('y1', from); g.setAttribute('y2', to);
+      [[0, 0.32], [1, 0.02]].forEach(([o, a]) => { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', color); st.setAttribute('stop-opacity', a); g.appendChild(st); });
+      defs.appendChild(g);
+    };
+    const clip = (id, y0c, h) => {
+      const c = document.createElementNS(NS, 'clipPath'); c.setAttribute('id', id);
+      const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', 0); r.setAttribute('width', W); r.setAttribute('y', y0c); r.setAttribute('height', Math.max(0, h));
+      c.appendChild(r); defs.appendChild(c);
+    };
+    grad(uid + 'gu', 'var(--ok)', m.t, z); grad(uid + 'gd', 'var(--bust)', H - m.b, z);
+    clip(uid + 'cu', 0, z); clip(uid + 'cd', z, H - z);
+    const area = dPath + `L${xy[xy.length - 1][0]},${z}L${xy[0][0]},${z}Z`;
+    add('path', { d: area, fill: `url(#${uid}gu)`, 'clip-path': `url(#${uid}cu)` });
+    add('path', { d: area, fill: `url(#${uid}gd)`, 'clip-path': `url(#${uid}cd)` });
+    add('path', { d: dPath, class: 'ln up', 'clip-path': `url(#${uid}cu)` });
+    add('path', { d: dPath, class: 'ln down', 'clip-path': `url(#${uid}cd)` });
+    for (const p of pts.slice(1)) add('circle', { cx: x(p.i), cy: y(p.bank), r: p.it.amt > 0 ? 4 : 2.75, class: p.it.amt > 0 ? 'pt-out' : 'pt-in' });
     const endTxt = add('text', { x: x(n) + 6, y: y(last) + 4, class: 'end' }, (last > 0 ? '+' : last < 0 ? '−' : '') + short(Math.abs(last)));
     endTxt.style.fill = last > 0 ? 'var(--ok)' : last < 0 ? 'var(--bust)' : 'var(--fg)';
     const hl = add('circle', { r: 6, fill: 'none', stroke: 'var(--fg)', 'stroke-width': 1.5, opacity: 0 });
