@@ -2,7 +2,7 @@ name: Poll APT live seating
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # best effort; runs queue back-to-back via the concurrency group
+    - cron: '*/15 * * * *'   # backup trigger: a queued run waits in the concurrency group and starts as soon as the running job ends
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ concurrency:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 358   # GitHub's hard cap is 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +29,7 @@ jobs:
           else
             echo "no previous state, starting fresh"
           fi
-      - name: Poll for 55 minutes
+      - name: Poll for 5 h 45 min
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node poller/poll.js --state state/state.json --minutes 55 --interval 60 --publish-every 3
+        run: node poller/poll.js --state state/state.json --minutes 345 --interval 60 --publish-every 3
