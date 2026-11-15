@@ -46,7 +46,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const t0 = Date.now();
     round++;
     try {
-      const s = await T.pollOnce(state, { fetchFn, interval, listEvery: 180, resultsEvery: 300, evEvery: 60, concurrency: 4 });
+      const s = await T.pollOnce(state, { fetchFn, interval, listEvery: 180, resultsEvery: 60, finalEvery: 300, evEvery: 60, concurrency: 4 });
       save(state);
       if (s.throttled) {
         // The site pushed back: double the wait (1 min to 10 min), honour Retry-After

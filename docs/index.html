@@ -199,6 +199,7 @@ details.notes li { margin: 5px 0; }
         <button class="chip re" data-kind="reentry" aria-pressed="true">Re-entries</button>
         <button class="chip entry" data-kind="entry" aria-pressed="false">New entries</button>
         <select id="feed-event" class="sel small" aria-label="Event"><option value="">All events</option></select>
+        <select id="feed-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
         <input id="feed-q" class="search" type="search" placeholder="Search player" aria-label="Search player" autocomplete="off">
       </div>
       <ul class="feed" id="feed"></ul>
@@ -219,7 +220,8 @@ details.notes li { margin: 5px 0; }
     <section id="view-players" class="panel" role="tabpanel" aria-label="Players" hidden>
       <div class="ph"><h2>Players</h2><span class="t" id="players-count"></span></div>
       <div class="filters">
-        <input id="players-q" class="search" type="search" placeholder="Search player or country code" aria-label="Search players" autocomplete="off">
+        <input id="players-q" class="search" type="search" placeholder="Search player" aria-label="Search players" autocomplete="off">
+        <select id="players-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
         <select id="players-sort" class="sel small" aria-label="Sort players">
           <option value="prizes">Top prizes</option><option value="net">Net</option><option value="bullets">Most bullets</option>
           <option value="reentries">Most re-entries</option><option value="buyins">Most buy-ins</option><option value="itm">ITM %</option>
@@ -273,7 +275,7 @@ details.notes li { margin: 5px 0; }
   <ul class="tl" id="sheet-tl"></ul>
 </aside>
 
-<script src="tracker.js?v=f4b0febcc2"></script>
+<script src="tracker.js?v=f53ace319a"></script>
 <script>
 (function () {
   'use strict';
@@ -345,7 +347,7 @@ details.notes li { margin: 5px 0; }
     polling = true; setStatus();
     const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
     try {
-      const s = await T.pollOnce(state, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 300, concurrency: 4 });
+      const s = await T.pollOnce(state, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 60, finalEvery: 300, concurrency: 4 });
       lastErr = s.errors.length && !s.events ? s.errors[0] : null;
       // If the site refuses requests, wait longer (2 min, doubling to 10 min) until it accepts them again
       backoff = s.throttled ? Math.min(600, Math.max(120, backoff * 2, s.retryAfter || 0)) : 0;
@@ -388,8 +390,25 @@ details.notes li { margin: 5px 0; }
     return m;
   }
 
+  // Country menus: flag, name and how many players, most common first. Rebuilt only when the list changes,
+  // so an open menu is not reset by the next poll.
+  const regionName = (() => { try { const d = new Intl.DisplayNames(['en'], { type: 'region' }); return (cc) => { try { return d.of(cc) || cc; } catch { return cc; } }; } catch { return (cc) => cc; } })();
+  function fillCountries(sel, ccs) {
+    const counts = new Map();
+    for (const cc of ccs) if (cc && /^[A-Z]{2}$/.test(cc)) counts.set(cc, (counts.get(cc) || 0) + 1);
+    if (prefs.country && !counts.has(prefs.country)) counts.set(prefs.country, 0);
+    const list = [...counts].sort((a, b) => b[1] - a[1] || regionName(a[0]).localeCompare(regionName(b[0])));
+    const sig = list.map(([c, n]) => c + n).join(',');
+    if (sel.dataset.sig !== sig) {
+      sel.replaceChildren(new Option('All countries', ''), ...list.map(([cc, n]) => new Option(`${flag(cc)} ${regionName(cc)} (${n})`, cc)));
+      sel.dataset.sig = sig;
+    }
+    sel.value = prefs.country || '';
+  }
+
   function renderFeed() {
     const ul = $('#feed');
+    { const seen = new Set(), ccs = []; for (const f of state.feed) if (!seen.has(f.n)) { seen.add(f.n); ccs.push(f.cc); } fillCountries($('#feed-country'), ccs); }
     const q = $('#feed-q').value.trim().toLowerCase();
     const res = resultIndex();
     const items = [];
@@ -398,6 +417,7 @@ details.notes li { margin: 5px 0; }
       if (!prefs.kinds[f.k]) continue;
       if (eventFilter && String(f.num) !== eventFilter) continue;
       if (q && !f.n.toLowerCase().includes(q)) continue;
+      if (prefs.country && f.cc !== prefs.country) continue;
       items.push(f);
     }
     const more = items.length > feedLimit; if (more) items.pop();
@@ -591,7 +611,9 @@ details.notes li { margin: 5px 0; }
     const all = T.players(state);
     $('#n-players').textContent = all.length ? nf.format(all.length) : '';
     const q = $('#players-q').value.trim().toLowerCase();
-    let rows = q ? all.filter((p) => p.name.toLowerCase().includes(q) || (p.cc || '').toLowerCase() === q) : all;
+    fillCountries($('#players-country'), all.map((p) => p.cc));
+    let rows = q ? all.filter((p) => p.name.toLowerCase().includes(q)) : all;
+    if (prefs.country) rows = rows.filter((p) => p.cc === prefs.country);
     const k = prefs.sort;
     const dir = prefs.sortDir === 'asc' ? 1 : -1; // -1 = high to low (A to Z for names)
     const val = (p) => k === 'seated' ? (p.seatedIn.length ? 1 : 0) : k === 'lastBust' ? (p.lastBust || 0) : p[k];
@@ -826,6 +848,10 @@ details.notes li { margin: 5px 0; }
   });
   $('#feed-event').addEventListener('change', (e) => { eventFilter = e.target.value; feedLimit = 150; renderEvents(); renderFeed(); });
   $('#feed-q').addEventListener('input', () => { feedLimit = 150; renderFeed(); });
+  document.querySelectorAll('.country-sel').forEach((sel) => sel.addEventListener('change', (e) => {
+    prefs.country = e.target.value; savePrefs(); feedLimit = 150; playersLimit = 60;
+    renderFeed(); if (!$('#view-players').hidden) renderPlayers();
+  }));
   $('#feed-more').addEventListener('click', () => { feedLimit += 150; renderFeed(); });
   $('#players-q').addEventListener('input', () => { playersLimit = 60; renderPlayers(); });
   $('#players-sort').value = prefs.sort;

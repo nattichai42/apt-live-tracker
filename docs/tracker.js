@@ -235,15 +235,16 @@
     const done = kids.every((x) => x.phase === 'Completed');
     const prevR = state.results[num];
     const same = !!prevR && sameRows(prevR.rows, rows);
-    const stable = same ? (prevR.stable || 0) + 1 : 0; // consecutive unchanged fetches (5 min apart)
+    const since = same ? (prevR.since || prevR.at || now) : now; // unchanged since this time
     // Satellites list only some places (seats, cash spots), so they never look "complete": accept 30 min unchanged.
     const sat = kids.some((x) => x.sat);
-    const final = done && same && (payoutsComplete(rows) || ((sat || !rows.length) && stable >= 6) || stable >= 72);
+    const quiet = now - since;
+    const final = done && same && (payoutsComplete(rows) || ((sat || !rows.length) && quiet >= 1800) || quiet >= 6 * 3600);
     // When each paid place first appeared. Rows already there on our first fetch get null (paid before we watched).
     const prev = state.results[num];
     const seen = (prev && prev.seen) || {};
     for (const [, n] of rows) if (!(n in seen)) seen[n] = prev && prev.seen ? now : null;
-    state.results[num] = { at: now, final, rows, seen, stable };
+    state.results[num] = { at: now, final, rows, seen, since };
     return true;
   }
 
@@ -305,7 +306,8 @@
   }
 
   /**
-   * One polling round. opts: {fetchFn, interval (s), listEvery (s), resultsEvery (s), concurrency}
+   * One polling round. opts: {fetchFn, interval (s), listEvery (s), resultsEvery (s, events in the money),
+   *   finalEvery (s, finished events whose payouts are still settling), evEvery (s), concurrency}
    * Returns a summary.
    */
   const THROTTLE = new Set([403, 429, 503]);
@@ -351,15 +353,15 @@
       const r = applySnapshot(state, g.kid, g.players, now, interval);
       summary.events++; summary.busts += r.busts; summary.reentries += r.reentries; summary.entries += r.entries;
     }
-    // Results: in-the-money events every resultsEvery, completed ones once (final)
+    // Payouts: in-the-money events every resultsEvery, finished ones every finalEvery until complete
     const nums = [...new Set(Object.values(state.events).map((e) => e.num))];
     const want = nums.filter((num) => {
       const evs = Object.values(state.events).filter((e) => e.num === num);
       const r = state.results[num];
       const anyItm = evs.some((e) => e.phase === 'In The Money' || e.phase === 'Final Table');
       const allDone = evs.every((e) => e.phase === 'Completed');
-      if (allDone) return !r || (!r.final && now - r.at >= (opts.resultsEvery || 300));
-      if (anyItm) return !r || now - r.at >= (opts.resultsEvery || 300);
+      if (allDone) return !r || (!r.final && now - r.at >= (opts.finalEvery || 300));
+      if (anyItm) return !r || now - r.at >= (opts.resultsEvery || 60);
       return false;
     });
     const rs = await pool(want, opts.concurrency || 4, (num) => fetchResults(fetchFn, state, num, now));
