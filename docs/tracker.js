@@ -372,9 +372,18 @@
 
   /* ---------- Derived views ---------- */
 
-  function resultsByName(state) {
+  // Was every flight/day of this event watched from its first minute (or not started yet)?
+  function watchedFromStart(state, num, now) {
+    now = now || nowSec();
+    const kids = Object.values(state.events).filter((e) => e.num === Number(num));
+    return kids.length > 0 && kids.some((k) => k.polls > 0) &&
+      kids.every((k) => (k.firstPoll && k.start && k.firstPoll - k.start < 900) || (!k.polls && (!k.start || k.start > now)));
+  }
+
+  function resultsByName(state, keep) {
     const m = new Map();
     for (const [num, r] of Object.entries(state.results)) for (const [pos, n0, cc, prize] of r.rows) {
+      if (keep && !keep(num)) continue;
       const n = canon(state, n0);
       if (!m.has(n)) m.set(n, []);
       m.get(n).push({ num: Number(num), pos, prize, cc, final: r.final });
@@ -392,12 +401,16 @@
   }
 
   // One row per player across the series
-  function players(state) {
+  // opts.fromStart: only events watched from their first minute, where non-cashers and re-entries are known too
+  function players(state, opts = {}) {
     const byNum = eventByNum(state);
-    const res = resultsByName(state);
+    const okCache = new Map();
+    const keep = opts.fromStart ? (num) => { if (!okCache.has(num)) okCache.set(num, watchedFromStart(state, num)); return okCache.get(num); } : null;
+    const res = resultsByName(state, keep);
     const map = new Map();
     const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], untracked: 0 }), map.get(n));
     for (const e of Object.values(state.events)) {
+      if (keep && !keep(String(e.num))) continue;
       for (const [n0, p] of Object.entries(e.p || {})) {
         const r = get(canon(state, n0)); if (p.cc) r.cc = p.cc;
         const k = r.nums.get(e.num) || { num: e.num, bullets: 0, buyin: e.buyin, tracked: true };
@@ -428,7 +441,8 @@
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
         buyins, prizes, net: prizes - buyins, cashes: r.cashes.length, itm: entered ? cashedNums.size / entered : 0,
-        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0 });
+        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0,
+        cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
     return out;
@@ -605,5 +619,5 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, completedEvents, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });

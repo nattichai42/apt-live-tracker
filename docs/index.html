@@ -107,6 +107,13 @@ main { padding-block: 14px 40px; }
 .row .num .big { font-size: 14px; }
 .pos { color: var(--ok); } .neg { color: var(--bust); }
 .legend { padding: 0 14px 12px; font-size: 12px; color: var(--muted); }
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border-block: 1px solid var(--line); margin: 0 0 12px; }
+@media (min-width: 560px) { .summary { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.summary div { background: var(--panel); padding: 9px 12px; min-width: 0; }
+.summary .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.summary .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; margin-top: 1px; overflow-wrap: anywhere; }
+.summary .s { font-size: 11px; color: var(--muted); }
+.summary-h { padding: 0 14px 6px; font-size: 12px; color: var(--muted); }
 details.notes { margin-top: 16px; color: var(--muted); font-size: 12.5px; }
 details.notes summary { cursor: pointer; color: var(--fg); font-weight: 500; }
 details.notes li { margin: 5px 0; }
@@ -228,7 +235,10 @@ details.notes li { margin: 5px 0; }
           <option value="lastBust">Latest bust</option><option value="seated">Seated now</option><option value="name">Name</option>
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
+        <label class="chip" style="cursor:pointer"><input type="checkbox" id="players-fromstart" style="margin:0"> Only events watched from the start</label>
       </div>
+      <div class="summary-h" id="summary-h"></div>
+      <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
       <p class="legend">Buy-in = bullets seen × buy-in. A ≥ marks players with events we didn't watch from the start; there one bullet is counted.</p>
       <ul class="plist" id="players"></ul>
       <button class="btn more" id="players-more" type="button" hidden>Show more</button>
@@ -276,7 +286,7 @@ details.notes li { margin: 5px 0; }
   <ul class="tl" id="sheet-tl"></ul>
 </aside>
 
-<script src="tracker.js?v=d36ac8c7fd"></script>
+<script src="tracker.js?v=7a374145c2"></script>
 <script>
 (function () {
   'use strict';
@@ -615,8 +625,43 @@ details.notes li { margin: 5px 0; }
     }
   }
 
+  // Totals for exactly the players listed (after country, search and "seated now"/"latest bust" filters)
+  function renderSummary(rows, q) {
+    const sum = (f) => rows.reduce((a, p) => a + (f(p) || 0), 0);
+    const n = rows.length;
+    const bullets = sum((p) => p.bullets), entered = sum((p) => p.events);
+    const buyins = sum((p) => p.buyins), prizes = sum((p) => p.prizes), net = prizes - buyins;
+    const itmPlayers = rows.filter((p) => p.cashes > 0).length, cashes = sum((p) => p.cashes), cashedEvents = sum((p) => p.cashedEvents);
+    const winners = rows.filter((p) => p.net > 0).length, wins = sum((p) => p.wins);
+    const partial = rows.some((p) => p.partial);
+    const pct = (a, b) => (b ? (a / b * 100).toFixed(1) + '%' : '—');
+    const tiles = [
+      ['Players', nf.format(n), ''],
+      ['Bullets', nf.format(bullets), n ? (bullets / n).toFixed(2) + ' per player' : ''],
+      ['Re-entries', nf.format(Math.max(0, bullets - entered)), entered ? pct(bullets - entered, entered) + ' of entries' : ''],
+      ['Total buy-in', (partial ? '≥' : '') + short(buyins), n ? short(buyins / n) + ' per player' : ''],
+      ['Total prizes', short(prizes), cashes ? short(prizes / cashes) + ' per cash' : ''],
+      ['Net', signed(net), buyins ? pct(net, buyins) + ' ROI' : '', net > 0 ? 'pos' : net < 0 ? 'neg' : ''],
+      ['Cashes', nf.format(cashes), wins ? nf.format(wins) + ' wins' : ''],
+      ['Players ITM', nf.format(itmPlayers), pct(itmPlayers, n) + ' of players'],
+      ['ITM per event', pct(cashedEvents, entered), `${nf.format(cashedEvents)} of ${nf.format(entered)} entered`],
+      ['ITM per bullet', pct(cashedEvents, bullets), `${nf.format(cashedEvents)} of ${nf.format(bullets)} bullets`],
+      ['Winning players', nf.format(winners), pct(winners, n) + ' net up'],
+      ['Losing players', nf.format(rows.filter((p) => p.net < 0).length), pct(rows.filter((p) => p.net < 0).length, n) + ' net down'],
+    ];
+    const box = $('#players-summary'); box.replaceChildren();
+    for (const [k, v, sub, cls] of tiles) {
+      const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
+      if (sub) d.appendChild(el('div', 's', sub)); box.appendChild(d);
+    }
+    const scope = [prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : 'All countries', q ? `matching “${q}”` : '',
+      prefs.sort === 'seated' ? 'seated now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
+    $('#summary-h').textContent = 'Summary: ' + scope + (prefs.fromStart ? ' · events watched from the start'
+      : ' · includes events played before tracking, where only cashers are known, so ITM and net look far better than reality');
+  }
+
   function renderPlayers() {
-    const all = T.players(state);
+    const all = T.players(state, { fromStart: !!prefs.fromStart });
     $('#n-players').textContent = all.length ? nf.format(all.length) : '';
     const q = $('#players-q').value.trim().toLowerCase();
     fillCountries($('#players-country'), all.map((p) => p.cc));
@@ -631,6 +676,7 @@ details.notes li { margin: 5px 0; }
     if (k === 'seated') rows = rows.filter((p) => p.seatedIn.length);
     if (k === 'lastBust') rows = rows.filter((p) => p.lastBust);
     $('#players-count').textContent = nf.format(rows.length) + ' players';
+    renderSummary(rows, q);
     const ul = $('#players'); ul.replaceChildren();
     if (!rows.length) ul.appendChild(el('li', 'empty', all.length ? 'No players match.' : 'Loading players…'));
     for (const p of rows.slice(0, playersLimit)) {
@@ -873,6 +919,8 @@ details.notes li { margin: 5px 0; }
   $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; setDirBtn(); });
   $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); playersLimit = 60; renderPlayers(); });
   $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
+  $('#players-fromstart').checked = !!prefs.fromStart;
+  $('#players-fromstart').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; savePrefs(); playersLimit = 60; renderPlayers(); });
   $('#done-more').addEventListener('click', () => { doneLimit = 1e9; renderDone(); });
   $('#interval').value = String(prefs.interval);
   $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
