@@ -146,7 +146,7 @@
               if (f.kid === kid && f.n === n && f.k === 'bust' && f.t === last) { state.feed.splice(i, 1); break; }
             }
           } else {
-            p.b = (p.b || 0) + 1; res.reentries++;
+            p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(now);
             pushFeed(state, { t: now, kid, num: e.num, n, k: 'reentry', b: p.b, cc: s[2] });
           }
         }
@@ -292,28 +292,58 @@
     return out;
   }
 
-  // Timeline for one player
+  // Timeline for one player, with money: every bullet costs the event's buy-in (amt < 0), every cash pays (amt > 0).
+  // Running `bank` is the cumulative sum, for the bankroll graph.
   function playerTimeline(state, name) {
     const items = [];
+    const nums = new Map(); // num -> {bullets seen, earliest start, name, buyin}
+    const numInfo = (num) => {
+      if (!nums.has(num)) {
+        const kids = Object.values(state.events).filter((x) => x.num === num);
+        const first = kids.slice().sort((a, b) => (a.start || 0) - (b.start || 0))[0] || {};
+        nums.set(num, { bullets: 0, start: first.start || null, lastStart: Math.max(0, ...kids.map((x) => x.start || 0)) || null,
+          lastPoll: Math.max(0, ...kids.map((x) => x.lastPoll || 0)) || null, tracked: kids.some((x) => x.polls > 0),
+          name: first.name || '#' + num, buyin: first.buyin || 0 });
+      }
+      return nums.get(num);
+    };
     for (const e of Object.values(state.events)) {
       const p = e.p && e.p[name]; if (!p) continue;
-      items.push({ t: p.f, k: p.carry ? 'carry' : 'seen', num: e.num, kid: e.kid, ev: e.name, first: e.firstPoll === p.f });
-      (p.x || []).forEach((t, i) => items.push({ t, k: 'bust', num: e.num, kid: e.kid, ev: e.name, b: i + 1 }));
-      if (p.st === 'end') items.push({ t: e.lastPoll, k: 'end', num: e.num, kid: e.kid, ev: e.name });
+      const info = numInfo(e.num);
+      const base = { num: e.num, kid: e.kid, ev: e.name };
+      const bullets = p.b || 0;
+      info.bullets += bullets;
+      if (p.carry) items.push({ ...base, t: p.f, k: 'carry' });
+      else items.push({ ...base, t: p.f, k: 'seen', first: e.firstPoll === p.f, b: 1, amt: bullets ? -e.buyin : 0 });
+      // Re-entry times: stored on the record, plus any older ones still in the feed
+      const times = new Set(p.r || []);
+      for (const f of state.feed) if (f.n === name && f.k === 'reentry' && f.kid === e.kid) times.add(f.t);
+      const rt = [...times].sort((a, b) => a - b);
+      const extra = Math.max(0, bullets - 1);
+      for (let i = 0; i < extra; i++) items.push({ ...base, t: rt[i] != null ? rt[i] : p.f, k: 'reentry', b: i + 2, amt: -e.buyin, approxTime: rt[i] == null });
+      (p.x || []).forEach((t) => items.push({ ...base, t, k: 'bust' }));
+      if (p.st === 'end') items.push({ ...base, t: e.lastPoll, k: 'end' });
     }
-    for (const f of state.feed) if (f.n === name && f.k === 'reentry') items.push({ t: f.t, k: 'reentry', num: f.num, kid: f.kid, ev: (state.events[f.kid] || {}).name, b: f.b });
-    const byNum = eventByNum(state);
-    for (const [num, r] of Object.entries(state.results)) for (const [pos, n, , prize] of r.rows) if (n === name) {
-      const ev = byNum.get(Number(num));
-      const kids = Object.values(state.events).filter((x) => x.num === Number(num));
-      const tracked = kids.some((x) => x.polls > 0);
-      const lastPoll = Math.max(0, ...kids.map((x) => x.lastPoll || 0));
-      const lastStart = Math.max(0, ...kids.map((x) => x.start || 0));
-      // Events that finished before tracking: we only know the day, not the bust time
-      items.push(tracked ? { t: r.final ? (lastPoll || r.at) : r.at, k: 'cash', num: Number(num), ev: ev ? ev.name : '#' + num, pos, prize }
-        : { t: lastStart || r.at, approx: true, k: 'cash', num: Number(num), ev: ev ? ev.name : '#' + num, pos, prize });
+    for (const [numS, r] of Object.entries(state.results)) for (const [pos, n, , prize] of r.rows) if (n === name) {
+      const num = Number(numS);
+      const info = numInfo(num);
+      if (info.tracked && info.bullets > 0) {
+        items.push({ t: r.final ? (info.lastPoll || r.at) : r.at, k: 'cash', num, ev: info.name, pos, prize, amt: prize });
+      } else {
+        // Not watched from the start: assume one bullet on the event's first day, cash on its last day
+        if (info.bullets === 0) { info.bullets = 1; items.push({ t: info.start || r.at, approx: true, k: 'buyin', num, ev: info.name, amt: -info.buyin }); }
+        items.push({ t: info.tracked ? (r.final ? (info.lastPoll || r.at) : r.at) : (info.lastStart || r.at) + 1, approx: !info.tracked, k: 'cash', num, ev: info.name, pos, prize, amt: prize });
+      }
     }
-    items.sort((a, b) => (a.t || 0) - (b.t || 0));
+    // Seen only as a carry-over into a later day: count the one bullet from the flight we did not watch
+    for (const [num, info] of nums) if (info.bullets === 0) {
+      info.bullets = 1;
+      items.push({ t: info.start || 0, approx: true, k: 'buyin', num, ev: info.name, amt: -info.buyin });
+    }
+    const order = { buyin: 0, seen: 1, carry: 1, reentry: 2, bust: 3, end: 4, cash: 5 };
+    items.sort((a, b) => (a.t || 0) - (b.t || 0) || order[a.k] - order[b.k]);
+    let bank = 0;
+    for (const it of items) { if (it.amt) bank += it.amt; it.bank = bank; }
     return items;
   }
 
