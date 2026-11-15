@@ -558,6 +558,29 @@
     return out;
   }
 
+  // One row per finished event (flights and days combined), newest first
+  function completedEvents(state) {
+    const byNum = new Map();
+    for (const e of Object.values(state.events)) { if (!byNum.has(e.num)) byNum.set(e.num, []); byNum.get(e.num).push(e); }
+    const out = [];
+    for (const [num, kids] of byNum) {
+      if (!kids.length || !kids.every((e) => e.phase === 'Completed')) continue;
+      const r = state.results[num];
+      if (!r || !r.rows.length) continue; // nothing paid out (e.g. events not played)
+      const last = kids.slice().sort((a, b) => (b.start || 0) - (a.start || 0))[0];
+      const later = kids.filter((e) => isLaterDay(e.name));
+      // A later day's entry count already covers every flight; otherwise flights add up
+      const entries = later.length ? Math.max(...later.map((e) => e.entries || 0)) : kids.reduce((a, e) => a + (e.entries || 0), 0);
+      const win = r.rows.find((x) => x[0] === 1);
+      out.push({ kid: last.kid, num, name: baseName(last.name), buyin: last.buyin, sat: kids.some((e) => e.sat), entries,
+        prizePool: Math.max(...kids.map((e) => e.prizePool || 0)), paid: r.rows.length, final: !!r.final,
+        finished: Math.max(...kids.map((e) => e.lastPoll || 0)) || Math.max(...kids.map((e) => e.start || 0)),
+        tracked: kids.some((e) => e.polls > 0),
+        winner: win ? { name: canon(state, win[1]), cc: win[2], prize: win[3] } : null });
+    }
+    return out.sort((a, b) => b.finished - a.finished || b.num - a.num);
+  }
+
   function upcoming(state, now, hours) {
     now = now || nowSec();
     return Object.values(state.events)
@@ -566,5 +589,5 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, completedEvents, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });

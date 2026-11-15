@@ -160,6 +160,11 @@ details.notes li { margin: 5px 0; }
 .soon li { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); align-items: baseline; }
 .soon .nm { overflow-wrap: anywhere; }
 .soon .meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.soon.done li { grid-template-columns: 74px minmax(0, 1fr) auto; cursor: pointer; }
+.soon.done li:hover .nm, .soon.done li:focus-visible .nm { text-decoration: underline; }
+.soon.done .win { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+.soon.done .win b { color: var(--fg); font-weight: 500; }
+.soon.done .right { text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -206,6 +211,9 @@ details.notes li { margin: 5px 0; }
       <div class="cards" id="events"></div>
       <div class="ph"><h2>Starting soon</h2></div>
       <ul class="soon" id="soon"></ul>
+      <div class="ph"><h2>Completed</h2><span class="t" id="done-count"></span></div>
+      <ul class="soon done" id="done"></ul>
+      <button class="btn more" id="done-more" type="button" hidden>Show all completed events</button>
     </section>
 
     <section id="view-players" class="panel" role="tabpanel" aria-label="Players" hidden>
@@ -215,8 +223,9 @@ details.notes li { margin: 5px 0; }
         <select id="players-sort" class="sel small" aria-label="Sort players">
           <option value="prizes">Top prizes</option><option value="net">Net</option><option value="bullets">Most bullets</option>
           <option value="reentries">Most re-entries</option><option value="buyins">Most buy-ins</option><option value="itm">ITM %</option>
-          <option value="lastBust">Latest bust</option><option value="seated">Seated now</option>
+          <option value="lastBust">Latest bust</option><option value="seated">Seated now</option><option value="name">Name</option>
         </select>
+        <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
       </div>
       <p class="legend">Buy-in = bullets seen × buy-in. A ≥ marks players with events we didn't watch from the start; there one bullet is counted.</p>
       <ul class="plist" id="players"></ul>
@@ -264,7 +273,7 @@ details.notes li { margin: 5px 0; }
   <ul class="tl" id="sheet-tl"></ul>
 </aside>
 
-<script src="tracker.js?v=dc845ceae1"></script>
+<script src="tracker.js?v=f4b0febcc2"></script>
 <script>
 (function () {
   'use strict';
@@ -475,6 +484,34 @@ details.notes li { margin: 5px 0; }
     return `${pl(e.entries, 'entry', 'entries')} = ${pl(e.unique, 'player', 'players')} + ${pl(e.reentriesSeen, 're-entry', 're-entries')} + ${nf.format(e.untracked)} missed`;
   }
 
+  let doneLimit = 15;
+  function renderDone() {
+    const ul = $('#done'); ul.replaceChildren();
+    const list = T.completedEvents(state);
+    $('#done-count').textContent = list.length ? nf.format(list.length) + ' events' : '';
+    if (!list.length) { ul.appendChild(el('li', 'empty', 'No event has finished yet.')); $('#done-more').hidden = true; return; }
+    for (const e of list.slice(0, doneLimit)) {
+      const li = el('li'); li.tabIndex = 0; li.setAttribute('role', 'button');
+      li.appendChild(el('span', 'meta', e.finished ? fDay.format(new Date(e.finished * 1000)).replace(/^\w+ /, '') : ''));
+      const mid = el('div');
+      mid.appendChild(el('div', 'nm', `#${e.num} ${e.name.replace(/^\[Event \d+\]\s*/, '')}`));
+      const w = el('div', 'win');
+      if (e.winner) { w.append('Won by '); w.appendChild(el('b', '', (flag(e.winner.cc) ? flag(e.winner.cc) + ' ' : '') + e.winner.name)); w.append(` · ${short(e.winner.prize)}`); }
+      else w.textContent = e.final ? '' : 'Payouts still being posted';
+      mid.appendChild(w);
+      li.appendChild(mid);
+      const right = el('div', 'right');
+      right.appendChild(el('div', '', nf.format(e.entries) + ' entries'));
+      right.appendChild(el('div', '', short(e.buyin) + ' buy-in'));
+      li.appendChild(right);
+      const open = () => showEvent(e.kid);
+      li.addEventListener('click', open);
+      li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') open(); });
+      ul.appendChild(li);
+    }
+    $('#done-more').hidden = list.length <= doneLimit;
+  }
+
   function renderSoon() {
     const ul = $('#soon'); ul.replaceChildren();
     const list = T.upcoming(state, Math.floor(Date.now() / 1000), 12);
@@ -489,6 +526,9 @@ details.notes li { margin: 5px 0; }
   }
 
   function showEvent(kid) {
+    const ev = state.events[kid];
+    if (ev && ev.phase === 'Completed') eventSeg = 'cashed';
+    else if (eventSeg === 'cashed') eventSeg = 'seated';
     openEvent = kid; openPlayer = null; backToEvent = null;
     $('#sheet-q').value = '';
     renderEventSheet();
@@ -553,8 +593,11 @@ details.notes li { margin: 5px 0; }
     const q = $('#players-q').value.trim().toLowerCase();
     let rows = q ? all.filter((p) => p.name.toLowerCase().includes(q) || (p.cc || '').toLowerCase() === q) : all;
     const k = prefs.sort;
+    const dir = prefs.sortDir === 'asc' ? 1 : -1; // -1 = high to low (A to Z for names)
     const val = (p) => k === 'seated' ? (p.seatedIn.length ? 1 : 0) : k === 'lastBust' ? (p.lastBust || 0) : p[k];
-    rows = rows.slice().sort((a, b) => (val(b) - val(a)) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));
+    rows = rows.slice().sort(k === 'name'
+      ? (a, b) => a.name.localeCompare(b.name) * -dir
+      : (a, b) => ((val(a) - val(b)) * dir) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));
     if (k === 'seated') rows = rows.filter((p) => p.seatedIn.length);
     if (k === 'lastBust') rows = rows.filter((p) => p.lastBust);
     $('#players-count').textContent = nf.format(rows.length) + ' players';
@@ -762,7 +805,7 @@ details.notes li { margin: 5px 0; }
   function render() {
     renderEvents(); renderFeed();
     if (!$('#view-players').hidden) renderPlayers(); else $('#n-players').textContent = '';
-    renderSoon();
+    renderSoon(); renderDone();
     if (openEvent) renderEventSheet();
     else if (openPlayer) { const back = backToEvent; openSheet(openPlayer); if (back) { backToEvent = back; $('#sheet-back').hidden = false; } }
     setStatus();
@@ -786,8 +829,17 @@ details.notes li { margin: 5px 0; }
   $('#feed-more').addEventListener('click', () => { feedLimit += 150; renderFeed(); });
   $('#players-q').addEventListener('input', () => { playersLimit = 60; renderPlayers(); });
   $('#players-sort').value = prefs.sort;
+  const setDirBtn = () => {
+    const asc = prefs.sortDir === 'asc', b = $('#players-dir');
+    b.textContent = prefs.sort === 'name' ? (asc ? 'Z→A' : 'A→Z') : (asc ? '↑ Low' : '↓ High');
+    b.setAttribute('aria-label', prefs.sort === 'name' ? (asc ? 'Sorted Z to A' : 'Sorted A to Z') : (asc ? 'Sorted lowest first' : 'Sorted highest first'));
+  };
+  setDirBtn();
+  $('#players-dir').addEventListener('click', () => { prefs.sortDir = prefs.sortDir === 'asc' ? 'desc' : 'asc'; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
+  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; setDirBtn(); });
   $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); playersLimit = 60; renderPlayers(); });
   $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
+  $('#done-more').addEventListener('click', () => { doneLimit = 1e9; renderDone(); });
   $('#interval').value = String(prefs.interval);
   $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
   $('#refresh').addEventListener('click', () => { clearTimeout(timer); poll(); });
