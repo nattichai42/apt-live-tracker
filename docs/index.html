@@ -3,194 +3,237 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f1513">
+<meta name="theme-color" content="#0c0c0f">
 <title>APT Taipei Live Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600&display=swap">
 <style>
-/* Layout: one column on phones, feed + side panel on wide screens. Felt-green neutrals, chip-red for busts. */
+/* Styled after the APT site: zinc-950 page, zinc-900 cards, Inter text, Oswald headings, teal status, gold prizes.
+   One deliberate dark look, like the site itself. */
 :root {
-  --bg: #f5f7f6; --panel: #ffffff; --line: #dfe5e2; --fg: #14201b; --muted: #5d6b65;
-  --accent: #0d7a5f; --accent-soft: #e2f2ec; --bust: #c8372d; --bust-soft: #fbe9e7;
-  --re: #b26b00; --re-soft: #fdf1dc; --entry: #2f5fb3; --entry-soft: #e6eefb; --ok: #1d8a4e;
-  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --r: 10px; color-scheme: light;
+  --bg: #0c0c0f; --card: #18181b; --card2: #1f1f23; --hover: #232328; --line: #27272a; --line2: #3f3f46;
+  --fg: #fafafa; --fg2: #d4d4d8; --muted: #a1a1aa; --dim: #71717a;
+  --teal: #14b8a6; --teal2: #2dd4bf; --teal-soft: rgba(20, 184, 166, .14);
+  --gold: #cea45b; --gold-soft: rgba(206, 164, 91, .14);
+  --rose: #f43f5e; --rose-soft: rgba(244, 63, 94, .14);
+  --amber: #fbbf24; --amber-soft: rgba(251, 191, 36, .14);
+  --sky: #38bdf8; --sky-soft: rgba(56, 189, 248, .14);
+  /* names used by the chart code */
+  --ok: var(--teal2); --bust: var(--rose); --panel: var(--card); --accent: var(--teal);
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --head: 'Oswald', 'Arial Narrow', 'Inter', sans-serif;
+  --r: 8px; color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0f1513; --panel: #161e1b; --line: #26312d; --fg: #e6ece9; --muted: #93a39c;
-  --accent: #3fc29c; --accent-soft: #15332a; --bust: #ff6b5e; --bust-soft: #3a1c19;
-  --re: #f0ad3c; --re-soft: #3a2b12; --entry: #7aa7ff; --entry-soft: #172540; --ok: #4cc983; color-scheme: dark; } }
-:root[data-theme="dark"] {
-  --bg: #0f1513; --panel: #161e1b; --line: #26312d; --fg: #e6ece9; --muted: #93a39c;
-  --accent: #3fc29c; --accent-soft: #15332a; --bust: #ff6b5e; --bust-soft: #3a1c19;
-  --re: #f0ad3c; --re-soft: #3a2b12; --entry: #7aa7ff; --entry-soft: #172540; --ok: #4cc983; color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
-body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { padding-bottom: env(safe-area-inset-bottom, 0px); font-variant-numeric: tabular-nums; }
 button, input, select { font: inherit; color: inherit; }
-.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
-header.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
-.top-row { display: flex; align-items: center; gap: 10px; padding-block: 10px 6px; }
-.top h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -.01em; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.top h1 small { color: var(--muted); font-weight: 400; }
-.status { font-size: 12px; color: var(--muted); padding-bottom: 8px; }
-.status .dot { display: inline-block; vertical-align: middle; margin: -2px 6px 0 0; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.dot.live { background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
-.dot.err { background: var(--bust); }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
-@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* Header */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(12, 12, 15, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--bg); }
+.top-row { display: flex; align-items: center; gap: 10px; padding-block: 12px 4px; }
+.brand { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.brand h1 { font: 600 20px/1 var(--head); letter-spacing: .02em; text-transform: uppercase; margin: 0; white-space: nowrap; }
+.brand span { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .ctl { display: flex; gap: 6px; align-items: center; }
-.btn, .sel { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
-.btn:hover { border-color: var(--muted); }
-.btn:focus-visible, .sel:focus-visible, .tab:focus-visible, .chip:focus-visible, .row:focus-visible, .card:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.tabs { display: flex; gap: 4px; padding-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
-.tab { border: 0; background: transparent; padding: 7px 12px; border-radius: 999px; cursor: pointer; color: var(--muted); font-weight: 500; white-space: nowrap; }
-.tab[aria-selected="true"] { background: var(--fg); color: var(--bg); }
-.tab .n { font-family: var(--mono); font-size: 11px; opacity: .8; margin-left: 4px; }
-main { padding-block: 14px 40px; }
-.grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 980px) { .grid.two { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; } .tabs .tab[data-tab="events"] { display: none; } .grid.two #view-events { display: block !important; grid-column: 2; grid-row: 1; } #view-feed, #view-players { grid-column: 1; grid-row: 1; } #view-events .cards { grid-template-columns: minmax(0, 1fr); } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
-.ph { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
-.ph h2 { font-size: 13px; font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; align-items: center; }
-.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
-.chip[aria-pressed="true"].bust { background: var(--bust-soft); border-color: var(--bust); color: var(--bust); }
-.chip[aria-pressed="true"].re { background: var(--re-soft); border-color: var(--re); color: var(--re); }
-.chip[aria-pressed="true"].entry { background: var(--entry-soft); border-color: var(--entry); color: var(--entry); }
-.search { flex: 1 1 180px; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 7px 10px; font-size: 16px; }
+.sel, .btn { border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+.sel { appearance: none; padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 13px) 52%, calc(100% - 9px) 52%; background-size: 4px 4px; background-repeat: no-repeat; max-width: 100%; }
+.btn:hover, .sel:hover { border-color: var(--dim); }
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-bottom: 6px; min-width: 0; }
+.status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+.dot.live { background: var(--teal); animation: pulse 2s infinite; }
+.dot.err { background: var(--rose); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, .6); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+.tabs { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+.tab { border: 0; background: none; padding: 8px 0 10px; cursor: pointer; color: var(--muted); font: 600 15px/1 var(--head); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; border-bottom: 2px solid transparent; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--teal); }
+.tab .n { font: 500 11px var(--sans); color: var(--dim); margin-left: 5px; letter-spacing: 0; }
+
+/* Layout */
+main { padding-block: 16px 48px; }
+.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) {
+  .grid.two { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+  .tabs .tab[data-tab="events"] { display: none; }
+  .grid.two #view-events { display: block !important; grid-column: 2; grid-row: 1; }
+  #view-feed, #view-players { grid-column: 1; grid-row: 1; }
+}
+.section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 22px 0 10px; }
+.section-h:first-child { margin-top: 0; }
+.section-h h2 { font: 600 16px/1.1 var(--head); letter-spacing: .05em; text-transform: uppercase; margin: 0; color: var(--fg); }
+.section-h .t { font-size: 12px; color: var(--dim); }
+.empty { padding: 22px 12px; color: var(--dim); text-align: center; font-size: 13px; }
+.more { display: block; width: 100%; margin-top: 10px; text-align: center; }
+
+/* Filters */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.chip { border: 1px solid var(--line2); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.chip[aria-pressed="true"].bust { background: var(--rose-soft); border-color: var(--rose); color: var(--rose); }
+.chip[aria-pressed="true"].re { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+.chip[aria-pressed="true"].entry { background: var(--sky-soft); border-color: var(--sky); color: var(--sky); }
+.chip.toggle input { accent-color: var(--teal); margin: 0; }
+.chip.toggle:has(input:checked) { border-color: var(--teal); color: var(--teal2); background: var(--teal-soft); }
+.search { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 7px 10px; font-size: 16px; }
+.search::placeholder { color: var(--dim); }
 @media (min-width: 700px) { .search { font-size: 13px; } }
-.sel.small { padding: 6px 8px; max-width: 100%; }
-.feed { list-style: none; margin: 0; padding: 0; }
-.feed li { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); }
-.feed li.day { display: block; padding: 8px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--bg); }
+.sel.small { font-size: 12.5px; padding-block: 5px; }
+
+/* Event cards (APT style) */
+.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+@media (min-width: 980px) { #view-events .cards { grid-template-columns: minmax(0, 1fr); } }
+.card { display: grid; gap: 10px; border: 0; border-radius: var(--r); background: var(--card); padding: 14px 16px; cursor: pointer; text-align: left; width: 100%; transition: background .15s; }
+.card:hover { background: var(--hover); }
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
+.card-top .when { color: var(--muted); font-weight: 600; }
+.phase { font-weight: 700; font-size: 12.5px; color: var(--teal); white-space: nowrap; }
+.phase.itm { color: var(--gold); } .phase.done { color: var(--dim); }
+.card h3 { margin: 0; font-size: 14.5px; font-weight: 500; line-height: 1.3; color: var(--fg); text-wrap: pretty; }
+.num-tag { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 4px; }
+.part { display: inline-block; font-size: 11px; font-weight: 600; color: var(--fg2); background: var(--card2); border: 1px solid var(--line2); border-radius: 4px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
+.stats4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; text-align: center; }
+.stats4 .k, .kv .k { font-size: 11px; color: var(--dim); }
+.stats4 .v { font-size: 14px; font-weight: 600; color: var(--fg2); }
+.mix { display: grid; gap: 6px; }
+.mix-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); }
+.mix-bar i { display: block; height: 100%; }
+.mix-bar .p { background: var(--teal); } .mix-bar .r { background: var(--amber); } .mix-bar .m { background: var(--line2); }
+.mix-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.mix-legend b { color: var(--fg2); font-weight: 600; }
+.mix-legend .sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.sw.p { background: var(--teal); } .sw.r { background: var(--amber); } .sw.m { background: var(--line2); } .sw.o { background: var(--rose); }
+
+/* Lists (starting soon, completed) */
+.list { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.list li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); align-items: center; }
+.list li:first-child { border-top: 0; }
+.list .when { font-size: 12px; font-weight: 600; color: var(--muted); }
+.list .nm { font-size: 13.5px; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
+.list .sub { font-size: 12px; color: var(--dim); margin-top: 2px; overflow-wrap: anywhere; }
+.list .sub b { color: var(--gold); font-weight: 600; }
+.list .sub b.bag { color: var(--teal2); }
+.list .right { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.list .right b { display: block; color: var(--fg2); font-weight: 600; }
+.list.click li { cursor: pointer; } .list.click li:hover { background: var(--hover); }
+.list .empty { display: block; }
+
+/* Bust feed */
+.feed { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.feed li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); }
+.feed li.day { display: block; padding: 7px 14px; font: 600 12px var(--head); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--card2); }
 .feed li.fresh { animation: flash 2.5s ease-out; }
-@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+@keyframes flash { from { background: var(--teal-soft); } to { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .feed li.fresh { animation: none; } }
-.t { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.feed .t { font-size: 12px; color: var(--dim); font-weight: 500; }
 .who { min-width: 0; }
-.who .nm { font-weight: 500; cursor: pointer; overflow-wrap: anywhere; }
+.who .nm { font-weight: 500; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .who .nm:hover { text-decoration: underline; }
-.who .ev { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; text-align: center; }
-.badge.bust { background: var(--bust-soft); color: var(--bust); }
-.badge.reentry { background: var(--re-soft); color: var(--re); }
-.badge.entry { background: var(--entry-soft); color: var(--entry); }
-.badge.cash { background: var(--accent-soft); color: var(--accent); }
-.badge.seat { background: var(--accent-soft); color: var(--accent); }
-.badge.end { background: var(--accent-soft); color: var(--accent); }
-.empty { padding: 26px 14px; color: var(--muted); text-align: center; }
-.more { display: block; width: calc(100% - 28px); margin: 10px 14px 14px; }
-.cards { display: grid; gap: 10px; padding: 0 14px 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
-.card { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; cursor: pointer; background: var(--bg); text-align: left; width: 100%; }
-.card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.card h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; line-height: 1.3; }
-.card .sub { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-.pill.lr { color: var(--re); border-color: var(--re); }
-.pill.itm { color: var(--accent); border-color: var(--accent); }
-.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; margin-top: 10px; }
-.kv div { min-width: 0; }
-.kv .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.kv .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; }
-.kv .v.warn { color: var(--re); }
-.bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 10px; overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--accent); }
-.plist { list-style: none; margin: 0; padding: 0; }
-.plist li { border-top: 1px solid var(--line); }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; cursor: pointer; width: 100%; border: 0; background: transparent; text-align: left; }
-.row:hover { background: var(--bg); }
+.who .ev { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap; text-align: center; }
+.badge.bust { background: var(--rose-soft); color: var(--rose); }
+.badge.reentry { background: var(--amber-soft); color: var(--amber); }
+.badge.entry { background: var(--sky-soft); color: var(--sky); }
+.badge.cash { background: var(--gold-soft); color: var(--gold); }
+.badge.seat, .badge.end { background: var(--teal-soft); color: var(--teal2); }
+
+/* Players */
+.summary { display: grid; gap: 8px; margin-bottom: 8px; }
+.sum-group { background: var(--card); border-radius: var(--r); padding: 10px 14px 12px; }
+.sum-group h3 { margin: 0 0 8px; font: 600 12px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sum-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
+.sum-grid .k { font-size: 11px; color: var(--dim); }
+.sum-grid .v { font-size: 16px; font-weight: 600; color: var(--fg); line-height: 1.25; overflow-wrap: anywhere; }
+.sum-grid .s { font-size: 11px; color: var(--dim); }
+.pos { color: var(--teal2) !important; } .neg { color: var(--rose) !important; } .gold { color: var(--gold) !important; }
+.note { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
+.note.warn { color: var(--amber); }
+.plist { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.plist li { border-top: 1px solid var(--line); } .plist li:first-child { border-top: 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; cursor: pointer; width: 100%; border: 0; background: transparent; text-align: left; align-items: center; }
+.row:hover { background: var(--hover); }
 .row .nm { font-weight: 500; overflow-wrap: anywhere; }
-.row .meta { color: var(--muted); font-size: 12px; }
-.row .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.row .num .big { font-size: 14px; }
-.pos { color: var(--ok); } .neg { color: var(--bust); }
-.legend { padding: 0 14px 12px; font-size: 12px; color: var(--muted); }
-.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border-block: 1px solid var(--line); margin: 0 0 12px; }
-@media (min-width: 560px) { .summary { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.summary div { background: var(--panel); padding: 9px 12px; min-width: 0; }
-.summary .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.summary .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; margin-top: 1px; overflow-wrap: anywhere; }
-.summary .s { font-size: 11px; color: var(--muted); }
-.summary-h { padding: 0 14px 6px; font-size: 12px; color: var(--muted); }
-details.notes { margin-top: 16px; color: var(--muted); font-size: 12.5px; }
-details.notes summary { cursor: pointer; color: var(--fg); font-weight: 500; }
-details.notes li { margin: 5px 0; }
-/* Player sheet */
-.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
-.sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: 86vh; overflow: auto; background: var(--panel); border-radius: 16px 16px 0 0; border: 1px solid var(--line);
-  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
-@media (min-width: 760px) { .sheet { left: auto; top: 0; bottom: 0; width: 440px; max-height: none; border-radius: 0; } }
-.sheet h2 { margin: 0; font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
-.sheet .close { float: right; }
-.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
-.stats .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.stats .v { font-family: var(--mono); font-size: 15px; }
-.tl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
-.tl li { position: relative; padding: 4px 0 10px 10px; }
-.tl li::before { content: ""; position: absolute; left: -20px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--panel); border: 2px solid var(--muted); }
-.tl li.bust::before { border-color: var(--bust); background: var(--bust); }
-.tl li.reentry::before { border-color: var(--re); background: var(--re); }
-.tl li.cash::before { border-color: var(--accent); background: var(--accent); }
-.tl .when { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
-.tl li.buyin::before { border-color: var(--bust); }
-.tl .amt { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 1px; }
-.tl .amt b { font-weight: 500; }
-.tl .amt .minus { color: var(--bust); } .tl .amt .plus { color: var(--ok); }
-.chart { position: relative; margin: 4px 0 14px; }
+.row .meta { color: var(--dim); font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; margin-top: 1px; }
+.row .num { text-align: right; white-space: nowrap; }
+.row .num .big { font-size: 14px; font-weight: 600; color: var(--gold); }
+.row .num .small { font-size: 12px; color: var(--dim); }
+.tag { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; }
+.tag.seat { background: var(--teal-soft); color: var(--teal2); }
+.tag.out { background: var(--card2); color: var(--muted); }
+
+/* Notes */
+details.notes { margin-top: 24px; color: var(--muted); font-size: 13px; background: var(--card); border-radius: var(--r); padding: 12px 16px; }
+details.notes summary { cursor: pointer; color: var(--fg); font: 600 14px var(--head); letter-spacing: .05em; text-transform: uppercase; }
+details.notes h4 { margin: 14px 0 4px; color: var(--fg2); font-size: 13px; }
+details.notes p, details.notes li { margin: 4px 0; max-width: 72ch; }
+details.notes ul { padding-left: 18px; margin: 4px 0; }
+
+/* Sheet */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 40; }
+.sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow: auto; background: var(--bg); border-radius: 14px 14px 0 0; border-top: 1px solid var(--line2);
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 760px) { .sheet { left: auto; top: 0; bottom: 0; width: 460px; max-height: none; border-radius: 0; border-top: 0; border-left: 1px solid var(--line2); } }
+.sheet-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.sheet-head .spacer { flex: 1; }
+.sheet h2 { margin: 0; font: 600 22px/1.15 var(--head); letter-spacing: .02em; overflow-wrap: anywhere; }
+.sheet .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; background: var(--card); border-radius: var(--r); padding: 12px 14px; }
+.kv .v { font-size: 16px; font-weight: 600; color: var(--fg); }
+.hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
+.chart-h { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+.chart-h h3, .tl-h { margin: 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.chart-h span { font-size: 11px; color: var(--dim); }
+.chart { position: relative; margin: 6px 0 16px; background: var(--card); border-radius: var(--r); padding: 10px 6px 4px; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
-.chart .lbl { fill: var(--muted); font: 10.5px var(--mono); }
+.chart .lbl { fill: var(--dim); font: 10.5px var(--sans); }
 .chart .grid { stroke: var(--line); }
-.chart .zero { stroke: var(--muted); stroke-dasharray: 3 3; opacity: .7; }
+.chart .zero { stroke: var(--line2); stroke-dasharray: 3 3; }
 .chart .day { stroke: var(--line); stroke-dasharray: 2 3; }
 .chart .ln { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
-.chart .ln.up { stroke: var(--ok); } .chart .ln.down { stroke: var(--bust); }
-.chart .pt-in, .chart .pt-out { stroke: var(--panel); stroke-width: 1.5; }
-.chart .pt-in { fill: var(--bust); } .chart .pt-out { fill: var(--ok); }
-.chart .end { fill: var(--fg); font: 600 11.5px var(--mono); }
-.chart .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 12px; line-height: 1.4; box-shadow: 0 4px 14px rgba(0,0,0,.18); max-width: 230px; z-index: 2; }
-.chart .tip .m { color: var(--muted); font-family: var(--mono); font-size: 11px; }
-.chart-h { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
-.chart-h h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
-.chart-h span { font-size: 11px; color: var(--muted); }
-.hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
-.seg { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 4px 0 10px; }
-.seg button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 11px; cursor: pointer; font-size: 12.5px; white-space: nowrap; }
+.chart .ln.up { stroke: var(--teal2); } .chart .ln.down { stroke: var(--rose); }
+.chart .pt-in, .chart .pt-out { stroke: var(--card); stroke-width: 1.5; }
+.chart .pt-in { fill: var(--rose); } .chart .pt-out { fill: var(--gold); }
+.chart .end { font: 600 11.5px var(--sans); }
+.chart .tip { position: absolute; pointer-events: none; background: var(--card2); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 9px; font-size: 12px; line-height: 1.4; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); max-width: 230px; z-index: 2; }
+.chart .tip .m { color: var(--muted); font-size: 11px; }
+.seg { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 4px 0 10px; }
+.seg button { border: 1px solid var(--line2); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.seg button .n { font-family: var(--mono); font-size: 11px; opacity: .75; margin-left: 4px; }
-.sheet .plist { margin: 0 -16px; }
-.sheet .row { padding: 9px 16px; }
-.sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
-.back { margin-right: 8px; }
-.soon { list-style: none; margin: 0; padding: 0 14px 14px; }
-.soon li { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); align-items: baseline; }
-.soon .nm { overflow-wrap: anywhere; }
-.soon .meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
-.soon.done li { grid-template-columns: 74px minmax(0, 1fr) auto; cursor: pointer; }
-.soon.done li:hover .nm, .soon.done li:focus-visible .nm { text-decoration: underline; }
-.soon.done .win { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
-.soon.done .win b { color: var(--fg); font-weight: 500; }
-.soon.done .right { text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.seg button .n { font-size: 11px; opacity: .7; margin-left: 4px; }
+.sheet .plist .row { padding: 9px 14px; }
+.tl { list-style: none; margin: 8px 0 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.tl li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); align-items: start; }
+.tl li:first-child { border-top: 0; }
+.tl .mk { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--dim); }
+.tl li.bust .mk { background: var(--rose); } .tl li.reentry .mk { background: var(--amber); } .tl li.cash .mk { background: var(--gold); }
+.tl li.buyin .mk { background: transparent; border: 1.5px solid var(--rose); } .tl li.end .mk, .tl li.seen .mk, .tl li.carry .mk { background: var(--teal); }
+.tl .when { font-size: 11.5px; color: var(--dim); }
+.tl .what { font-size: 13px; color: var(--fg2); overflow-wrap: anywhere; }
+.tl .amt { text-align: right; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.tl .amt small { display: block; font-weight: 400; font-size: 11px; color: var(--dim); }
+.tl .amt.minus { color: var(--rose); } .tl .amt.plus { color: var(--gold); }
 </style>
 </head>
 <body>
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <h1>APT Taipei 2026 <small>live tracker</small></h1>
+      <div class="brand"><h1>APT Taipei 2026</h1><span>Live tracker</span></div>
       <div class="ctl">
-        <label class="sr" for="interval">Poll every</label>
-        <select id="interval" class="sel small" aria-label="Poll interval">
-          <option value="15">15s</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2 min</option><option value="0">Paused</option>
+        <select id="interval" class="sel" aria-label="How often this page polls">
+          <option value="15">15s</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2m</option><option value="0">Off</option>
         </select>
         <button id="refresh" class="btn" type="button" aria-label="Poll now">↻</button>
       </div>
     </div>
     <div class="status" aria-live="polite"><span id="dot" class="dot"></span><span id="status-text">Starting…</span></div>
     <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" data-tab="events" aria-selected="false">Live events<span class="n" id="n-events"></span></button>
+      <button class="tab" role="tab" data-tab="events" aria-selected="false">Events<span class="n" id="n-events"></span></button>
       <button class="tab" role="tab" data-tab="feed" aria-selected="true">Bust feed<span class="n" id="n-feed"></span></button>
       <button class="tab" role="tab" data-tab="players" aria-selected="false">Players<span class="n" id="n-players"></span></button>
     </nav>
@@ -199,8 +242,8 @@ details.notes li { margin: 5px 0; }
 
 <main class="wrap">
   <div class="grid two" id="grid">
-    <section id="view-feed" class="panel" role="tabpanel" aria-label="Bust feed">
-      <div class="ph"><h2>Bust feed</h2><span class="t" id="feed-count"></span></div>
+    <section id="view-feed" role="tabpanel" aria-label="Bust feed">
+      <div class="section-h"><h2>Bust feed</h2><span class="t" id="feed-count"></span></div>
       <div class="filters">
         <button class="chip bust" data-kind="bust" aria-pressed="true">Busts</button>
         <button class="chip re" data-kind="reentry" aria-pressed="true">Re-entries</button>
@@ -213,65 +256,77 @@ details.notes li { margin: 5px 0; }
       <button class="btn more" id="feed-more" type="button" hidden>Show more</button>
     </section>
 
-    <section id="view-events" class="panel" role="tabpanel" aria-label="Live events" hidden>
-      <div class="ph"><h2>Live events</h2></div>
-      <p class="legend">Tap an event to see its players. Entries = players seen + re-entries + missed. Missed bullets were never seen seated: busted before tracking began, or entered and busted between two polls.</p>
+    <section id="view-events" role="tabpanel" aria-label="Events" hidden>
+      <div class="section-h"><h2>Running now</h2><span class="t">tap for players</span></div>
       <div class="cards" id="events"></div>
-      <div class="ph"><h2>Starting soon</h2></div>
-      <ul class="soon" id="soon"></ul>
-      <div class="ph"><h2>Completed</h2><span class="t" id="done-count"></span></div>
-      <ul class="soon done" id="done"></ul>
-      <button class="btn more" id="done-more" type="button" hidden>Show all completed events</button>
+      <div class="section-h"><h2>Starting soon</h2></div>
+      <ul class="list" id="soon"></ul>
+      <div class="section-h"><h2>Completed</h2><span class="t" id="done-count"></span></div>
+      <ul class="list click" id="done"></ul>
+      <button class="btn more" id="done-more" type="button" hidden>Show all completed</button>
     </section>
 
-    <section id="view-players" class="panel" role="tabpanel" aria-label="Players" hidden>
-      <div class="ph"><h2>Players</h2><span class="t" id="players-count"></span></div>
+    <section id="view-players" role="tabpanel" aria-label="Players" hidden>
+      <div class="section-h"><h2>Players</h2><span class="t" id="players-count"></span></div>
       <div class="filters">
         <input id="players-q" class="search" type="search" placeholder="Search player" aria-label="Search players" autocomplete="off">
         <select id="players-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
         <select id="players-sort" class="sel small" aria-label="Sort players">
-          <option value="prizes">Top prizes</option><option value="net">Net</option><option value="bullets">Most bullets</option>
-          <option value="reentries">Most re-entries</option><option value="buyins">Most buy-ins</option><option value="itm">ITM %</option>
+          <option value="prizes">Prizes</option><option value="net">Net</option><option value="bullets">Bullets</option>
+          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM %</option>
           <option value="lastBust">Latest bust</option><option value="seated">Seated now</option><option value="name">Name</option>
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
-        <label class="chip" style="cursor:pointer"><input type="checkbox" id="players-fromstart" style="margin:0"> Only events watched from the start</label>
+        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> Watched from start only</label>
       </div>
-      <div class="summary-h" id="summary-h"></div>
+      <p class="note" id="summary-h"></p>
       <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
-      <p class="legend">Buy-in = bullets seen × buy-in. A ≥ marks players with events we didn't watch from the start; there one bullet is counted.</p>
       <ul class="plist" id="players"></ul>
       <button class="btn more" id="players-more" type="button" hidden>Show more</button>
     </section>
   </div>
 
   <details class="notes">
-    <summary>How this works and its limits</summary>
+    <summary>How the numbers work</summary>
+    <h4>Where the data comes from</h4>
     <ul>
-      <li>Every 60 seconds (by default) this page reads the APT site's live seating for every running event, straight from your browser. A player whose seat disappears is logged as busted; a busted player who sits down again is a re-entry.</li>
-      <li>History comes from a poller on GitHub Actions that does the same thing around the clock and saves its record every few minutes. This page loads that record on open and then continues live.</li>
-      <li>Times are Taipei time. A bust is stamped at the poll that first saw the seat empty, so it can be up to one poll late.</li>
-      <li>A bust and re-entry inside one poll interval looks like a seat change and is missed. Those show up as untracked bullets on the event card.</li>
-      <li>Results (places and prizes) come from the site's payout pages. Players are matched by name exactly as printed.</li>
-      <li>Chip counts are not live on the site, so they are not shown.</li>
+      <li>This page reads the APT site's live seating for every running event, from your browser (every 60 s by default). A player whose seat disappears is logged as busted; a busted player who sits down again while registration is open is a re-entry.</li>
+      <li>A poller on GitHub does the same around the clock and saves its record every few minutes. This page loads that record on open, then continues live.</li>
+      <li>Payouts (places and prizes) come from the site's payout pages, checked every minute while an event is in the money. Chip counts on the site are not live, so they are not shown.</li>
+      <li>Times are Taipei time. A bust is stamped at the poll that first saw the seat empty.</li>
+    </ul>
+    <h4>Event cards</h4>
+    <ul>
+      <li>Entries (official) = players seen + re-entries + missed. The coloured bar shows that split.</li>
+      <li>Missed bullets were never seen seated: busted before tracking began, or a bust and re-entry faster than one poll.</li>
+      <li>"Over" means we counted more bullets than the official entries: registrations cancelled after seating.</li>
+      <li>For a later day (Day 2, Final Day) the entries cover every flight, so missed is only known when all flights were watched from their start.</li>
+    </ul>
+    <h4>Players</h4>
+    <ul>
+      <li>Buy-in = bullets seen × buy-in. A ≥ means some of that player's events were not watched from the start; there one bullet is counted.</li>
+      <li>Events played before tracking began only show their cashers, so ITM and net look far better than reality. Tick "Watched from start only" for honest totals.</li>
+      <li>Players are matched by name; name edits by the floor (e.g. reordered names) are merged.</li>
     </ul>
   </details>
 </main>
 
 <div id="sheet-bg" class="sheet-bg" hidden></div>
 <aside id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-name" hidden>
-  <button class="btn close" id="sheet-close" type="button" aria-label="Close">✕</button>
-  <button class="btn back" id="sheet-back" type="button" hidden>← Event</button>
+  <div class="sheet-head">
+    <button class="btn" id="sheet-back" type="button" hidden>← Event</button>
+    <span class="spacer"></span>
+    <button class="btn" id="sheet-close" type="button" aria-label="Close">✕</button>
+  </div>
   <h2 id="sheet-name"></h2>
-  <div class="t" id="sheet-sub"></div>
-  <div class="stats" id="sheet-stats"></div>
+  <div class="sub" id="sheet-sub"></div>
+  <div class="kv" id="sheet-stats"></div>
   <div id="sheet-chart-wrap" hidden>
-    <div class="chart-h"><h3>Bankroll</h3><span>buy-ins − / cashes +</span></div>
+    <div class="chart-h"><h3>Bankroll</h3><span><span style="color:var(--rose)">●</span> buy-in &nbsp;<span style="color:var(--gold)">●</span> cash</span></div>
     <div class="chart" id="sheet-chart"></div>
   </div>
-  <p class="hint" id="sheet-hint"></p>
+  <div class="hint" id="sheet-hint"></div>
   <div id="sheet-event" hidden>
-    <div class="sheet-actions"><button class="btn" id="sheet-feed" type="button">Show this event's busts in the feed</button></div>
     <div class="seg" id="sheet-seg" role="group" aria-label="Player status">
       <button type="button" data-seg="seated" aria-pressed="true">Seated<span class="n"></span></button>
       <button type="button" data-seg="busted" aria-pressed="false">Busted<span class="n"></span></button>
@@ -280,10 +335,13 @@ details.notes li { margin: 5px 0; }
       <button type="button" data-seg="cashed" aria-pressed="false">Cashed<span class="n"></span></button>
       <button type="button" data-seg="all" aria-pressed="false">All<span class="n"></span></button>
     </div>
-    <input id="sheet-q" class="search" type="search" placeholder="Search this event" aria-label="Search players in this event" autocomplete="off" style="width:100%;margin-bottom:6px">
+    <div class="filters">
+      <input id="sheet-q" class="search" type="search" placeholder="Search this event" aria-label="Search players in this event" autocomplete="off">
+      <button class="btn" id="sheet-feed" type="button">Busts in feed →</button>
+    </div>
     <ul class="plist" id="sheet-list"></ul>
   </div>
-  <ul class="tl" id="sheet-tl"></ul>
+  <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
 </aside>
 
 <script src="tracker.js?v=7a374145c2"></script>
@@ -322,6 +380,7 @@ details.notes li { margin: 5px 0; }
   const tz = 'Asia/Taipei';
   const fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
   const fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
+  const fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short' });
   const fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const dayKey = (t) => fDay.format(new Date(t * 1000));
   const nf = new Intl.NumberFormat('en-US');
@@ -331,14 +390,21 @@ details.notes li { margin: 5px 0; }
   const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + short(Math.abs(v));
   const ord = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
   const flag = (cc) => (cc && /^[A-Z]{2}$/.test(cc)) ? String.fromCodePoint(...[...cc].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65)) : '';
-  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; };
+  const withFlag = (cc, name) => (flag(cc) ? flag(cc) + ' ' : '') + name;
+  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : Math.round(s / 3600) + 'h ago'; };
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  const evShort = (e) => e ? `#${e.num} ${e.name.replace(/^\[Event \d+\]\s*/, '')}` : '';
+  const PART = /\s*-\s*\b((?:Turbo )?Flight \w+|Day \d+|Final Day|Final Table)\b/i;
+  // Short event name for lists: no "[Event 1]", guarantee, sponsor or long game notes in brackets
+  const cleanName = (name) => String(name || '').replace(/^\[Event \d+\]\s*/, '').replace(/\s*-\s*(?:TWD|USD) [\d,]+ GTD.*$/i, '').replace(/\s*-\s*Sponsored by .*$/i, '').replace(/\s*\([^)]{12,}\)/g, '').trim();
+  const partOf = (name) => { const m = String(name || '').match(PART); return m ? m[1] : ''; };
+  const baseOf = (name) => cleanName(String(name || '').replace(/\s*-\s*\b((?:Turbo )?Flight \w+|Day \d+|Final Day|Final Table)\b.*$/i, ''));
+  const evShort = (e) => e ? `#${e.num} ${baseOf(e.name)}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
+  const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
+  const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
 
   /* ---------- data plumbing ---------- */
   function persist() {
     if (!store.set(LS_STATE, JSON.stringify(state))) {
-      // Too big for this browser's storage: keep a trimmed copy
       const slim = { ...state, feed: state.feed.slice(-1500) };
       store.set(LS_STATE, JSON.stringify(slim));
     }
@@ -362,7 +428,7 @@ details.notes li { margin: 5px 0; }
       lastErr = s.errors.length && !s.events ? s.errors[0] : null;
       // If the site refuses requests, wait longer (2 min, doubling to 10 min) until it accepts them again
       backoff = s.throttled ? Math.min(600, Math.max(120, backoff * 2, s.retryAfter || 0)) : 0;
-      if (s.throttled) lastErr = 'the site is limiting requests, slowing down';
+      if (s.throttled) lastErr = 'site is limiting requests, slowing down';
       freshSince = before;
       persist();
     } catch (e) { lastErr = String(e.message || e); }
@@ -384,26 +450,23 @@ details.notes li { margin: 5px 0; }
     const iv = Number(prefs.interval);
     dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
     const parts = [];
-    if (polling) parts.push('Polling…');
-    else if (lastErr) parts.push('Site unreachable: ' + lastErr);
-    else if (state.updatedAt) parts.push('Updated ' + fTime.format(new Date(state.updatedAt * 1000)) + ' Taipei');
-    if (iv && nextAt && !polling) parts.push('next in ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
-    if (!iv) parts.push('paused');
-    parts.push(STATE_URL ? (ghAt ? 'history ' + ago(ghAt) : 'history loading') : 'no GitHub history (add ?repo=owner/name)');
+    if (polling) parts.push('Updating…');
+    else if (lastErr) parts.push(lastErr);
+    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + fTime.format(new Date(state.updatedAt * 1000)) + ' Taipei');
+    if (iv && nextAt && !polling) parts.push('next ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
+    parts.push(STATE_URL ? (ghAt ? 'history ' + ago(ghAt) : 'loading history') : 'no history (?repo=owner/name)');
     txt.textContent = parts.join(' · ');
   }
   setInterval(setStatus, 1000);
 
-  /* ---------- views ---------- */
+  /* ---------- shared bits ---------- */
   function resultIndex() {
     const m = new Map();
-    for (const [num, r] of Object.entries(state.results || {})) for (const [pos, n, , prize] of r.rows) m.set(num + '|' + n, { pos, prize });
+    for (const [n0, r] of Object.entries(state.results || {})) for (const [pos, n, , prize] of r.rows) m.set(n0 + '|' + n, { pos, prize });
     return m;
   }
-
-  // Country menus: flag, name and how many players, most common first. Rebuilt only when the list changes,
-  // so an open menu is not reset by the next poll.
   const regionName = (() => { try { const d = new Intl.DisplayNames(['en'], { type: 'region' }); return (cc) => { try { return d.of(cc) || cc; } catch { return cc; } }; } catch { return (cc) => cc; } })();
+  // Country menus: flag, name and player count, most common first; rebuilt only when the list changes
   function fillCountries(sel, ccs) {
     const counts = new Map();
     for (const cc of ccs) if (cc && /^[A-Z]{2}$/.test(cc)) counts.set(cc, (counts.get(cc) || 0) + 1);
@@ -416,7 +479,33 @@ details.notes li { margin: 5px 0; }
     }
     sel.value = prefs.country || '';
   }
+  // Small label/value tile
+  const tile = (parent, k, v, sub, cls) => {
+    const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
+    if (sub) d.appendChild(el('div', 's', sub)); parent.appendChild(d); return d;
+  };
+  // Entries split into players seen / re-entries / missed, as a bar plus three numbers
+  function entriesMix(e) {
+    const box = el('div', 'mix');
+    if (e.entries == null) return box;
+    const p = e.unique || 0, r = e.reentriesSeen || 0, m = e.untracked;
+    const total = Math.max(e.entries, p + r) || 1;
+    const bar = el('div', 'mix-bar'); bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label', `${e.entries} entries: ${p} players, ${r} re-entries, ${m == null ? 'unknown' : m} missed`);
+    const seg = (cls, n) => { if (n > 0) { const i = el('i', cls); i.style.width = (n / total * 100) + '%'; bar.appendChild(i); } };
+    seg('p', p); seg('r', r); if (m) seg('m', m);
+    box.appendChild(bar);
+    const lg = el('div', 'mix-legend');
+    const item = (sw, n, label) => { const s = el('span'); s.appendChild(el('span', 'sw ' + sw)); s.appendChild(el('b', '', n)); s.append(' ' + label); lg.appendChild(s); };
+    item('p', nf.format(p), p === 1 ? 'player' : 'players');
+    item('r', nf.format(r), r === 1 ? 're-entry' : 're-entries');
+    if (e.over) item('o', '+' + nf.format(e.over), 'over (cancelled)');
+    else item('m', m == null ? '?' : nf.format(m), 'missed');
+    box.appendChild(lg);
+    return box;
+  }
 
+  /* ---------- bust feed ---------- */
   function renderFeed() {
     const ul = $('#feed');
     { const seen = new Set(), ccs = []; for (const f of state.feed) if (!seen.has(f.n)) { seen.add(f.n); ccs.push(f.cc); } fillCountries($('#feed-country'), ccs); }
@@ -433,9 +522,7 @@ details.notes li { margin: 5px 0; }
     }
     const more = items.length > feedLimit; if (more) items.pop();
     ul.replaceChildren();
-    if (!items.length) {
-      ul.appendChild(el('li', 'empty', state.feed.length ? 'Nothing matches these filters yet.' : 'Waiting for the first busts. The feed fills as players lose their seats.'));
-    }
+    if (!items.length) ul.appendChild(el('li', 'empty', state.feed.length ? 'Nothing matches these filters.' : 'Waiting for the first busts.'));
     let lastDay = '';
     for (const f of items) {
       const d = dayKey(f.t);
@@ -443,100 +530,100 @@ details.notes li { margin: 5px 0; }
       const li = el('li', f.t > freshSince && freshSince ? 'fresh' : '');
       li.appendChild(el('span', 't', fTime.format(new Date(f.t * 1000))));
       const who = el('div', 'who');
-      const nm = el('div', 'nm', (flag(f.cc) ? flag(f.cc) + ' ' : '') + f.n);
+      const nm = el('div', 'nm', withFlag(f.cc, f.n));
       nm.tabIndex = 0; nm.setAttribute('role', 'button');
       nm.addEventListener('click', () => openSheet(f.n));
-      nm.addEventListener('keydown', (e) => { if (e.key === 'Enter') openSheet(f.n); });
+      nm.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') openSheet(f.n); });
       who.appendChild(nm);
-      const e = state.events[f.kid];
-      let extra = '';
-      if (f.k === 'bust') { const r = res.get(f.num + '|' + f.n); if (r) extra = ` · ${ord(r.pos)} for ${short(r.prize)}`; else if (f.b > 1) extra = ` · bullet ${f.b}`; }
-      if (f.k === 'reentry') extra = ` · bullet ${f.b}`;
-      who.appendChild(el('div', 'ev', evShort(e) + extra));
+      who.appendChild(el('div', 'ev', evShort(state.events[f.kid])));
       li.appendChild(who);
-      const label = f.k === 'bust' ? (res.has(f.num + '|' + f.n) ? 'Cashed out' : 'Busted') : f.k === 'reentry' ? 'Re-entered' : 'Entered';
-      li.appendChild(el('span', 'badge ' + (f.k === 'bust' && res.has(f.num + '|' + f.n) ? 'cash' : f.k), label));
+      const r = f.k === 'bust' ? res.get(f.num + '|' + f.n) : null;
+      const [cls, label] = r ? ['cash', `${ord(r.pos)} · ${short(r.prize)}`]
+        : f.k === 'bust' ? ['bust', f.b > 1 ? `Busted · B${f.b}` : 'Busted']
+        : f.k === 'reentry' ? ['reentry', `Bullet ${f.b}`] : ['entry', 'New'];
+      li.appendChild(el('span', 'badge ' + cls, label));
       ul.appendChild(li);
     }
     $('#feed-more').hidden = !more;
     const busts = state.feed.filter((f) => f.k === 'bust').length;
-    $('#feed-count').textContent = nf.format(busts) + ' busts logged';
+    $('#feed-count').textContent = plural(busts, 'bust', 'busts');
     $('#n-feed').textContent = busts ? nf.format(busts) : '';
   }
 
+  /* ---------- events ---------- */
   function renderEvents() {
     const now = Math.floor(Date.now() / 1000);
     const evs = T.liveEvents(state, now);
     const box = $('#events');
     box.replaceChildren();
     $('#n-events').textContent = evs.filter((e) => e.phase !== 'Completed').length || '';
-    // event select for feed
     const sel = $('#feed-event'); const cur = sel.value;
     const nums = [...new Map(evs.map((e) => [e.num, e])).values()];
-    sel.replaceChildren(new Option('All events', ''), ...nums.map((e) => new Option(evShort(e).slice(0, 48), String(e.num))));
+    sel.replaceChildren(new Option('All events', ''), ...nums.map((e) => new Option(`#${e.num} ${baseOf(e.name)}`.slice(0, 40), String(e.num))));
     sel.value = nums.some((e) => String(e.num) === cur) ? cur : '';
-    if (!evs.length) { box.appendChild(el('div', 'empty', 'No event is running right now. Cards appear when play starts.')); return; }
+    if (!evs.length) { box.appendChild(el('div', 'empty', 'No event is running right now.')); return; }
     for (const e of evs) {
-      const c = el('button', 'card' + (eventFilter === String(e.num) ? ' on' : ''));
-      c.type = 'button';
-      c.setAttribute('aria-pressed', String(eventFilter === String(e.num)));
-      c.appendChild(el('h3', '', evShort(e)));
-      const sub = el('div', 'sub');
-      const ph = el('span', 'pill' + (e.phase === 'Late Reg' || e.phase === 'Reg Open' ? ' lr' : e.phase === 'In The Money' ? ' itm' : ''), e.phase);
-      sub.appendChild(ph);
-      sub.appendChild(el('span', '', money(e.buyin)));
-      if (e.regClose && e.regClose > now) { const m = Math.round((e.regClose - now) / 60); sub.appendChild(el('span', '', `reg closes ${fTime.format(new Date(e.regClose * 1000))} (${m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'})`)); }
-      else if (e.regClose) sub.appendChild(el('span', '', 'reg closed'));
-      c.appendChild(sub);
-      const kv = el('div', 'kv');
-      const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); kv.appendChild(d); };
-      add('Entries', num(e.entries));
-      add('Left', num(e.remaining));
-      add('Busts', num(e.busts));
-      add('Players seen', num(e.unique));
-      add('Re-entries', num(e.reentriesSeen));
-      add('Missed', num(e.untracked), e.untracked ? 'warn' : '');
-      c.appendChild(kv);
-      if (e.entries) { const b = el('div', 'bar'); const i = el('i'); i.style.width = Math.min(100, (e.remaining || 0) / e.entries * 100) + '%'; b.appendChild(i); c.appendChild(b); }
-      const foot = el('div', 'sub'); foot.style.marginTop = '8px';
-      foot.textContent = explainEntries(e) + ' · ' + (e.trackedFromStart ? 'tracked from the start' : `tracking since ${fTime.format(new Date(e.firstPoll * 1000))}`);
-      c.appendChild(foot);
+      const c = el('button', 'card'); c.type = 'button';
+      const top = el('div', 'card-top');
+      let when;
+      if (e.phase === 'Completed') when = 'Finished';
+      else if (e.regClose && e.regClose > now) when = `Reg closes ${fTime.format(new Date(e.regClose * 1000))} · ${dur(e.regClose - now)}`;
+      else when = 'Reg closed';
+      if (!e.trackedFromStart && e.firstPoll) when += ` · watched since ${fTime.format(new Date(e.firstPoll * 1000))}`;
+      top.appendChild(el('span', 'when', when));
+      top.appendChild(el('span', 'phase' + (e.phase === 'In The Money' || e.phase === 'Final Table' ? ' itm' : e.phase === 'Completed' ? ' done' : ''), e.phase));
+      c.appendChild(top);
+      const h = el('h3'); h.appendChild(el('span', 'num-tag', '#' + e.num)); h.append(baseOf(e.name));
+      if (partOf(e.name)) h.appendChild(el('span', 'part', partOf(e.name)));
+      c.appendChild(h);
+      const st = el('div', 'stats4');
+      tile(st, 'Buy-in', short(e.buyin)); tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Busts', num(e.busts));
+      c.appendChild(st);
+      c.appendChild(entriesMix(e));
       c.addEventListener('click', () => showEvent(e.kid));
       box.appendChild(c);
     }
   }
 
-  // "83 entries = 65 players + 14 re-entries + 4 missed"
-  function explainEntries(e) {
-    const pl = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
-    if (e.entries == null) return '';
-    if (e.untracked == null) return e.laterDay ? 'Missed unknown: earlier flights were not watched from the start' : '';
-    if (e.over) return `${pl(e.unique, 'player', 'players')} + ${pl(e.reentriesSeen, 're-entry', 're-entries')} = ${nf.format(e.entries + e.over)}, ${nf.format(e.over)} more than the ${pl(e.entries, 'official entry', 'official entries')} (registrations cancelled after seating)`;
-    return `${pl(e.entries, 'entry', 'entries')} = ${pl(e.unique, 'player', 'players')} + ${pl(e.reentriesSeen, 're-entry', 're-entries')} + ${nf.format(e.untracked)} missed`;
+  function renderSoon() {
+    const ul = $('#soon'); ul.replaceChildren();
+    const list = T.upcoming(state, Math.floor(Date.now() / 1000), 12);
+    if (!list.length) { ul.appendChild(el('li', 'empty', 'Nothing else starts in the next 12 hours.')); return; }
+    for (const e of list.slice(0, 15)) {
+      const li = el('li');
+      li.appendChild(el('span', 'when', fTime.format(new Date(e.start * 1000))));
+      const mid = el('div');
+      const nm = el('div', 'nm'); nm.appendChild(el('span', 'num-tag', '#' + e.num)); nm.append(baseOf(e.name));
+      if (partOf(e.name)) nm.appendChild(el('span', 'part', partOf(e.name)));
+      mid.appendChild(nm); li.appendChild(mid);
+      const right = el('div', 'right'); right.appendChild(el('b', '', short(e.buyin))); right.append('buy-in');
+      li.appendChild(right);
+      ul.appendChild(li);
+    }
   }
 
   let doneLimit = 15;
   function renderDone() {
     const ul = $('#done'); ul.replaceChildren();
     const list = T.completedEvents(state);
-    $('#done-count').textContent = list.length ? nf.format(list.length) + ' events' : '';
+    $('#done-count').textContent = list.length ? plural(list.length, 'event', 'events') : '';
     if (!list.length) { ul.appendChild(el('li', 'empty', 'No event has finished yet.')); $('#done-more').hidden = true; return; }
     for (const e of list.slice(0, doneLimit)) {
       const li = el('li'); li.tabIndex = 0; li.setAttribute('role', 'button');
-      li.appendChild(el('span', 'meta', e.finished ? fDay.format(new Date(e.finished * 1000)).replace(/^\w+ /, '') : ''));
+      li.appendChild(el('span', 'when', e.finished ? fDate.format(new Date(e.finished * 1000)) : ''));
       const mid = el('div');
-      mid.appendChild(el('div', 'nm', `#${e.num} ${e.name.replace(/^\[Event \d+\]\s*/, '')}${e.part ? ' · ' + e.part : ''}`));
-      const w = el('div', 'win');
+      const nm = el('div', 'nm'); nm.appendChild(el('span', 'num-tag', '#' + e.num)); nm.append(baseOf(e.name));
+      if (e.part) nm.appendChild(el('span', 'part', e.part));
+      mid.appendChild(nm);
+      const sub = el('div', 'sub');
       if (e.kind === 'flight') {
-        w.appendChild(el('b', '', `${nf.format(e.bagged)} bagged`));
-        if (e.next) w.append(` · ${e.next.part} ${e.next.start ? fFull.format(new Date(e.next.start * 1000)) : ''}`);
-      } else if (e.winner) { w.append('Won by '); w.appendChild(el('b', '', (flag(e.winner.cc) ? flag(e.winner.cc) + ' ' : '') + e.winner.name)); w.append(` · ${short(e.winner.prize)}`); }
-      else w.textContent = e.final ? '' : 'Payouts still being posted';
-      mid.appendChild(w);
+        sub.appendChild(el('b', 'bag', `${nf.format(e.bagged)} bagged`));
+        if (e.next) sub.append(` → ${e.next.part}${e.next.start ? ' ' + fFull.format(new Date(e.next.start * 1000)) : ''}`);
+      } else if (e.winner) { sub.append('🏆 '); sub.appendChild(el('b', '', withFlag(e.winner.cc, e.winner.name))); sub.append(` · ${short(e.winner.prize)}`); }
+      else sub.textContent = e.final ? '' : 'Payouts being posted';
+      mid.appendChild(sub);
       li.appendChild(mid);
-      const right = el('div', 'right');
-      right.appendChild(el('div', '', nf.format(e.entries) + ' entries'));
-      right.appendChild(el('div', '', short(e.buyin) + ' buy-in'));
+      const right = el('div', 'right'); right.appendChild(el('b', '', nf.format(e.entries))); right.append('entries · ' + short(e.buyin));
       li.appendChild(right);
       const open = () => showEvent(e.kid);
       li.addEventListener('click', open);
@@ -546,19 +633,7 @@ details.notes li { margin: 5px 0; }
     $('#done-more').hidden = list.length <= doneLimit;
   }
 
-  function renderSoon() {
-    const ul = $('#soon'); ul.replaceChildren();
-    const list = T.upcoming(state, Math.floor(Date.now() / 1000), 12);
-    if (!list.length) { ul.appendChild(el('li', 'empty', 'Nothing else starts in the next 12 hours.')); return; }
-    for (const e of list.slice(0, 15)) {
-      const li = el('li');
-      li.appendChild(el('span', 'meta', fTime.format(new Date(e.start * 1000))));
-      li.appendChild(el('span', 'nm', evShort(e)));
-      li.appendChild(el('span', 'meta', short(e.buyin)));
-      ul.appendChild(li);
-    }
-  }
-
+  /* ---------- event panel ---------- */
   function showEvent(kid) {
     const ev = state.events[kid];
     if (ev && ev.phase === 'Completed') {
@@ -578,86 +653,86 @@ details.notes li { margin: 5px 0; }
     const now = Math.floor(Date.now() / 1000);
     const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
     $('#sheet-back').hidden = true;
-    $('#sheet-event').hidden = false; $('#sheet-tl').hidden = true; $('#sheet-chart-wrap').hidden = true;
-    $('#sheet-name').textContent = evShort(e);
-    $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.regClose ? (e.regClose > now ? 'reg closes ' + fTime.format(new Date(e.regClose * 1000)) : 'reg closed') : '', e.firstPoll ? 'tracking since ' + fTime.format(new Date(e.firstPoll * 1000)) : ''].filter(Boolean).join(' · ');
+    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true;
+    $('#sheet-name').textContent = '#' + e.num + ' ' + String(e.name).replace(/^\[Event \d+\]\s*/, '');
+    $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.regClose ? (e.regClose > now ? 'reg closes ' + fTime.format(new Date(e.regClose * 1000)) : 'reg closed') : '',
+      e.firstPoll ? (info.trackedFromStart ? 'watched from the start' : 'watched since ' + fTime.format(new Date(e.firstPoll * 1000))) : ''].filter(Boolean).join(' · ');
     const st = $('#sheet-stats'); st.replaceChildren();
-    const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
     const ps = T.eventPlayers(state, e.kid);
-    add('Entries', num(e.entries)); add('Left', num(e.remaining)); add('Seated', num(ps.filter((p) => p.status === 'seated').length));
-    add('Busts', num(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', num(info.reentriesSeen || 0)); add('Missed', num(info.untracked), info.untracked ? 'warn' : '');
-    $('#sheet-hint').textContent = explainEntries(info) + '. ' + (info.trackedFromStart ? '' : 'Tracking began after this event started, so earlier busts and re-entries are not listed.');
+    tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Seated', num(ps.filter((p) => p.status === 'seated').length));
+    tile(st, 'Busts', num(ps.reduce((a, p) => a + p.busts.length, 0))); tile(st, 'Re-entries', num(info.reentriesSeen || 0)); tile(st, 'Missed', num(info.untracked), '', info.untracked ? 'gold' : '');
+    const hint = $('#sheet-hint'); hint.replaceChildren();
+    if (info.entries != null) hint.appendChild(entriesMix(info));
     const groups = {
       seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),
       busted: ps.filter((p) => p.status === 'busted').sort((a, b) => (b.lastBust || 0) - (a.lastBust || 0)),
       reentered: ps.filter((p) => p.bullets > 1).sort((a, b) => b.bullets - a.bullets || (b.lastBust || 0) - (a.lastBust || 0)),
-      cashed: ps.filter((p) => p.pos != null).sort((a, b) => a.pos - b.pos),
       bagged: ps.filter((p) => p.status === 'end').sort((a, b) => a.name.localeCompare(b.name)),
+      cashed: ps.filter((p) => p.pos != null).sort((a, b) => a.pos - b.pos),
       all: ps.slice().sort((a, b) => a.name.localeCompare(b.name)),
     };
     document.querySelectorAll('#sheet-seg button').forEach((b) => {
+      const n = groups[b.dataset.seg].length;
       b.setAttribute('aria-pressed', String(b.dataset.seg === eventSeg));
-      b.querySelector('.n').textContent = nf.format(groups[b.dataset.seg].length);
+      b.querySelector('.n').textContent = nf.format(n);
+      b.hidden = !n && b.dataset.seg !== eventSeg && b.dataset.seg !== 'all';
     });
     const q = $('#sheet-q').value.trim().toLowerCase();
     let rows = groups[eventSeg] || [];
     if (q) rows = rows.filter((p) => p.name.toLowerCase().includes(q));
     const ul = $('#sheet-list'); ul.replaceChildren();
-    if (!rows.length) ul.appendChild(el('li', 'empty', q ? 'No player matches.' : eventSeg === 'busted' ? 'No busts seen yet.' : eventSeg === 'reentered' ? 'No re-entries seen yet.' : eventSeg === 'cashed' ? 'No payouts yet.' : eventSeg === 'bagged' ? 'Nobody has bagged chips here yet.' : 'Nobody here.'));
+    if (!rows.length) ul.appendChild(el('li', 'empty', q ? 'No player matches.' : 'Nobody here yet.'));
     for (const p of rows.slice(0, 600)) {
       const li = el('li'); const b = el('button', 'row'); b.type = 'button';
       const left = el('div');
-      left.appendChild(el('div', 'nm', (flag(p.cc) ? flag(p.cc) + ' ' : '') + p.name));
-      const meta = [];
-      if (p.status === 'seated') meta.push(p.table ? `Table ${p.table} · Seat ${p.seat}` : 'Registered, waiting for a seat');
-      if (p.status === 'end') meta.push('Still in at the end');
-      if (p.lastBust) meta.push((p.status === 'seated' ? 'last bust ' : 'busted ') + fTime.format(new Date(p.lastBust * 1000)));
-      if (p.bullets > 1) meta.push(`bullet ${p.bullets}`);
-      if (p.atStart && p.status !== 'cashed') meta.push('seated before tracking');
-      if (p.status === 'cashed') meta.push('not seen seated');
-      left.appendChild(el('div', 'meta', meta.join(' · ')));
+      left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
+      const meta = el('div', 'meta');
+      if (p.status === 'seated') meta.appendChild(el('span', '', p.table ? `Table ${p.table} · Seat ${p.seat}` : 'Waiting for a seat'));
+      if (p.lastBust) meta.appendChild(el('span', '', (p.status === 'seated' ? 'last bust ' : 'out ') + fTime.format(new Date(p.lastBust * 1000))));
+      if (p.bullets > 1) meta.appendChild(el('span', '', `bullet ${p.bullets}`));
+      if (p.status === 'cashed') meta.appendChild(el('span', '', 'paid before tracking'));
+      left.appendChild(meta);
       const right = el('div', 'num');
-      if (p.pos != null) { right.appendChild(el('div', 'big', ord(p.pos))); right.appendChild(el('div', 'meta', short(p.prize))); }
-      else right.appendChild(el('span', 'badge ' + (p.status === 'seated' ? 'seat' : p.status === 'end' ? 'end' : 'bust'), p.status === 'seated' ? (p.bullets > 1 ? 'Re-entered' : 'Seated') : p.status === 'end' ? 'Bagged' : 'Busted'));
+      if (p.pos != null) { right.appendChild(el('div', 'big', ord(p.pos))); right.appendChild(el('div', 'small', short(p.prize))); }
+      else right.appendChild(el('span', 'badge ' + (p.status === 'seated' ? 'seat' : p.status === 'end' ? 'end' : 'bust'),
+        p.status === 'seated' ? (p.bullets > 1 ? 'Re-entered' : 'Seated') : p.status === 'end' ? 'Bagged' : 'Busted'));
       b.append(left, right);
       b.addEventListener('click', () => { const ev = openEvent; openSheet(p.name); backToEvent = ev; $('#sheet-back').hidden = false; });
       li.appendChild(b); ul.appendChild(li);
     }
   }
 
-  // Totals for exactly the players listed (after country, search and "seated now"/"latest bust" filters)
+  /* ---------- players ---------- */
+  // Totals for exactly the players listed (after country, search and sort filters), in three groups
   function renderSummary(rows, q) {
     const sum = (f) => rows.reduce((a, p) => a + (f(p) || 0), 0);
     const n = rows.length;
     const bullets = sum((p) => p.bullets), entered = sum((p) => p.events);
     const buyins = sum((p) => p.buyins), prizes = sum((p) => p.prizes), net = prizes - buyins;
     const itmPlayers = rows.filter((p) => p.cashes > 0).length, cashes = sum((p) => p.cashes), cashedEvents = sum((p) => p.cashedEvents);
-    const winners = rows.filter((p) => p.net > 0).length, wins = sum((p) => p.wins);
+    const winners = rows.filter((p) => p.net > 0).length, losers = rows.filter((p) => p.net < 0).length, wins = sum((p) => p.wins);
     const partial = rows.some((p) => p.partial);
     const pct = (a, b) => (b ? (a / b * 100).toFixed(1) + '%' : '—');
-    const tiles = [
-      ['Players', nf.format(n), ''],
-      ['Bullets', nf.format(bullets), n ? (bullets / n).toFixed(2) + ' per player' : ''],
-      ['Re-entries', nf.format(Math.max(0, bullets - entered)), entered ? pct(bullets - entered, entered) + ' of entries' : ''],
-      ['Total buy-in', (partial ? '≥' : '') + short(buyins), n ? short(buyins / n) + ' per player' : ''],
-      ['Total prizes', short(prizes), cashes ? short(prizes / cashes) + ' per cash' : ''],
-      ['Net', signed(net), buyins ? pct(net, buyins) + ' ROI' : '', net > 0 ? 'pos' : net < 0 ? 'neg' : ''],
-      ['Cashes', nf.format(cashes), wins ? nf.format(wins) + ' wins' : ''],
-      ['Players ITM', nf.format(itmPlayers), pct(itmPlayers, n) + ' of players'],
-      ['ITM per event', pct(cashedEvents, entered), `${nf.format(cashedEvents)} of ${nf.format(entered)} entered`],
-      ['ITM per bullet', pct(cashedEvents, bullets), `${nf.format(cashedEvents)} of ${nf.format(bullets)} bullets`],
-      ['Winning players', nf.format(winners), pct(winners, n) + ' net up'],
-      ['Losing players', nf.format(rows.filter((p) => p.net < 0).length), pct(rows.filter((p) => p.net < 0).length, n) + ' net down'],
+    const groups = [
+      ['Field', [['Players', nf.format(n), ''], ['Bullets', nf.format(bullets), n ? (bullets / n).toFixed(2) + ' each' : ''], ['Re-entries', nf.format(Math.max(0, bullets - entered)), pct(bullets - entered, entered)]]],
+      ['Money', [['Buy-in', (partial ? '≥' : '') + short(buyins), n ? short(buyins / n) + ' each' : ''], ['Prizes', short(prizes), cashes ? short(prizes / cashes) + ' per cash' : '', 'gold'],
+        ['Net', signed(net), buyins ? 'ROI ' + pct(net, buyins) : '', net > 0 ? 'pos' : net < 0 ? 'neg' : '']]],
+      ['Results', [['Cashes', nf.format(cashes), wins ? plural(wins, 'win', 'wins') : ''], ['Players ITM', pct(itmPlayers, n), nf.format(itmPlayers) + ' players'],
+        ['ITM per event', pct(cashedEvents, entered), `${nf.format(cashedEvents)}/${nf.format(entered)}`], ['ITM per bullet', pct(cashedEvents, bullets), `${nf.format(cashedEvents)}/${nf.format(bullets)}`],
+        ['Winning', pct(winners, n), nf.format(winners) + ' players', 'pos'], ['Losing', pct(losers, n), nf.format(losers) + ' players', 'neg']]],
     ];
     const box = $('#players-summary'); box.replaceChildren();
-    for (const [k, v, sub, cls] of tiles) {
-      const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
-      if (sub) d.appendChild(el('div', 's', sub)); box.appendChild(d);
+    for (const [title, tiles] of groups) {
+      const g = el('div', 'sum-group'); g.appendChild(el('h3', '', title));
+      const grid = el('div', 'sum-grid');
+      for (const [k, v, sub, cls] of tiles) tile(grid, k, v, sub, cls);
+      g.appendChild(grid); box.appendChild(g);
     }
-    const scope = [prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : 'All countries', q ? `matching “${q}”` : '',
+    const scope = [prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : '', q ? `“${q}”` : '',
       prefs.sort === 'seated' ? 'seated now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
-    $('#summary-h').textContent = 'Summary: ' + scope + (prefs.fromStart ? ' · events watched from the start'
-      : ' · includes events played before tracking, where only cashers are known, so ITM and net look far better than reality');
+    const h = $('#summary-h');
+    h.className = 'note' + (prefs.fromStart ? '' : ' warn');
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : '⚠ Includes events played before tracking (only cashers known): ITM and net look better than reality');
   }
 
   function renderPlayers() {
@@ -675,21 +750,24 @@ details.notes li { margin: 5px 0; }
       : (a, b) => ((val(a) - val(b)) * dir) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));
     if (k === 'seated') rows = rows.filter((p) => p.seatedIn.length);
     if (k === 'lastBust') rows = rows.filter((p) => p.lastBust);
-    $('#players-count').textContent = nf.format(rows.length) + ' players';
+    $('#players-count').textContent = plural(rows.length, 'player', 'players');
     renderSummary(rows, q);
     const ul = $('#players'); ul.replaceChildren();
     if (!rows.length) ul.appendChild(el('li', 'empty', all.length ? 'No players match.' : 'Loading players…'));
     for (const p of rows.slice(0, playersLimit)) {
       const li = el('li'); const b = el('button', 'row'); b.type = 'button';
       const left = el('div');
-      left.appendChild(el('div', 'nm', (flag(p.cc) ? flag(p.cc) + ' ' : '') + p.name));
-      const status = p.seatedIn.length ? 'Seated in #' + p.seatedIn.join(', #') : p.lastBust ? 'Busted ' + fFull.format(new Date(p.lastBust * 1000)) : '';
-      left.appendChild(el('div', 'meta', [`${p.bullets} bullet${p.bullets === 1 ? '' : 's'} in ${p.events} event${p.events === 1 ? '' : 's'}`, p.cashes ? `${p.cashes} cash${p.cashes === 1 ? '' : 'es'} (${Math.round(p.itm * 100)}% ITM)` : 'no cash', status].filter(Boolean).join(' · ')));
+      left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
+      const meta = el('div', 'meta');
+      meta.appendChild(el('span', '', `${plural(p.bullets, 'bullet', 'bullets')} · ${plural(p.events, 'event', 'events')}`));
+      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${Math.round(p.itm * 100)}% ITM` : 'no cash'));
+      if (p.seatedIn.length) meta.appendChild(el('span', 'tag seat', 'Seated #' + p.seatedIn.join(', #')));
+      else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + fTime.format(new Date(p.lastBust * 1000))));
+      left.appendChild(meta);
       const right = el('div', 'num');
       right.appendChild(el('div', 'big', p.prizes ? short(p.prizes) : '—'));
-      const n = el('div', 'meta ' + (p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : ''), 'net ' + signed(p.net));
-      right.appendChild(n);
-      right.appendChild(el('div', 'meta', 'in ' + (p.partial ? '≥' : '') + short(p.buyins)));
+      right.appendChild(el('div', 'small ' + (p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : ''), signed(p.net)));
+      right.appendChild(el('div', 'small', 'in ' + (p.partial ? '≥' : '') + short(p.buyins)));
       b.append(left, right);
       b.addEventListener('click', () => openSheet(p.name));
       li.appendChild(b); ul.appendChild(li);
@@ -697,24 +775,24 @@ details.notes li { margin: 5px 0; }
     $('#players-more').hidden = rows.length <= playersLimit;
   }
 
+  /* ---------- player panel ---------- */
   function whenText(it) {
     if (!it.t) return '';
     const d = new Date((it.before ? it.t + 1 : it.t) * 1000);
     if (it.approx) return fDay.format(d);
-    if (it.before) return fDay.format(d) + ', before ' + fTime.format(d) + ' (paid before tracking)';
+    if (it.before) return fDay.format(d) + ', before ' + fTime.format(d) + ' (before tracking)';
     return fFull.format(d);
   }
-
   function describe(it) {
-    const ev = '#' + it.num + ' ' + String(it.ev || '').replace(/^\[Event \d+\]\s*/, '');
+    const ev = '#' + it.num + ' ' + baseOf(it.ev || '') + (partOf(it.ev) ? ' · ' + partOf(it.ev) : '');
     switch (it.k) {
       case 'bust': return `Busted · ${ev}`;
       case 'reentry': return `Re-entered (bullet ${it.b}) · ${ev}`;
-      case 'cash': return `Cashed ${ord(it.pos)} for ${money(it.prize)} · ${ev}`;
-      case 'end': return `Still in at the end · ${ev}`;
-      case 'carry': return `Carried over to ${ev}`;
-      case 'buyin': return `Bought in (1 bullet assumed, not watched) · ${ev}`;
-      default: return it.first ? `Already seated when tracking began · ${ev}` : `Entered · ${ev}`;
+      case 'cash': return `${ord(it.pos)} place · ${ev}`;
+      case 'end': return `In at the end · ${ev}`;
+      case 'carry': return `Carried over · ${ev}`;
+      case 'buyin': return `Bought in (not watched) · ${ev}`;
+      default: return it.first ? `Seated when tracking began · ${ev}` : `Entered · ${ev}`;
     }
   }
 
@@ -767,21 +845,18 @@ details.notes li { margin: 5px 0; }
       add('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 0 ? 'zero' : 'grid' });
       add('text', { x: m.l - 6, y: y(v) + 3.5, 'text-anchor': 'end', class: 'lbl' }, short(v));
     }
-    // Day separators
     let prevDay = '', lastLabelX = -99;
     pts.slice(1).forEach((p) => {
-      const d = p.it.t ? fDay.format(new Date(p.it.t * 1000)).replace(/^\w+ /, '') : '';
+      const d = p.it.t ? fDate.format(new Date(p.it.t * 1000)) : '';
       if (d && d !== prevDay) {
         const xx = x(p.i - 1) + (x(p.i) - x(p.i - 1)) / 2;
         if (prevDay) add('line', { x1: xx, x2: xx, y1: m.t, y2: H - m.b, class: 'day' });
-        // Place the label centred on the day change, nudged inside the plot, and skip it if it would touch the previous one
-        const w = d.length * 6.4;
+        const w = d.length * 6.2;
         const left = Math.min(Math.max(m.l, xx - w / 2), W - m.r - w);
         if (left > lastLabelX + 8) { add('text', { x: left, y: H - 6, class: 'lbl', 'text-anchor': 'start' }, d); lastLabelX = left + w; }
         prevDay = d;
       }
     });
-    // Smooth curve through the points (monotone cubic: never overshoots between two values)
     const xy = pts.map((p) => [x(p.i), y(p.bank)]);
     const dPath = smoothPath(xy);
     const z = y(0);
@@ -791,7 +866,7 @@ details.notes li { margin: 5px 0; }
       const g = document.createElementNS(NS, 'linearGradient');
       g.setAttribute('id', id); g.setAttribute('gradientUnits', 'userSpaceOnUse');
       g.setAttribute('x1', 0); g.setAttribute('x2', 0); g.setAttribute('y1', from); g.setAttribute('y2', to);
-      [[0, 0.32], [1, 0.02]].forEach(([o, a]) => { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', color); st.setAttribute('stop-opacity', a); g.appendChild(st); });
+      [[0, 0.35], [1, 0.02]].forEach(([o, a]) => { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', color); st.setAttribute('stop-opacity', a); g.appendChild(st); });
       defs.appendChild(g);
     };
     const clip = (id, y0c, h) => {
@@ -799,7 +874,7 @@ details.notes li { margin: 5px 0; }
       const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', 0); r.setAttribute('width', W); r.setAttribute('y', y0c); r.setAttribute('height', Math.max(0, h));
       c.appendChild(r); defs.appendChild(c);
     };
-    grad(uid + 'gu', 'var(--ok)', m.t, z); grad(uid + 'gd', 'var(--bust)', H - m.b, z);
+    grad(uid + 'gu', '#2dd4bf', m.t, z); grad(uid + 'gd', '#f43f5e', H - m.b, z);
     clip(uid + 'cu', 0, z); clip(uid + 'cd', z, H - z);
     const area = dPath + `L${xy[xy.length - 1][0]},${z}L${xy[0][0]},${z}Z`;
     add('path', { d: area, fill: `url(#${uid}gu)`, 'clip-path': `url(#${uid}cu)` });
@@ -808,7 +883,7 @@ details.notes li { margin: 5px 0; }
     add('path', { d: dPath, class: 'ln down', 'clip-path': `url(#${uid}cd)` });
     for (const p of pts.slice(1)) add('circle', { cx: x(p.i), cy: y(p.bank), r: p.it.amt > 0 ? 4 : 2.75, class: p.it.amt > 0 ? 'pt-out' : 'pt-in' });
     const endTxt = add('text', { x: x(n) + 6, y: y(last) + 4, class: 'end' }, (last > 0 ? '+' : last < 0 ? '−' : '') + short(Math.abs(last)));
-    endTxt.style.fill = last > 0 ? 'var(--ok)' : last < 0 ? 'var(--bust)' : 'var(--fg)';
+    endTxt.style.fill = last > 0 ? 'var(--teal2)' : last < 0 ? 'var(--rose)' : 'var(--fg)';
     const hl = add('circle', { r: 6, fill: 'none', stroke: 'var(--fg)', 'stroke-width': 1.5, opacity: 0 });
     box.appendChild(svg);
     const tip = el('div', 'tip'); tip.hidden = true; box.appendChild(tip);
@@ -821,7 +896,7 @@ details.notes li { margin: 5px 0; }
       tip.replaceChildren(el('div', 'm', whenText(p.it)), el('div', '', describe(p.it)),
         el('div', 'm', (p.it.amt < 0 ? '−' : '+') + nf.format(Math.abs(p.it.amt)) + ' → ' + (p.bank > 0 ? '+' : p.bank < 0 ? '−' : '') + nf.format(Math.abs(p.bank))));
       tip.hidden = false;
-      const px = x(p.i) / k, py = y(p.bank) / k;
+      const px = x(p.i) / k + 6, py = y(p.bank) / k + 10;
       tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, px - tip.offsetWidth / 2)) + 'px';
       tip.style.top = Math.max(0, py - tip.offsetHeight - 12) + 'px';
     };
@@ -833,32 +908,30 @@ details.notes li { margin: 5px 0; }
   function openSheet(name) {
     name = T.canon(state, name);
     openPlayer = name; openEvent = null; backToEvent = null;
-    $('#sheet-event').hidden = true; $('#sheet-tl').hidden = false; $('#sheet-back').hidden = true;
+    $('#sheet-event').hidden = true; $('#sheet-tl-wrap').hidden = false; $('#sheet-back').hidden = true;
     const p = T.players(state).find((x) => x.name === name);
-    $('#sheet-name').textContent = (p && flag(p.cc) ? flag(p.cc) + ' ' : '') + name;
-    $('#sheet-sub').textContent = p ? (p.seatedIn.length ? 'Seated now in #' + p.seatedIn.join(', #') : p.lastBust ? 'Last bust ' + fFull.format(new Date(p.lastBust * 1000)) : '') : '';
+    $('#sheet-name').textContent = withFlag(p && p.cc, name);
+    $('#sheet-sub').textContent = p ? [p.cc ? regionName(p.cc) : '', p.seatedIn.length ? 'seated now in #' + p.seatedIn.join(', #') : p.lastBust ? 'last bust ' + fFull.format(new Date(p.lastBust * 1000)) : ''].filter(Boolean).join(' · ') : '';
     const st = $('#sheet-stats'); st.replaceChildren();
     if (p) {
-      const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
-      add('Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); add('Prizes', short(p.prizes)); add('Net', signed(p.net), p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
-      add('Events', String(p.events)); add('Bullets', String(p.bullets)); add('ITM', Math.round(p.itm * 100) + '%');
+      tile(st, 'Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); tile(st, 'Prizes', short(p.prizes), '', 'gold'); tile(st, 'Net', signed(p.net), '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
+      tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM', Math.round(p.itm * 100) + '%');
     }
-    $('#sheet-hint').textContent = p && p.partial ? 'Some events were not watched from the start, so earlier bullets there may be missing.' : '';
+    $('#sheet-hint').textContent = p && p.partial ? '≥ Some events were not watched from the start; one bullet is counted there.' : '';
     const tl = $('#sheet-tl'); tl.replaceChildren();
     const items = T.playerTimeline(state, name);
     $('#sheet-chart-wrap').hidden = !items.some((i) => i.amt);
-    drawBankroll($('#sheet-chart'), items);
-    if (!items.length) tl.appendChild(el('li', '', 'No tracked activity yet.'));
+    if (!items.length) tl.appendChild(el('li', 'empty', 'No tracked activity yet.'));
     for (const it of items.slice().reverse()) {
       const li = el('li', it.k);
-      li.appendChild(el('div', 'when', whenText(it)));
-      li.appendChild(el('div', '', describe(it)));
-      if (it.amt) {
-        const a = el('div', 'amt');
-        const b = el('b', it.amt < 0 ? 'minus' : 'plus', (it.amt < 0 ? '−' : '+') + money(Math.abs(it.amt)));
-        a.append(b, ' · bankroll ' + (it.bank > 0 ? '+' : it.bank < 0 ? '−' : '') + nf.format(Math.abs(it.bank)));
-        li.appendChild(a);
-      }
+      li.appendChild(el('span', 'mk'));
+      const mid = el('div');
+      mid.appendChild(el('div', 'when', whenText(it)));
+      mid.appendChild(el('div', 'what', describe(it)));
+      li.appendChild(mid);
+      const a = el('div', 'amt' + (it.amt < 0 ? ' minus' : it.amt > 0 ? ' plus' : ''));
+      if (it.amt) { a.append((it.amt < 0 ? '−' : '+') + short(Math.abs(it.amt))); a.appendChild(el('small', '', 'bank ' + signed(it.bank))); }
+      li.appendChild(a);
       tl.appendChild(li);
     }
     const wasHidden = $('#sheet').hidden;
@@ -900,7 +973,7 @@ details.notes li { margin: 5px 0; }
     c.setAttribute('aria-pressed', String(!!prefs.kinds[c.dataset.kind]));
     c.addEventListener('click', () => { prefs.kinds[c.dataset.kind] = !prefs.kinds[c.dataset.kind]; c.setAttribute('aria-pressed', String(prefs.kinds[c.dataset.kind])); savePrefs(); feedLimit = 150; renderFeed(); });
   });
-  $('#feed-event').addEventListener('change', (e) => { eventFilter = e.target.value; feedLimit = 150; renderEvents(); renderFeed(); });
+  $('#feed-event').addEventListener('change', (e) => { eventFilter = e.target.value; feedLimit = 150; renderFeed(); });
   $('#feed-q').addEventListener('input', () => { feedLimit = 150; renderFeed(); });
   document.querySelectorAll('.country-sel').forEach((sel) => sel.addEventListener('change', (e) => {
     prefs.country = e.target.value; savePrefs(); feedLimit = 150; playersLimit = 60;
@@ -916,8 +989,7 @@ details.notes li { margin: 5px 0; }
   };
   setDirBtn();
   $('#players-dir').addEventListener('click', () => { prefs.sortDir = prefs.sortDir === 'asc' ? 'desc' : 'asc'; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
-  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; setDirBtn(); });
-  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); playersLimit = 60; renderPlayers(); });
+  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
   $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
   $('#players-fromstart').checked = !!prefs.fromStart;
   $('#players-fromstart').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; savePrefs(); playersLimit = 60; renderPlayers(); });
