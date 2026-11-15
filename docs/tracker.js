@@ -45,7 +45,13 @@
   }
   async function getData(fetchFn, url) {
     const r = await fetchFn(url);
-    if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+    if (!r.ok) {
+      const err = new Error(`HTTP ${r.status} for ${url}`);
+      err.status = r.status;
+      const ra = r.headers && r.headers.get && r.headers.get('retry-after');
+      if (ra && !isNaN(Number(ra))) err.retryAfter = Number(ra);
+      throw err;
+    }
     const j = await r.json();
     const nodes = (j.nodes || []).map((n) => (n && n.type === 'data' ? unflatten(n.data) : null));
     return nodes[nodes.length - 1] || {};
@@ -229,7 +235,7 @@
 
   async function pool(items, n, fn) {
     const out = []; let i = 0;
-    const run = async () => { while (i < items.length) { const k = i++; try { out[k] = await fn(items[k]); } catch (err) { out[k] = { error: String(err && err.message || err) }; } } };
+    const run = async () => { while (i < items.length) { const k = i++; try { out[k] = await fn(items[k]); } catch (err) { out[k] = { error: String(err && err.message || err), status: err && err.status, retryAfter: err && err.retryAfter }; } } };
     await Promise.all(Array.from({ length: Math.min(n, items.length) }, run));
     return out;
   }
@@ -282,26 +288,37 @@
    * One polling round. opts: {fetchFn, interval (s), listEvery (s), resultsEvery (s), concurrency}
    * Returns a summary.
    */
+  const THROTTLE = new Set([403, 429, 503]);
+
   async function pollOnce(state, opts = {}) {
-    const fetchFn = opts.fetchFn || ((u) => fetch(u, { cache: 'no-store' }));
+    const baseFetch = opts.fetchFn || ((u) => fetch(u, { cache: 'no-store' }));
     const interval = opts.interval || 60;
     const now = nowSec();
-    const summary = { at: now, events: 0, busts: 0, reentries: 0, entries: 0, errors: [], repaired: repair(state) };
+    const summary = { at: now, events: 0, busts: 0, reentries: 0, entries: 0, errors: [], requests: 0, throttled: 0, retryAfter: 0, repaired: repair(state) };
+    const fetchFn = (u) => { summary.requests++; return baseFetch(u); };
+    const note = (err) => {
+      summary.errors.push(err.error || err.message || String(err));
+      if (THROTTLE.has(err.status)) { summary.throttled++; summary.retryAfter = Math.max(summary.retryAfter, err.retryAfter || 0); }
+    };
     if (!state.listAt || now - state.listAt >= (opts.listEvery || 300) || !Object.keys(state.events).length) {
-      try { mergeList(state, await fetchEventList(fetchFn), now); } catch (err) { summary.errors.push('list: ' + err.message); }
+      try { mergeList(state, await fetchEventList(fetchFn), now); } catch (err) { note({ error: 'list: ' + err.message, status: err.status, retryAfter: err.retryAfter }); }
     }
     const kids = activeKids(state, now);
     const got = await pool(kids, opts.concurrency || 4, async (kid) => {
+      const e0 = state.events[kid];
+      // Entry counts matter while registration is open (re-entry check); after that, status once a minute is enough
+      const regOpen = !e0.regClose || now <= e0.regClose + REG_GRACE;
+      const needEv = regOpen || !e0.evAt || now - e0.evAt >= (opts.evEvery || 60) || e0.phase === 'Completed';
       const [ev, ls] = await Promise.all([
-        getData(fetchFn, `${BASE}/${kid}/__data.json`),
+        needEv ? getData(fetchFn, `${BASE}/${kid}/__data.json`) : Promise.resolve(null),
         getData(fetchFn, `${BASE}/${kid}/live-seating/__data.json`),
       ]);
-      return { kid, ev: ev.event, players: (ls && ls.players) || null };
+      return { kid, ev: ev && ev.event, players: (ls && ls.players) || null };
     });
     for (const g of got) {
-      if (!g || g.error) { summary.errors.push(g ? g.error : 'unknown'); continue; }
+      if (!g || g.error) { note(g || { error: 'unknown' }); continue; }
       const e = state.events[g.kid];
-      if (g.ev) Object.assign(e, eventMeta({ ...g.ev, startTimeUTC: g.ev.startTimeUTC, regCloseUTC: g.ev.regCloseUTC || (e.regClose ? new Date(e.regClose * 1000).toISOString() : null) }));
+      if (g.ev) { Object.assign(e, eventMeta({ ...g.ev, startTimeUTC: g.ev.startTimeUTC, regCloseUTC: g.ev.regCloseUTC || (e.regClose ? new Date(e.regClose * 1000).toISOString() : null) })); e.evAt = now; }
       if (g.ev && g.ev.startingStack) e.stack = g.ev.startingStack;
       if (!g.players) { if (e.phase === 'Completed') e.closed = 1; continue; }
       const r = applySnapshot(state, g.kid, g.players, now, interval);
@@ -318,7 +335,8 @@
       if (anyItm) return !r || now - r.at >= (opts.resultsEvery || 300);
       return false;
     });
-    await pool(want, opts.concurrency || 4, (num) => fetchResults(fetchFn, state, num, now));
+    const rs = await pool(want, opts.concurrency || 4, (num) => fetchResults(fetchFn, state, num, now));
+    for (const r of rs) if (r && r.error) note(r);
     state.updatedAt = now;
     return summary;
   }

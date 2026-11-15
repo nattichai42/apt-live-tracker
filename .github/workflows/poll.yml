@@ -44,4 +44,4 @@ jobs:
       - name: Poll for 5 h 45 min
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node poller/poll.js --state state/state.json --minutes 345 --interval 60 --publish-every 3
+        run: node poller/poll.js --state state/state.json --minutes 345 --min-interval 10 --max-interval 60 --budget 1 --publish-every 3
