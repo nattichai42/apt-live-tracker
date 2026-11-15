@@ -55,6 +55,8 @@
     return { v: 1, series: SERIES, updatedAt: 0, listAt: 0, events: {}, results: {}, feed: [] };
   }
 
+  // "[Event 1] National Cup Championship - Flight A - TWD 20,000,000 GTD" -> "[Event 1] National Cup Championship"
+  const baseName = (name) => clean(name).split(/ - (?=(?:Turbo )?Flight\b|Day \d|Final Day|Final Table)/)[0];
   const isLaterDay = (name) => /\b(Day [2-9]|Final Day|Final Table)\b/i.test(name || '');
 
   function eventMeta(e) {
@@ -177,7 +179,11 @@
     const d = await getData(fetchFn, `${BASE}/${kids[0].kid}/results/__data.json`);
     const rows = (d.results || []).filter((r) => r && r.name).map((r) => [r.position, clean(r.name), r.countryCode || '', Math.round(r.amount || 0)]);
     const final = kids.every((x) => x.phase === 'Completed');
-    state.results[num] = { at: now, final, rows };
+    // When each paid place first appeared. Rows already there on our first fetch get null (paid before we watched).
+    const prev = state.results[num];
+    const seen = (prev && prev.seen) || {};
+    for (const [, n] of rows) if (!(n in seen)) seen[n] = prev && prev.seen ? now : null;
+    state.results[num] = { at: now, final, rows, seen };
     return true;
   }
 
@@ -324,6 +330,23 @@
     return out;
   }
 
+  // Best estimate of when a player's cash happened (their bust in that event, not when we fetched payouts)
+  function cashTime(state, num, name, r, info) {
+    const kids = Object.values(state.events).filter((x) => x.num === num);
+    let bust = 0, end = 0;
+    for (const e of kids) {
+      const p = e.p && e.p[name]; if (!p) continue;
+      for (const t of p.x || []) if (t > bust) bust = t;
+      if (p.st === 'end' && e.lastPoll > end) end = e.lastPoll;
+    }
+    if (end && end >= bust) return { t: end };
+    if (bust) return { t: bust };
+    if (r.seen && r.seen[name]) return { t: r.seen[name] };
+    const firsts = kids.filter((x) => x.firstPoll).map((x) => x.firstPoll);
+    if (firsts.length) return { t: Math.min(...firsts) - 1, before: true }; // paid before we started watching
+    return { t: (info.lastStart || r.at) + 1, approx: true };
+  }
+
   // Timeline for one player, with money: every bullet costs the event's buy-in (amt < 0), every cash pays (amt > 0).
   // Running `bank` is the cumulative sum, for the bankroll graph.
   function playerTimeline(state, name) {
@@ -359,13 +382,12 @@
     for (const [numS, r] of Object.entries(state.results)) for (const [pos, n, , prize] of r.rows) if (n === name) {
       const num = Number(numS);
       const info = numInfo(num);
-      if (info.tracked && info.bullets > 0) {
-        items.push({ t: r.final ? (info.lastPoll || r.at) : r.at, k: 'cash', num, ev: info.name, pos, prize, amt: prize });
-      } else {
-        // Not watched from the start: assume one bullet on the event's first day, cash on its last day
-        if (info.bullets === 0) { info.bullets = 1; items.push({ t: info.start || r.at, approx: true, k: 'buyin', num, ev: info.name, amt: -info.buyin }); }
-        items.push({ t: info.tracked ? (r.final ? (info.lastPoll || r.at) : r.at) : (info.lastStart || r.at) + 1, approx: !info.tracked, k: 'cash', num, ev: info.name, pos, prize, amt: prize });
+      const cashEv = baseName(info.name);
+      if (info.bullets === 0) {
+        // Not watched from the start: assume one bullet on the event's first day
+        info.bullets = 1; items.push({ t: info.start || r.at, approx: true, k: 'buyin', num, ev: cashEv, amt: -info.buyin });
       }
+      items.push({ ...cashTime(state, num, name, r, info), k: 'cash', num, ev: cashEv, pos, prize, amt: prize });
     }
     // Seen only as a carry-over into a later day: count the one bullet from the flight we did not watch
     for (const [num, info] of nums) if (info.bullets === 0) {
@@ -427,5 +449,5 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, repair, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, repair, baseName, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });

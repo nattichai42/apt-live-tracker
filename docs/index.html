@@ -563,6 +563,14 @@ details.notes li { margin: 5px 0; }
     $('#players-more').hidden = rows.length <= playersLimit;
   }
 
+  function whenText(it) {
+    if (!it.t) return '';
+    const d = new Date((it.before ? it.t + 1 : it.t) * 1000);
+    if (it.approx) return fDay.format(d);
+    if (it.before) return fDay.format(d) + ', before ' + fTime.format(d) + ' (paid before tracking)';
+    return fFull.format(d);
+  }
+
   function describe(it) {
     const ev = '#' + it.num + ' ' + String(it.ev || '').replace(/^\[Event \d+\]\s*/, '');
     switch (it.k) {
@@ -612,7 +620,10 @@ details.notes li { margin: 5px 0; }
       if (d && d !== prevDay) {
         const xx = x(p.i - 1) + (x(p.i) - x(p.i - 1)) / 2;
         if (prevDay) add('line', { x1: xx, x2: xx, y1: m.t, y2: H - m.b, class: 'day' });
-        if (xx - lastLabelX > 46) { add('text', { x: Math.max(m.l, xx), y: H - 6, class: 'lbl', 'text-anchor': prevDay ? 'middle' : 'start' }, d); lastLabelX = xx; }
+        // Place the label centred on the day change, nudged inside the plot, and skip it if it would touch the previous one
+        const w = d.length * 6.4;
+        const left = Math.min(Math.max(m.l, xx - w / 2), W - m.r - w);
+        if (left > lastLabelX + 8) { add('text', { x: left, y: H - 6, class: 'lbl', 'text-anchor': 'start' }, d); lastLabelX = left + w; }
         prevDay = d;
       }
     });
@@ -633,7 +644,7 @@ details.notes li { margin: 5px 0; }
       const i = Math.max(1, Math.min(n, Math.round((mx - m.l) / ((W - m.l - m.r) / n))));
       const p = pts[i];
       hl.setAttribute('cx', x(p.i)); hl.setAttribute('cy', y(p.bank)); hl.setAttribute('opacity', 1);
-      tip.replaceChildren(el('div', 'm', p.it.t ? (p.it.approx ? fDay.format(new Date(p.it.t * 1000)) : fFull.format(new Date(p.it.t * 1000))) : ''), el('div', '', describe(p.it)),
+      tip.replaceChildren(el('div', 'm', whenText(p.it)), el('div', '', describe(p.it)),
         el('div', 'm', (p.it.amt < 0 ? '−' : '+') + nf.format(Math.abs(p.it.amt)) + ' → ' + (p.bank > 0 ? '+' : p.bank < 0 ? '−' : '') + nf.format(Math.abs(p.bank))));
       tip.hidden = false;
       const px = x(p.i) / k, py = y(p.bank) / k;
@@ -665,7 +676,7 @@ details.notes li { margin: 5px 0; }
     if (!items.length) tl.appendChild(el('li', '', 'No tracked activity yet.'));
     for (const it of items.slice().reverse()) {
       const li = el('li', it.k);
-      li.appendChild(el('div', 'when', it.t ? (it.approx ? fDay.format(new Date(it.t * 1000)) : fFull.format(new Date(it.t * 1000))) : ''));
+      li.appendChild(el('div', 'when', whenText(it)));
       li.appendChild(el('div', '', describe(it)));
       if (it.amt) {
         const a = el('div', 'amt');
