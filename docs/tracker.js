@@ -21,6 +21,7 @@
   const BASE = `${SITE}/series/${SERIES}/events`;
   const ACTIVE = new Set(['Late Reg', 'Running', 'In The Money', 'Reg Open', 'Final Table', 'Break', 'Paused']);
   const FEED_CAP = 5000;
+  const REG_GRACE = 300; // seconds after the published registration close that a re-entry is still accepted
 
   const nowSec = () => Math.floor(Date.now() / 1000);
   const toSec = (iso) => (iso ? Math.floor(Date.parse(iso) / 1000) : null);
@@ -117,13 +118,13 @@
       }
       e.entriesAtFirst = e.entries;
     } else {
-      const glitchWindow = Math.max(3 * (interval || 60), 180);
+      const glitchWindow = 1800; // back in the very same seat within 30 min = never left
       for (const n of Object.keys(prev)) {
         if (cur[n]) continue;
         const p = e.p[n];
         if (!p || p.st !== 's') continue;
         if (e.phase === 'Completed') continue; // handled below
-        p.st = 'x'; p.x.push(now); res.busts++;
+        p.st = 'x'; p.x.push(now); p.xe = e.entries; res.busts++;
         pushFeed(state, { t: now, kid, num: e.num, n, k: 'bust', b: p.b || 1, cc: p.cc });
       }
       for (const [n, s] of Object.entries(cur)) {
@@ -138,7 +139,10 @@
         if (p.st === 'x') {
           const last = p.x[p.x.length - 1];
           const sameSeat = p.seat && p.seat[0] === s[0] && p.seat[1] === s[1];
-          if (sameSeat && now - last <= glitchWindow) {
+          // A return only counts as a re-entry while registration is open and the official entry count went up.
+          const regOpen = !e.regClose || now <= e.regClose + REG_GRACE;
+          const entriesGrew = p.xe == null || e.entries == null || e.entries > p.xe;
+          if ((sameSeat && now - last <= glitchWindow) || !regOpen || !entriesGrew) {
             // Not a real bust: undo it
             p.x.pop(); res.busts--;
             for (let i = state.feed.length - 1; i >= 0; i--) {
@@ -184,6 +188,34 @@
     return out;
   }
 
+  // Undo re-entries recorded before the rules above existed: any "re-entry" after registration closed
+  // was a player briefly missing from the seating list, so its bust and re-entry are removed. Idempotent.
+  function repair(state) {
+    let fixed = 0;
+    for (let i = state.feed.length - 1; i >= 0; i--) {
+      const f = state.feed[i];
+      if (f.k !== 'reentry') continue;
+      const e = state.events[f.kid];
+      if (!e || !e.regClose || f.t <= e.regClose + REG_GRACE) continue;
+      const p = e.p && e.p[f.n];
+      state.feed.splice(i, 1); fixed++;
+      if (!p) continue;
+      p.b = Math.max(1, (p.b || 1) - 1);
+      if (p.r) p.r = p.r.filter((t) => t !== f.t);
+      const bt = (p.x || []).filter((t) => t < f.t).pop();
+      if (bt != null) {
+        p.x.splice(p.x.lastIndexOf(bt), 1);
+        for (let j = state.feed.length - 1; j >= 0; j--) {
+          const g = state.feed[j];
+          if (g.kid === f.kid && g.n === f.n && g.k === 'bust' && g.t === bt) { state.feed.splice(j, 1); if (j < i) i--; break; }
+        }
+      }
+      // Later feed items for this player in this event carry a bullet number that is now one too high
+      for (const g of state.feed) if (g.kid === f.kid && g.n === f.n && g.t > f.t && g.b > 1) g.b--;
+    }
+    return fixed;
+  }
+
   /**
    * One polling round. opts: {fetchFn, interval (s), listEvery (s), resultsEvery (s), concurrency}
    * Returns a summary.
@@ -192,7 +224,7 @@
     const fetchFn = opts.fetchFn || ((u) => fetch(u, { cache: 'no-store' }));
     const interval = opts.interval || 60;
     const now = nowSec();
-    const summary = { at: now, events: 0, busts: 0, reentries: 0, entries: 0, errors: [] };
+    const summary = { at: now, events: 0, busts: 0, reentries: 0, entries: 0, errors: [], repaired: repair(state) };
     if (!state.listAt || now - state.listAt >= (opts.listEvery || 300) || !Object.keys(state.events).length) {
       try { mergeList(state, await fetchEventList(fetchFn), now); } catch (err) { summary.errors.push('list: ' + err.message); }
     }
@@ -395,5 +427,5 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, repair, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });
