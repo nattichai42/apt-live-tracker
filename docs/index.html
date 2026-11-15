@@ -447,7 +447,7 @@ details.notes li { margin: 5px 0; }
       const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); kv.appendChild(d); };
       add('Entries', e.entries != null ? nf.format(e.entries) : '—');
       add('Left', e.remaining != null ? nf.format(e.remaining) : '—');
-      add('Busts 15m', nf.format(e.bustsLast15));
+      add('Busts', nf.format(e.busts));
       add('Players seen', nf.format(e.unique));
       add('Re-entries', nf.format(e.reentriesSeen));
       add('Missed', e.untracked == null ? '—' : nf.format(e.untracked), e.untracked ? 'warn' : '');
@@ -503,7 +503,7 @@ details.notes li { margin: 5px 0; }
     const add = (k, v, cls) => { const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v)); st.appendChild(d); };
     const ps = T.eventPlayers(state, e.kid);
     add('Entries', e.entries != null ? nf.format(e.entries) : '—'); add('Left', e.remaining != null ? nf.format(e.remaining) : '—'); add('Seated', nf.format(ps.filter((p) => p.status === 'seated').length));
-    add('Busts seen', nf.format(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', nf.format(info.reentriesSeen || 0)); add('Missed', info.untracked == null ? '—' : nf.format(info.untracked), info.untracked ? 'warn' : '');
+    add('Busts', nf.format(ps.reduce((a, p) => a + p.busts.length, 0))); add('Re-entries', nf.format(info.reentriesSeen || 0)); add('Missed', info.untracked == null ? '—' : nf.format(info.untracked), info.untracked ? 'warn' : '');
     $('#sheet-hint').textContent = explainEntries(info) + '. ' + (info.trackedFromStart ? '' : 'Tracking began after this event started, so earlier busts and re-entries are not listed.');
     const groups = {
       seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),

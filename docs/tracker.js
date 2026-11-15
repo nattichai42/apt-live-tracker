@@ -490,7 +490,7 @@
           // Bullets we counted beyond the official number (the site lowers it when a registration is cancelled)
           over: e.entries == null || isLaterDay(e.name) ? 0 : Math.max(0, seen - e.entries),
           trackedFromStart: !!(e.firstPoll && e.start && e.firstPoll - e.start < 900),
-          bustsLast15: recent, firstPoll: e.firstPoll, lastPoll: e.lastPoll, sat: e.sat };
+          bustsLast15: recent, busts: ps.reduce((a, p) => a + (p.x || []).length, 0), firstPoll: e.firstPoll, lastPoll: e.lastPoll, sat: e.sat };
       })
       .sort((a, b) => (a.phase === 'Completed') - (b.phase === 'Completed') || (b.entries || 0) - (a.entries || 0));
   }
