@@ -103,11 +103,11 @@ main { padding-block: 16px 48px; }
 .mix { display: grid; gap: 6px; }
 .mix-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); }
 .mix-bar i { display: block; height: 100%; }
-.mix-bar .p { background: var(--teal); } .mix-bar .r { background: var(--amber); } .mix-bar .m { background: var(--line2); }
+.mix-bar .p { background: var(--teal); } .mix-bar .r { background: var(--amber); } .mix-bar .m { background: var(--line2); } .mix-bar .w { background: var(--sky); } .mix-bar .c { background: #0f766e; }
 .mix-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
 .mix-legend b { color: var(--fg2); font-weight: 600; }
 .mix-legend .sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
-.sw.p { background: var(--teal); } .sw.r { background: var(--amber); } .sw.m { background: var(--line2); } .sw.o { background: var(--rose); }
+.sw.p { background: var(--teal); } .sw.r { background: var(--amber); } .sw.m { background: var(--line2); } .sw.o { background: var(--rose); } .sw.w { background: var(--sky); } .sw.c { background: #0f766e; }
 
 /* Lists (starting soon, completed) */
 .list { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
@@ -297,8 +297,10 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     </ul>
     <h4>Event cards</h4>
     <ul>
-      <li>Entries (official) = players seen + re-entries + missed. The coloured bar shows that split.</li>
-      <li>Missed bullets were never seen seated: busted before tracking began, or a bust and re-entry faster than one poll.</li>
+      <li>Entries (official) = players seen + re-entries + waiting for a seat + missed. The coloured bar shows that split.</li>
+      <li>Waiting for a seat: registered (counted in entries and players left) but not in the seating list yet.</li>
+      <li>Missed bullets were never seen: busted before tracking began, a re-entry bought at the table without leaving the seat (the seating list doesn't change and the site has no live chip counts), or a rebuy back into the same seat within 3 minutes, which is treated as a data glitch.</li>
+      <li>A later day (Day 2, Final Day) shows players carried over from the flights, plus new entries if registration is open.</li>
       <li>"Over" means we counted more bullets than the official entries: registrations cancelled after seating.</li>
       <li>For a later day (Day 2, Final Day) the entries cover every flight, so missed is only known when all flights were watched from their start.</li>
     </ul>
@@ -344,7 +346,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
 </aside>
 
-<script src="tracker.js?v=7a374145c2"></script>
+<script src="tracker.js?v=580aee35e5"></script>
 <script>
 (function () {
   'use strict';
@@ -484,23 +486,28 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
     if (sub) d.appendChild(el('div', 's', sub)); parent.appendChild(d); return d;
   };
-  // Entries split into players seen / re-entries / missed, as a bar plus three numbers
+  // Entries split into players seen / re-entries / waiting for a seat / missed, as a bar plus the numbers.
+  // A later day (Final Day) shows players carried over from the flights instead.
   function entriesMix(e) {
     const box = el('div', 'mix');
     if (e.entries == null) return box;
-    const p = e.unique || 0, r = e.reentriesSeen || 0, m = e.untracked;
-    const total = Math.max(e.entries, p + r) || 1;
+    const p = e.unique || 0, r = e.reentriesSeen || 0, w = e.waiting || 0, c = e.carried || 0, m = e.untracked;
+    const parts = e.laterDay
+      ? [['c', c, 'carried over'], ['p', p, 'new'], ['r', r, r === 1 ? 're-entry' : 're-entries']]
+      : [['p', p, p === 1 ? 'player' : 'players'], ['r', r, r === 1 ? 're-entry' : 're-entries'], ['w', w, 'waiting for a seat']];
+    const field = parts.reduce((a, x) => a + x[1], 0);
+    // A later day's entry count covers every flight, so its bar is scaled to today's field instead
+    const total = (e.laterDay && m == null ? field : Math.max(e.entries, field)) || 1;
     const bar = el('div', 'mix-bar'); bar.setAttribute('role', 'img');
-    bar.setAttribute('aria-label', `${e.entries} entries: ${p} players, ${r} re-entries, ${m == null ? 'unknown' : m} missed`);
-    const seg = (cls, n) => { if (n > 0) { const i = el('i', cls); i.style.width = (n / total * 100) + '%'; bar.appendChild(i); } };
-    seg('p', p); seg('r', r); if (m) seg('m', m);
+    bar.setAttribute('aria-label', `${e.entries} entries: ` + parts.map((x) => `${x[1]} ${x[2]}`).join(', ') + `, ${m == null ? 'unknown' : m} missed`);
+    for (const [cls, n] of parts) if (n > 0) { const i = el('i', cls); i.style.width = (n / total * 100) + '%'; bar.appendChild(i); }
+    if (m) { const i = el('i', 'm'); i.style.width = (m / total * 100) + '%'; bar.appendChild(i); }
     box.appendChild(bar);
     const lg = el('div', 'mix-legend');
     const item = (sw, n, label) => { const s = el('span'); s.appendChild(el('span', 'sw ' + sw)); s.appendChild(el('b', '', n)); s.append(' ' + label); lg.appendChild(s); };
-    item('p', nf.format(p), p === 1 ? 'player' : 'players');
-    item('r', nf.format(r), r === 1 ? 're-entry' : 're-entries');
+    for (const [cls, n, label] of parts) if (n > 0 || cls === 'p' || cls === 'r') item(cls, nf.format(n), label);
     if (e.over) item('o', '+' + nf.format(e.over), 'over (cancelled)');
-    else item('m', m == null ? '?' : nf.format(m), 'missed');
+    else if (!(e.laterDay && m == null)) item('m', m == null ? '?' : nf.format(m), 'missed');
     box.appendChild(lg);
     return box;
   }

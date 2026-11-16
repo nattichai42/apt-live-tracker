@@ -546,7 +546,11 @@
           reentriesSeen: re,
           // A flight's entry count covers that flight only; a later day's (Day 2, Final Day) covers every flight.
           // Missed = entries - every bullet we saw = players seen + re-entries seen, subtracted from the official count.
-          untracked: e.entries == null ? null : isLaterDay(e.name) ? (fullyTracked ? Math.max(0, e.entries - seenAll) : null) : Math.max(0, e.entries - seen),
+          // Registered (counted in entries and players left) but not in the seating list yet
+          waiting: e.phase !== 'Completed' && e.remaining != null && e.seated != null ? Math.max(0, e.remaining - e.seated) : 0,
+          carried: ps.filter((p) => p.carry).length,
+          untracked: e.entries == null ? null : isLaterDay(e.name) ? (fullyTracked ? Math.max(0, e.entries - seenAll) : null)
+            : Math.max(0, e.entries - seen - (e.phase !== 'Completed' && e.remaining != null && e.seated != null ? Math.max(0, e.remaining - e.seated) : 0)),
           laterDay: isLaterDay(e.name),
           // Bullets we counted beyond the official number (the site lowers it when a registration is cancelled)
           over: e.entries == null || isLaterDay(e.name) ? 0 : Math.max(0, seen - e.entries),
