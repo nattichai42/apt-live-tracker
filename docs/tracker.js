@@ -22,6 +22,7 @@
   const ACTIVE = new Set(['Late Reg', 'Running', 'In The Money', 'Reg Open', 'Final Table', 'Break', 'Paused']);
   const FEED_CAP = 5000;
   const REG_GRACE = 300; // seconds after the published registration close that a re-entry is still accepted
+  const PEND_WAIT = 180; // seconds to wait for the entry count to catch up with a player who sat back down
 
   const nowSec = () => Math.floor(Date.now() / 1000);
   const toSec = (iso) => (iso ? Math.floor(Date.parse(iso) / 1000) : null);
@@ -206,19 +207,38 @@
           const regOpen = !e.regClose || now <= e.regClose + REG_GRACE;
           const entriesGrew = p.xe == null || e.entries == null || e.entries > p.xe;
           // The seat itself decides nothing: rebuys can land back in the same seat, depending on table balance.
-          if (!regOpen || !entriesGrew) {
-            // Not a real bust: undo it
-            p.x.pop(); res.busts--;
-            for (let i = state.feed.length - 1; i >= 0; i--) {
-              const f = state.feed[i];
-              if (f.kid === kid && f.n === n && f.k === 'bust' && f.t === last) { state.feed.splice(i, 1); break; }
-            }
+          if (!regOpen) {
+            undoBust(state, kid, n, p, last); res.busts--;
+          } else if (!entriesGrew) {
+            // The entry count often updates after the seating list: wait up to PEND_WAIT for it before deciding
+            p.pend = { t: now, cc: s[2], xe: p.xe, bust: last };
           } else {
             p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(now);
             pushFeed(state, { t: now, kid, num: e.num, n, k: 'reentry', b: p.b, cc: s[2] });
           }
         }
         p.st = 's'; p.seat = [s[0], s[1]]; p.l = now; if (s[2]) p.cc = s[2];
+      }
+    }
+
+    // Returns waiting for the entry count: a re-entry once it rises, a data glitch if it hasn't after PEND_WAIT
+    for (const [n, p] of Object.entries(e.p)) {
+      if (!p.pend) continue;
+      const grew = e.entries != null && p.pend.xe != null && e.entries > p.pend.xe;
+      if (p.st !== 's') {
+        // Busted again before we decided: the return was real play if the count went up, otherwise a glitch
+        if (grew) { p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(p.pend.t); pushFeed(state, { t: p.pend.t, kid, num: e.num, n, k: 'reentry', b: p.b, cc: p.pend.cc || p.cc }); state.feed.sort((a, b) => a.t - b.t); }
+        else { undoBust(state, kid, n, p, p.pend.bust); res.busts--; }
+        delete p.pend; continue;
+      }
+      if (grew) {
+        p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(p.pend.t);
+        pushFeed(state, { t: p.pend.t, kid, num: e.num, n, k: 'reentry', b: p.b, cc: p.pend.cc || p.cc });
+        state.feed.sort((a, b) => a.t - b.t);
+        delete p.pend;
+      } else if (now - p.pend.t >= PEND_WAIT) {
+        undoBust(state, kid, n, p, p.pend.bust); res.busts--;
+        delete p.pend;
       }
     }
 
@@ -240,6 +260,16 @@
     return pos.length > 0 && pos[0] === 1 && pos.every((x, i) => x === i + 1 || x === pos[i - 1]);
   };
   const sameRows = (a, b) => (a || []).length === (b || []).length && (a || []).every((r, i) => r[0] === b[i][0] && r[1] === b[i][1] && r[3] === b[i][3]);
+
+  // A bust that turned out not to be one: remove it and its feed item
+  function undoBust(state, kid, n, p, t) {
+    if (t == null) return;
+    const i = (p.x || []).lastIndexOf(t); if (i >= 0) p.x.splice(i, 1);
+    for (let j = state.feed.length - 1; j >= 0; j--) {
+      const f = state.feed[j];
+      if (f.kid === kid && f.n === n && f.k === 'bust' && f.t === t) { state.feed.splice(j, 1); break; }
+    }
+  }
 
   async function fetchResults(fetchFn, state, num, now) {
     const kids = Object.values(state.events).filter((x) => x.num === num).sort((a, b) => (b.start || 0) - (a.start || 0));
