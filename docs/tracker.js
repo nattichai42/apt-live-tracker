@@ -92,6 +92,17 @@
     (state.aliases || (state.aliases = {}))[from] = to;
   }
 
+  // Name under which player n bagged chips in an earlier flight/day of the same event (exact, else a similar
+  // name not already present in this event), or null
+  function findCarrySource(state, e, n) {
+    const sibs = Object.values(state.events).filter((x) => x.num === e.num && x.kid !== e.kid && (x.start || 0) < (e.start || Infinity));
+    if (sibs.some((x) => x.p && x.p[n] && x.p[n].st === 'end')) return n;
+    for (const x of sibs) for (const [k, p] of Object.entries(x.p || {})) {
+      if (p.st === 'end' && k !== n && !(e.p && e.p[k]) && similarNames(k, n)) return k;
+    }
+    return null;
+  }
+
   // "[Event 1] National Cup Championship - Flight A - TWD 20,000,000 GTD" -> "[Event 1] National Cup Championship"
   const baseName = (name) => clean(name).split(/ - (?=(?:Turbo )?Flight\b|Day \d|Final Day|Final Table)/)[0];
   const isLaterDay = (name) => /\b(Day [2-9]|Final Day|Final Table)\b/i.test(name || '');
@@ -147,7 +158,13 @@
     if (prevCount > 15 && curCount < prevCount * 0.55 && e.phase !== 'Completed') { res.skipped = true; return res; }
 
     const siblings = Object.values(state.events).filter((x) => x.num === e.num && x.kid !== kid);
-    const carried = (n) => isLaterDay(e.name) && siblings.some((x) => x.p[n] && x.p[n].st === 'end');
+    // A later day's player who bagged chips in an earlier flight, even if the floor re-ordered the name
+    const carried = (n) => {
+      if (!isLaterDay(e.name)) return false;
+      const src = findCarrySource(state, e, n);
+      if (src && src !== n) (state.aliases || (state.aliases = {}))[src] = n;
+      return !!src;
+    };
 
     if (!e.firstPoll) {
       e.firstPoll = now;
@@ -258,6 +275,15 @@
   // was a player briefly missing from the seating list, so its bust and re-entry are removed. Idempotent.
   function repair(state) {
     let fixed = 0;
+    // Later-day players counted as new entries because their name was re-ordered since the flight they bagged in
+    for (const e of Object.values(state.events || {})) {
+      if (!isLaterDay(e.name) || !e.p || !e.firstPoll) continue;
+      for (const [n, p] of Object.entries(e.p)) {
+        if (p.carry || p.f !== e.firstPoll || (p.b || 0) > 1) continue;
+        const src = findCarrySource(state, e, n);
+        if (src && src !== n) { p.carry = 1; p.b = 0; (state.aliases || (state.aliases = {}))[src] = n; fixed++; }
+      }
+    }
     // Payouts saved as final while the site was still filling them in
     for (const r of Object.values(state.results || {})) if (r.final && !payoutsComplete(r.rows)) { r.final = false; r.at = 0; fixed++; }
     // Completed events whose last players were left marked as seated
