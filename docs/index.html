@@ -375,7 +375,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
   const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
 
-  let ghAt = 0, lastErr = null, polling = false, nextAt = 0, timer = null, freshSince = 0, backoff = 0;
+  let ghAt = 0, ghAdopted = 0, lastErr = null, polling = false, nextAt = 0, timer = null, freshSince = 0, backoff = 0;
   let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null, openEvent = null, eventSeg = 'seated', backToEvent = null;
 
   /* ---------- formatting ---------- */
@@ -418,7 +418,14 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const s = await r.json();
       ghAt = s.updatedAt || 0;
-      if (s && s.v === 1 && (s.updatedAt || 0) > (state.updatedAt || 0)) { T.repair(s); state = s; persist(); render(); }
+      // The GitHub poller watches around the clock, so its record is the complete one: take every new save,
+      // even when this page polled more recently (it may have been closed or in the background meanwhile).
+      // The page's own polling then continues from it.
+      if (s && s.v === 1 && (s.updatedAt || 0) > ghAdopted) {
+        T.repair(s);
+        freshSince = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
+        state = s; ghAdopted = s.updatedAt; persist(); render();
+      }
     } catch (e) { console.warn('GitHub history unavailable', e); }
   }
   async function poll() {
@@ -1004,7 +1011,12 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#interval').value = String(prefs.interval);
   $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
   $('#refresh').addEventListener('click', () => { clearTimeout(timer); poll(); });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && Number(prefs.interval) && Date.now() > nextAt) { clearTimeout(timer); poll(); } });
+  // Back from the background: load the GitHub record first (it kept watching), then poll live
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) return;
+    await loadGitHub();
+    if (Number(prefs.interval) && Date.now() > nextAt) { clearTimeout(timer); poll(); }
+  });
 
   /* ---------- boot ---------- */
   selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
