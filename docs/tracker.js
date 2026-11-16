@@ -157,7 +157,6 @@
       }
       e.entriesAtFirst = e.entries;
     } else {
-      const glitchWindow = 180; // back in the very same seat within 3 min = a data blip (a later same-seat return can be a rebuy)
       // Renames: a name that left and a similar name that sat down in the very same seat in this poll are one player
       for (const [y, s] of Object.entries(cur)) {
         if (prev[y] || e.p[y]) continue;
@@ -186,11 +185,11 @@
         }
         if (p.st === 'x') {
           const last = p.x[p.x.length - 1];
-          const sameSeat = p.seat && p.seat[0] === s[0] && p.seat[1] === s[1];
           // A return only counts as a re-entry while registration is open and the official entry count went up.
           const regOpen = !e.regClose || now <= e.regClose + REG_GRACE;
           const entriesGrew = p.xe == null || e.entries == null || e.entries > p.xe;
-          if ((sameSeat && now - last <= glitchWindow) || !regOpen || !entriesGrew) {
+          // The seat itself decides nothing: rebuys can land back in the same seat, depending on table balance.
+          if (!regOpen || !entriesGrew) {
             // Not a real bust: undo it
             p.x.pop(); res.busts--;
             for (let i = state.feed.length - 1; i >= 0; i--) {
