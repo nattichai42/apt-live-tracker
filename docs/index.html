@@ -340,6 +340,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     </div>
     <div class="filters">
       <input id="sheet-q" class="search" type="search" placeholder="Search this event" aria-label="Search players in this event" autocomplete="off">
+      <select id="sheet-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
       <button class="btn" id="sheet-feed" type="button">Busts in feed →</button>
     </div>
     <ul class="plist" id="sheet-list"></ul>
@@ -680,9 +681,12 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.regClose ? (e.regClose > now ? 'reg closes ' + fTime.format(new Date(e.regClose * 1000)) : 'reg closed') : '',
       e.firstPoll ? (info.trackedFromStart ? 'watched from the start' : 'watched since ' + fTime.format(new Date(e.firstPoll * 1000))) : ''].filter(Boolean).join(' · ');
     const st = $('#sheet-stats'); st.replaceChildren();
-    const ps = T.eventPlayers(state, e.kid);
-    tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Seated', num(ps.filter((p) => p.status === 'seated').length));
-    tile(st, 'Busts', num(ps.reduce((a, p) => a + p.busts.length, 0))); tile(st, 'Re-entries', num(info.reentriesSeen || 0)); tile(st, 'Missed', num(info.untracked), '', info.untracked ? 'gold' : '');
+    const psAll = T.eventPlayers(state, e.kid);
+    fillCountries($('#sheet-country'), psAll.map((p) => p.cc));
+    // The country filter narrows the lists and their counts; the totals above stay for the whole field
+    const ps = prefs.country ? psAll.filter((p) => p.cc === prefs.country) : psAll;
+    tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Seated', num(psAll.filter((p) => p.status === 'seated').length));
+    tile(st, 'Busts', num(psAll.reduce((a, p) => a + p.busts.length, 0))); tile(st, 'Re-entries', num(info.reentriesSeen || 0)); tile(st, 'Missed', num(info.untracked), '', info.untracked ? 'gold' : '');
     const hint = $('#sheet-hint'); hint.replaceChildren();
     if (info.entries != null) hint.appendChild(entriesMix(info));
     const groups = {
@@ -703,7 +707,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     let rows = groups[eventSeg] || [];
     if (q) rows = rows.filter((p) => p.name.toLowerCase().includes(q));
     const ul = $('#sheet-list'); ul.replaceChildren();
-    if (!rows.length) ul.appendChild(el('li', 'empty', q ? 'No player matches.' : 'Nobody here yet.'));
+    if (!rows.length) ul.appendChild(el('li', 'empty', q || prefs.country ? 'No player matches.' : 'Nobody here yet.'));
     for (const p of rows.slice(0, 600)) {
       const li = el('li'); const b = el('button', 'row'); b.type = 'button';
       const left = el('div');
@@ -999,7 +1003,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#feed-q').addEventListener('input', () => { feedLimit = 150; renderFeed(); });
   document.querySelectorAll('.country-sel').forEach((sel) => sel.addEventListener('change', (e) => {
     prefs.country = e.target.value; savePrefs(); feedLimit = 150; playersLimit = 60;
-    renderFeed(); if (!$('#view-players').hidden) renderPlayers();
+    renderFeed(); if (!$('#view-players').hidden) renderPlayers(); if (openEvent) renderEventSheet();
   }));
   $('#feed-more').addEventListener('click', () => { feedLimit += 150; renderFeed(); });
   $('#players-q').addEventListener('input', () => { playersLimit = 60; renderPlayers(); });
