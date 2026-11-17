@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// Runs the tracker in a loop and periodically publishes state to the `data` branch.
-// Usage: node poller/poll.js --state state/state.json --minutes 345 --min-interval 10 --budget 1 --publish-every 3 [--no-publish]
+// Runs a tracker engine in a loop and periodically publishes its state to a data branch.
+// Usage: node poller/poll.js --state state/state.json --minutes 345 --min-interval 10 --budget 1 --publish-every 3 [--engine docs/glpc/glpc.js --branch glpc-data] [--no-publish]
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const T = require('../docs/tracker.js');
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const flag = (k) => args.includes('--' + k);
+// Which tracker: docs/tracker.js (APT, default) or docs/glpc/glpc.js (GLPC), and the branch its record goes to
+const T = require(path.resolve(opt('engine', path.join(__dirname, '../docs/tracker.js'))));
+const branch = opt('branch', 'data');
 const statePath = opt('state', 'state/state.json');
 const minutes = Number(opt('minutes', 55));
 // Poll as fast as the request budget allows: interval = requests in a round / budget, clamped to [min, max].
@@ -33,7 +35,7 @@ function save(state) {
 }
 function publish() {
   if (noPublish) return;
-  try { execFileSync('bash', [path.join(__dirname, 'publish.sh'), statePath], { stdio: 'inherit' }); }
+  try { execFileSync('bash', [path.join(__dirname, 'publish.sh'), statePath, branch], { stdio: 'inherit' }); }
   catch (e) { console.error('publish failed:', e.message); }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

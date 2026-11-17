@@ -1,4 +1,4 @@
-# APT Taipei 2026 live tracker
+# APT Taipei 2026 + GLPC VI live trackers
 
 Real-time bust and re-entry tracking for the APT Championship Taipei 2026, built on the public
 live-seating data of theasianpokertour.com.
@@ -38,7 +38,7 @@ To stop after the series, disable the workflow in the Actions tab.
 
 ## Changing the engine
 
-After editing `docs/tracker.js`, run `tools/stamp.sh`. It points `index.html` at `tracker.js?v=<content hash>`,
+After editing `docs/tracker.js` or `docs/glpc/glpc.js`, run `tools/stamp.sh`. It points each page at its engine by content hash (`tracker.js?v=<hash>`),
 so phones never combine a new page with a cached old engine.
 
 ## Local run
@@ -46,3 +46,18 @@ so phones never combine a new page with a cached old engine.
 ```bash
 node poller/poll.js --state state/state.json --minutes 10 --interval 60 --no-publish
 ```
+
+## GLPC VI (Grand Loyal Poker Championships, 18–29 Nov 2026)
+
+A second tracker with the same views lives in `docs/glpc/` (page at `https://<owner>.github.io/<repo>/glpc/`),
+built on the public JSON behind grandloyal.vn's tracker (`apitracker.grandloyal.vn`, the requests its own pages make).
+
+- Engine: `docs/glpc/glpc.js`. Workflow: *Poll GLPC live tracker* (`.github/workflows/glpc-poll.yml`), record on the
+  `glpc-data` branch. Start it once from the Actions tab (*Run workflow*); it queues its own successors until 1 Dec.
+- The site lists everyone who registered for an event, each with a player id and a busted flag, plus official entry
+  and rebuy counts. A flip to busted is a bust; back in (or the same name registering again) is a re-entry once the
+  entry count has gone up. Official rebuys we could not attach to a player show as *missed*.
+- Places come from the leaderboard rank, prizes from the payout table (stored by the site in thousands of VND).
+- Times from the site are Vietnam wall-clock time with a `Z` suffix; the engine converts them to UTC.
+- Later days get their event number from the flights that feed them (`multiDayTourId`); the schedule's reused
+  numbers for different single-day events (#14/#15/#16 on 20 and 21 Nov) are kept apart as `#14·2` etc.

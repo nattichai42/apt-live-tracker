@@ -1,0 +1,47 @@
+name: Poll GLPC live tracker
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'   # backup trigger: a queued run waits in the concurrency group and starts as soon as the running job ends
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write   # lets a run queue the next run of this workflow
+
+concurrency:
+  group: glpc-poller
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358   # GitHub's hard cap is 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Restore state from the glpc-data branch
+        run: |
+          mkdir -p state
+          if git fetch --depth=1 origin glpc-data 2>/dev/null; then
+            git show origin/glpc-data:state.json > state/glpc.json && echo "restored $(wc -c < state/glpc.json) bytes"
+          else
+            echo "no previous state, starting fresh"
+          fi
+      - name: Queue the next run
+        # Each run queues its successor, which waits in the concurrency group and starts the moment this one
+        # ends, so polling continues even when GitHub delays or skips the cron schedule. Stops after the series.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if node -e 'const over = Date.now() > Date.parse("2026-12-01T00:00:00Z"); let done = false; try { const ev = Object.values(require("./state/glpc.json").events || {}); done = ev.length > 0 && ev.every(e => e.phase === "Completed" || e.closed); } catch {} process.exit(over || done ? 0 : 1)'; then
+            echo "The series is over; not queueing another run."
+          else
+            gh workflow run glpc-poll.yml --ref main && echo "Queued the next run." || echo "::warning::Could not queue the next run; the cron schedule is the fallback."
+          fi
+      - name: Poll for 5 h 45 min
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node poller/poll.js --engine docs/glpc/glpc.js --branch glpc-data --state state/glpc.json --minutes 345 --min-interval 10 --max-interval 60 --budget 1 --publish-every 3
