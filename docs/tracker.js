@@ -456,11 +456,21 @@
   }
 
   // One row per player across the series
+  // Every flight and day of this event is over (a multi-day event counts only once its last day has ended)
+  function eventFinished(state, num) {
+    const kids = Object.values(state.events).filter((e) => e.num === Number(num));
+    return kids.length > 0 && kids.every((e) => e.phase === 'Completed');
+  }
+
   // opts.fromStart: only events watched from their first minute, where non-cashers and re-entries are known too
+  // opts.finished: only events whose every flight and day has ended
   function players(state, opts = {}) {
     const byNum = eventByNum(state);
     const okCache = new Map();
-    const keep = opts.fromStart ? (num) => { if (!okCache.has(num)) okCache.set(num, watchedFromStart(state, num)); return okCache.get(num); } : null;
+    const keep = opts.fromStart || opts.finished ? (num) => {
+      if (!okCache.has(num)) okCache.set(num, (!opts.fromStart || watchedFromStart(state, num)) && (!opts.finished || eventFinished(state, num)));
+      return okCache.get(num);
+    } : null;
     const res = resultsByName(state, keep);
     const map = new Map();
     const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], untracked: 0 }), map.get(n));
@@ -678,5 +688,5 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
 });

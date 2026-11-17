@@ -525,9 +525,23 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
     return { ps, re, missed };
   }
 
+  // Every flight and day of this event is over (a multi-day event counts only once its last day has ended).
+  // A day that never ran, long past its start, does not hold the event open.
+  function eventFinished(state, num, now) {
+    now = now || nowSec();
+    const kids = kidsOf(state, num);
+    return kids.some((e) => e.phase === 'Completed') &&
+      kids.every((e) => e.phase === 'Completed' || (!e.polls && e.start && e.start < now - 8 * 3600));
+  }
+
+  // opts.fromStart: only events watched from their first minute; opts.finished: only events whose every day has ended
   function players(state, opts = {}) {
     const okCache = new Map();
-    const keep = (num) => { if (!opts.fromStart) return true; if (!okCache.has(num)) okCache.set(num, watchedFromStart(state, num)); return okCache.get(num); };
+    const keep = (num) => {
+      if (!opts.fromStart && !opts.finished) return true;
+      if (!okCache.has(num)) okCache.set(num, (!opts.fromStart || watchedFromStart(state, num)) && (!opts.finished || eventFinished(state, num)));
+      return okCache.get(num);
+    };
     const map = new Map();
     const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, buyins: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], partial: false }), map.get(n));
     for (const e of Object.values(state.events)) {
@@ -709,6 +723,6 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat, gtd: e.gtd, regClose: e.regCloseSched }));
   }
 
-  return { SITE, API, SERIES, SERIES_URL, ACTIVE, TZ_OFF, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, canon,
+  return { SITE, API, SERIES, SERIES_URL, ACTIVE, TZ_OFF, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, canon,
     emptyState, pollOnce, applySnapshot, applyDetail, mergeList, settle, buildResults, players, playerTimeline, liveEvents, isLaterDay, parseName, label, ccOf, regCloseOf, titleCase };
 });
