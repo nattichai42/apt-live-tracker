@@ -322,9 +322,25 @@
 
   // Undo re-entries recorded before the rules above existed: any "re-entry" after registration closed
   // was a player briefly missing from the seating list, so its bust and re-entry are removed. Idempotent.
+  // APT sometimes leaves a decided event "In The Money" (or "Final Table") for hours. Once nobody is left and the
+  // payouts name the 1st-place finisher, it is over: mark its last stage completed and whoever was still seated
+  // finished it (the winner, and anyone we saw seated after their bust). Runs after every poll and on every load.
+  function finishDecided(state) {
+    let n = 0;
+    for (const [num, r] of Object.entries(state.results || {})) {
+      if (!r.rows.some((x) => x[0] === 1)) continue;
+      const kids = Object.values(state.events).filter((e) => String(e.num) === num);
+      const last = kids.slice().sort((a, b) => (b.start || 0) - (a.start || 0))[0];
+      if (!last || last.phase === 'Completed' || last.remaining !== 0 || !['In The Money', 'Final Table', 'Break', 'Paused', 'Running'].includes(last.phase)) continue;
+      last.phase = 'Completed'; last.decided = 1; n++;
+      for (const p of Object.values(last.p || {})) if (p.st === 's') p.st = 'end';
+    }
+    return n;
+  }
+
   function repair(state) {
     for (const e of Object.values(state.events || {})) if (e.currency && !/^[A-Z]{3}$/.test(e.currency)) e.currency = curCode(e.currency);
-    let fixed = 0;
+    let fixed = finishDecided(state);
     // Later-day players counted as new entries because their name was re-ordered since the flight they bagged in
     for (const e of Object.values(state.events || {})) {
       if (!isLaterDay(e.name) || !e.p || !e.firstPoll) continue;
@@ -501,6 +517,7 @@
     });
     const rs = await pool(want, opts.concurrency || 4, (num) => fetchResults(fetchFn, state, num, now));
     for (const r of rs) if (r && r.error) note(r);
+    finishDecided(state); // the event's status just came back from the site, maybe still "In The Money"
     state.updatedAt = now;
     return summary;
   }
