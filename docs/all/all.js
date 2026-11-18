@@ -174,7 +174,8 @@
     if (archivesAdded) return []; archivesAdded = true;
     const added = [];
     try {
-      const idx = await (await fetch('../apt/archive/index.json')).json();
+      const [idx, fx] = await Promise.all([fetch('../apt/archive/index.json').then((r) => r.json()), fetch('../apt/archive/fx.json').then((r) => r.json()).catch(() => null)]);
+      FX.seed(fx); // their dates' rates, saved with them
       for (const f of idx.series || []) {
         const dup = SRC.find((x) => x.org === 'apt' && x.entry.source && x.entry.source.series === f.id);
         if (dup) SRC.splice(SRC.indexOf(dup), 1); // archived since: the saved file replaces the live record
@@ -216,8 +217,10 @@
       if (f == null) ok = false;
       return f == null ? 1 : f;
     };
+    // A currency with no rate at all (an unknown code) falls back to the series' own, so one bad event can't blank the page
+    const natOf = (e) => { const c = s.nat(e); return FX.perUsd(c, '2025-01-01') == null && s.entry.currency && FX.perUsd(s.entry.currency, '2025-01-01') != null ? s.entry.currency : c; };
     for (const [k, e] of Object.entries(src.events || {})) {
-      const from = s.nat(e), f = fac(from, FX.ymd(e.start || src.updatedAt || Date.now() / 1000));
+      const from = natOf(e), f = fac(from, FX.ymd(e.start || src.updatedAt || Date.now() / 1000));
       out.events[k] = f === 1 ? e : { ...e, buyin: Math.round((e.buyin || 0) * f), prizePool: Math.round((e.prizePool || 0) * f), ...(e.gtd ? { gtd: Math.round(e.gtd * f) } : {}) };
       const key = String(e.num), end = evEnd(e) || 0, cur = byNum.get(key);
       if (!cur || end > cur.end) byNum.set(key, { end, from });
@@ -370,7 +373,12 @@
   }
   function seriesTags(p) {
     const box = el('span', 'stags');
-    for (const s of SRC) if (p.rows[s.id]) box.appendChild(stag(s.id, s.all ? (p.fests > 1 ? '×' + p.fests : '') : null));
+    // One tag per organiser: its series' name when one, "×n" when several (Triton: festivals)
+    for (const o of ORGS) {
+      const mine = SRC.filter((s) => s.org === o && p.rows[s.id]); if (!mine.length) continue;
+      const n = mine.reduce((a, s) => a + (s.all ? p.fests || 1 : 1), 0);
+      box.appendChild(stag(mine[0].id, n > 1 ? '×' + n : mine[0].all ? '' : null));
+    }
     return box;
   }
   function renderSummary(rows, q) {

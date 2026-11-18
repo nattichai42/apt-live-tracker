@@ -36,7 +36,7 @@
   // storage: browser key of the page's saved copy (defaults to the id).
   const LIST = [
     { id: 'apt-taipei-2026', org: 'apt', branch: 'data', storage: 'apt-live-state-v1',
-      name: 'APT Taipei 2026', tag: "Taipei '26", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2026-11-12', end: '2026-11-29',
+      name: 'APT Championship Taipei 2026', tag: "Championship '26", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2026-11-12', end: '2026-11-29',
       link: 'https://www.theasianpokertour.com/series/apt-championship-taipei-2026',
       title: 'APT Championship, Taipei 2026', mark: 'APT Taipei', sub: 'Championship · 2026', art: 'apt', watermark: '2026',
       source: { series: 'apt-championship-taipei-2026' } },

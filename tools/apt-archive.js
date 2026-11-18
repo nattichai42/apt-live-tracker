@@ -4,6 +4,8 @@
 //   node tools/apt-archive.js [--only <series slug>] [--force]
 //   node tools/apt-archive.js --from-state <state.json> --only <slug>   (a series we watched live: keep its richer record)
 //   node tools/apt-archive.js --repack   (rewrite the saved files in the current compact form, no requests)
+//   node tools/apt-archive.js --rates    (only rebuild fx.json: exchange rates for every saved series' dates)
+// Also writes docs/apt/archive/fx.json, so pages convert these series without asking for hundreds of days of rates.
 // Writes docs/apt/archive/<slug>.json and docs/apt/archive/index.json.
 //
 // What a finished series still serves: every event's entries, buy-in and times, its payouts, and its registration
@@ -20,6 +22,35 @@ const arg = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : null);
 const only = arg('--only'), fromState = arg('--from-state');
 const force = args.includes('--force');
 const repack = args.includes('--repack');
+const ratesOnly = args.includes('--rates');
+
+// Units per USD for each day of each saved series (a week either side): ECB rates (Frankfurter) for KRW, PHP, ..., and
+// the daily jsDelivr files for TWD and VND, which the ECB doesn't publish (from 2 March 2024; earlier days use that one)
+async function writeRates(series) {
+  const FX = require('../docs/fx.js').FX;
+  const shift = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const table = {};
+  const put = (d, c, v) => { if (v > 0) (table[d] || (table[d] = {}))[c] = v; };
+  const ecb = FX.LIST.filter((c) => c !== 'USD' && FX.ECB.has(c));
+  const days = new Set();
+  for (const f of series) {
+    const r = await fetchFn(`https://api.frankfurter.dev/v1/${shift(f.start, -7)}..${shift(f.end, 7)}?base=USD&symbols=${ecb.join(',')}`);
+    if (r.ok) for (const [d, x] of Object.entries((await r.json()).rates || {})) for (const [c, v] of Object.entries(x)) put(d, c, v);
+    for (let d = shift(f.start, -1); d <= shift(f.end, 3) && d <= today; d = shift(d, 1)) days.add(d < '2024-03-02' ? '2024-03-02' : d);
+    await sleep(150);
+  }
+  const list = [...days].sort(); let i = 0;
+  const work = async () => { while (i < list.length) { const d = list[i++];
+    try {
+      const r = await fetchFn(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${d}/v1/currencies/usd.min.json`);
+      if (r.ok) { const u = (await r.json()).usd || {}; put(d, 'TWD', u.twd); put(d, 'VND', u.vnd); }
+    } catch {} } };
+  await Promise.all([work(), work(), work(), work()]);
+  const file = path.join(DIR, 'fx.json');
+  fs.writeFileSync(file, JSON.stringify(table));
+  console.log(`fx.json: ${Object.keys(table).length} days, ${Math.round(fs.statSync(file).size / 1024)} KB`);
+}
 const DIR = path.join(__dirname, '../docs/apt/archive');
 fs.mkdirSync(DIR, { recursive: true });
 
@@ -82,15 +113,17 @@ async function archive(league) {
 
 (async () => {
   if (repack) {
-    for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json') && x !== 'index.json')) {
+    for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json') && x !== 'index.json' && x !== 'fx.json')) {
       const file = path.join(DIR, f), before = fs.statSync(file).size;
-      fs.writeFileSync(file, JSON.stringify(A.pack(A.unpack(JSON.parse(fs.readFileSync(file, 'utf8'))))));
+      const st = A.unpack(JSON.parse(fs.readFileSync(file, 'utf8'))); A.repair(st); // the engine's current clean-ups
+      fs.writeFileSync(file, JSON.stringify(A.pack(st)));
       console.log(`${f}: ${Math.round(before / 1024)} -> ${Math.round(fs.statSync(file).size / 1024)} KB`);
     }
     const ip = path.join(DIR, 'index.json');
     if (fs.existsSync(ip)) { const ix = JSON.parse(fs.readFileSync(ip, 'utf8')); for (const s of ix.series) { try { s.bytes = fs.statSync(path.join(DIR, s.id + '.json')).size; } catch {} } fs.writeFileSync(ip, JSON.stringify(ix, null, 1)); }
     return;
   }
+  if (ratesOnly) return writeRates(JSON.parse(fs.readFileSync(path.join(DIR, 'index.json'), 'utf8')).series);
   const d = await (await fetchFn(`${A.SITE}/series/__data.json`)).json();
   const node = d.nodes.map((n) => (n && n.data ? A.unflatten(n.data) : null)).find((x) => x && x.pastLeagues);
   // Series still polled live (docs/series.js) keep their own tracker until they are archived with --from-state
@@ -109,4 +142,5 @@ async function archive(league) {
   index.updatedAt = Math.floor(Date.now() / 1000);
   fs.writeFileSync(indexPath, JSON.stringify(index, null, 1));
   console.log(`index: ${index.series.length} series`);
+  await writeRates(index.series);
 })();

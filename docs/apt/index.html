@@ -394,8 +394,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=913361b8f8"></script>
-<script src="../series.js?v=e540f28cb6"></script>
-<script src="tracker.js?v=915d1d95b6"></script>
+<script src="../series.js?v=3ebaa9259a"></script>
+<script src="tracker.js?v=bce8511306"></script>
 <script>
 (function () {
   'use strict';
@@ -566,7 +566,9 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   let archLoaded = false;
   async function loadArchive() {
     try {
-      const [r, idx] = await Promise.all([fetch(`archive/${FEST}.json`), fetch('archive/index.json').then((x) => x.json()).catch(() => ({ series: [] }))]);
+      const [r, idx, fx] = await Promise.all([fetch(`archive/${FEST}.json`), fetch('archive/index.json').then((x) => x.json()).catch(() => ({ series: [] })),
+        fetch('archive/fx.json').then((x) => x.json()).catch(() => null)]);
+      FX.seed(fx); // the saved series' dates' rates
       if (!r.ok) throw new Error(r.status === 404 ? 'No saved series with this id' : 'HTTP ' + r.status);
       const s = T.unpack(await r.json()); T.repair(s);
       raw = state = s; archLoaded = true; lastErr = null;

@@ -119,12 +119,15 @@
     return null;
   }
 
+  // The site sometimes gives a symbol ("₱") instead of the currency code
+  const SYMBOL = { '₱': 'PHP', '₩': 'KRW', '₫': 'VND', 'NT$': 'TWD', '$': 'USD', 'US$': 'USD', '฿': 'THB', '¥': 'JPY', 'HK$': 'HKD', 'S$': 'SGD', 'RM': 'MYR', '€': 'EUR', '£': 'GBP' };
+  const curCode = (c) => { if (!c) return c; const t = String(c).trim(); return SYMBOL[t] || t.toUpperCase(); };
   function eventMeta(e) {
     return {
       maxBullets: maxBulletsOf(clean(e.name)),
       kid: e.kholdemId, num: e.number, name: clean(e.name), phase: e.phase,
       start: toSec(e.startTimeUTC), regClose: toSec(e.regCloseUTC),
-      buyin: Math.round(Number(e.buyin || 0) + Number(e.fee || 0)), currency: e.currency || 'TWD',
+      buyin: Math.round(Number(e.buyin || 0) + Number(e.fee || 0)), currency: curCode(e.currency) || 'TWD',
       entries: e.totalEntries ?? null, remaining: e.playersRemaining ?? null,
       sat: !!e.isSatellite, prizePool: Math.round(Number(e.prizePool || 0)),
     };
@@ -320,6 +323,7 @@
   // Undo re-entries recorded before the rules above existed: any "re-entry" after registration closed
   // was a player briefly missing from the seating list, so its bust and re-entry are removed. Idempotent.
   function repair(state) {
+    for (const e of Object.values(state.events || {})) if (e.currency && !/^[A-Z]{3}$/.test(e.currency)) e.currency = curCode(e.currency);
     let fixed = 0;
     // Later-day players counted as new entries because their name was re-ordered since the flight they bagged in
     for (const e of Object.values(state.events || {})) {
