@@ -249,6 +249,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       <a class="home" href="../" aria-label="Back to all series"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
       <div class="brand"><h1><a href="../" title="All series">Triton</a></h1><span><a href="https://tritonpoker.plus/festival/daca20f2-506a-4377-9c73-2651390b6782" target="_blank" rel="noopener">N. Cyprus 2026</a></span></div>
       <div class="ctl">
+        <select id="fx" class="sel" aria-label="Currency shown"></select>
         <button id="theme" class="btn" type="button"></button>
         <select id="interval" class="sel" aria-label="How often this page checks for a new save">
           <option value="30">30s</option><option value="60" selected>60s</option><option value="120">2m</option><option value="0">Off</option>
@@ -296,6 +297,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       <div class="filters">
         <input id="players-q" class="search" type="search" placeholder="Search player" aria-label="Search players" autocomplete="off">
         <select id="players-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
+        <select id="players-fest" class="sel small" aria-label="Festival" hidden><option value="">All festivals</option></select>
         <select id="players-sort" class="sel small" aria-label="Sort players">
           <option value="prizes">Prizes</option><option value="net">Net</option><option value="bullets">Bullets</option>
           <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM %</option>
@@ -368,7 +370,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
 </aside>
 
-<script src="triton.js?v=3f85fbda3c"></script>
+<script src="../fx.js?v=f81f1587bd"></script>
+<script src="triton.js?v=0445fb62a2"></script>
 <script>
 (function () {
   'use strict';
@@ -390,6 +393,11 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     return null;
   }
   const REPO = repoSlug();
+  // Three views on one page: the live festival, a past festival (?f=<id>) and all festivals together (?view=all)
+  const params = new URLSearchParams(location.search);
+  const FEST = /^[0-9a-f-]{36}$/.test(params.get('f') || '') ? params.get('f') : null;
+  const MODE = FEST ? 'archive' : params.get('view') === 'all' ? 'all' : 'live';
+  const HOME_TAB = MODE === 'all' ? 'players' : 'feed';
   const BRANCH = 'triton-data';
   const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/${BRANCH}/state.json` : null;
   // The raw file host serves a branch file up to 5 minutes old. Asking GitHub for the branch's latest commit
@@ -397,8 +405,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const REF_URL = REPO ? `https://api.github.com/repos/${REPO}/git/ref/heads/${BRANCH}` : null;
   let lastSha = null;
 
-  let state = T.emptyState();
-  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); state = s; } } catch {}
+  let raw = T.emptyState(), state = raw; // raw: as polled and saved; state: what's shown (maybe converted)
+  if (MODE === 'live') try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
   const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
   const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
   // Dark by default; the ☀/☾ button switches and is remembered on this device
@@ -420,15 +428,21 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null, openEvent = null, eventSeg = 'seated', backToEvent = null;
 
   /* ---------- formatting ---------- */
-  const tz = 'Europe/Athens'; // the festival's own time zone (Northern Cyprus keeps the same clock)
-  const fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
-  const fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
-  const fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short' });
-  const fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  // The festival's own time zone (Northern Cyprus keeps Athens' clock); all-time view: the viewer's own
+  let tz, fTime, fDay, fDate, fFull, fYear;
+  function setTz(z) {
+    try { new Intl.DateTimeFormat('en-GB', { timeZone: z || undefined }); tz = z || undefined; } catch { tz = 'UTC'; }
+    fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+    fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', ...(MODE === 'live' ? {} : { year: 'numeric' }) });
+    fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short', ...(MODE === 'all' ? { year: '2-digit' } : {}) });
+    fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', ...(MODE === 'live' ? {} : { year: 'numeric' }), hour: '2-digit', minute: '2-digit' });
+  }
+  setTz(MODE === 'all' ? null : 'Europe/Athens');
   const dayKey = (t) => fDay.format(new Date(t * 1000));
   const nf = new Intl.NumberFormat('en-US');
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(v) : '—');
-  const money = (v) => '$' + nf.format(Math.round(v || 0));
+  const SYM = { USD: '$', EUR: '€', GBP: '£', HKD: 'HK$' };
+  const money = (v) => (SYM[curLabel()] || curLabel() + ' ') + nf.format(Math.round(v || 0));
   // 3,500 -> 3.5K, 16,500 -> 16.5K, 165,000 -> 165K, 1,555,940 -> 1.56M (never round a buy-in to a different number)
   const short = (v) => {
     const a = Math.abs(v), s = v < 0 ? '−' : '';
@@ -453,15 +467,134 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const evShort = (e) => e ? `${tag(e.num)} ${baseOf(e.name)}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
   const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
   const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
+  const NATIVE_OF = (e) => e.cur || (raw.festival && raw.festival.currency) || 'USD', NATIVE_LABEL = () => (raw.festival && raw.festival.currency) || 'USD', FIXED_FX = MODE === 'all', FX_FALLBACK = MODE === 'all' ? (from, to, d) => (to === 'USD' ? T.usdRate(from, d) : null) : null;
+
+  /* ---------- currency ---------- */
+  // Amounts in each event's own currency, or in one picked at the top (shared by all the trackers):
+  // a buy-in converted at the rate of the event's start date, a prize at the rate of its finish date.
+  let fxCur = FX.pick();
+  if (FIXED_FX && !fxCur) fxCur = 'USD'; // several currencies at once: pick one
+  let fxShown = '', fxBusy = false, fxTried = '';
+  const evEnd = (e) => e.doneAt || e.lastPoll || e.start;
+  function fxNeeds(src) {
+    const dates = [], curs = new Set([fxCur]);
+    for (const e of Object.values(src.events || {})) { if (!e.polls && !e.start) continue; curs.add(NATIVE_OF(e)); if (e.start) dates.push(FX.ymd(e.start)); const end = evEnd(e); if (end) dates.push(FX.ymd(end)); }
+    return { dates, curs: [...curs] };
+  }
+  // A converted copy for display: raw keeps polling and saving in its own currency
+  function display(src) {
+    if (!fxCur) return { s: src, ok: true };
+    const out = { ...src, events: {}, results: {} }, byNum = new Map();
+    let ok = true, approx = false;
+    const fac = (from, d) => {
+      let f = FX.factor(from, fxCur, d);
+      if (f != null && !FX.exact(from, fxCur, d)) approx = true;
+      if (f == null && FX_FALLBACK) { f = FX_FALLBACK(from, fxCur, d); approx = true; }
+      if (f == null) ok = false;
+      return f == null ? 1 : f;
+    };
+    for (const [k, e] of Object.entries(src.events || {})) {
+      const from = NATIVE_OF(e), d = FX.ymd(e.start || src.updatedAt || Date.now() / 1000);
+      const f = fac(from, d);
+      out.events[k] = f === 1 ? e : { ...e, buyin: Math.round((e.buyin || 0) * f), prizePool: Math.round((e.prizePool || 0) * f), ...(e.gtd ? { gtd: Math.round(e.gtd * f) } : {}) };
+      const key = String(e.num), end = evEnd(e) || 0, cur = byNum.get(key);
+      if (!cur || end > cur.end) byNum.set(key, { end, from });
+    }
+    for (const [num, r] of Object.entries(src.results || {})) {
+      const info = byNum.get(String(num));
+      if (!info) { out.results[num] = r; continue; }
+      const f = fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000));
+      out.results[num] = f === 1 ? r : { ...r, rows: r.rows.map((row) => [row[0], row[1], row[2], Math.round(row[3] * f), ...row.slice(4)]) };
+    }
+    return { s: ok ? out : src, ok, approx };
+  }
+  // Rebuild what's shown from raw (after new data or a currency change), loading missing rates if needed
+  function refresh() {
+    const v = display(raw);
+    // Switching to a currency whose rates haven't loaded yet: keep showing the previous currency meanwhile
+    if (v.ok || !fxShown) { state = v.s; fxShown = v.ok ? fxCur : ''; }
+    render();
+    const sig = fxCur + '|' + Object.keys(raw.events || {}).length + '|' + Object.keys(raw.results || {}).length;
+    if ((!v.ok || v.approx) && fxCur && !fxBusy && fxTried !== sig) {
+      fxBusy = true; fxTried = sig; setStatus();
+      const n = fxNeeds(raw);
+      FX.ensure(n.dates, n.curs).catch(() => {}).then(() => { fxBusy = false; refresh(); });
+    }
+  }
+  const curLabel = () => fxShown || NATIVE_LABEL();
+  function fillFx() {
+    const sel = $('#fx'); const nat = NATIVE_LABEL();
+    const opts = [];
+    if (!FIXED_FX) { const o = new Option(nat, ''); o.title = 'Each event in its own currency'; opts.push(o); }
+    for (const c of FX.LIST) if (FIXED_FX || c !== nat) opts.push(new Option(c, c));
+    sel.replaceChildren(...opts); sel.value = fxCur;
+  }
+  $('#fx').addEventListener('change', (e) => { fxCur = e.target.value; FX.choose(fxCur); fxTried = ''; refresh(); });
 
   /* ---------- data plumbing ---------- */
   function persist() {
-    if (!store.set(LS_STATE, JSON.stringify(state))) {
-      const slim = { ...state, feed: state.feed.slice(-1500) };
+    if (MODE !== 'live') return; // past festivals and all-time come from the site's own files
+    if (!store.set(LS_STATE, JSON.stringify(raw))) {
+      const slim = { ...raw, feed: raw.feed.slice(-1500) };
       store.set(LS_STATE, JSON.stringify(slim));
     }
   }
+  async function fetchLive() {
+    let url = STATE_URL + '?t=' + Math.floor(Date.now() / 60000);
+    try {
+      const g = await fetch(REF_URL, { cache: 'no-cache', headers: { Accept: 'application/vnd.github+json' } });
+      if (g.ok) { const sha = ((await g.json()).object || {}).sha; if (sha) url = `https://raw.githubusercontent.com/${REPO}/${sha}/state.json`; }
+    } catch {}
+    const r = await fetch(url, { cache: url.includes('?') ? 'no-store' : 'default' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+  let loaded = false, festivals = [];
+  // Past festival or all-time: static files saved by tools/triton-archive.js, plus (all-time) the live festival
+  async function loadStatic() {
+    if (loaded) return;
+    try {
+      if (MODE === 'archive') {
+        const r = await fetch(`archive/${FEST}.json`);
+        if (!r.ok) throw new Error(r.status === 404 ? 'No saved festival with this id' : 'HTTP ' + r.status);
+        raw = state = T.feedFromBusts(await r.json());
+        setTz(raw.festival && raw.festival.timeZone);
+      } else {
+        festivals = (await (await fetch('archive/index.json')).json()).festivals || [];
+        const parts = await Promise.all(festivals.map(async (f) => ({ state: await (await fetch(`archive/${f.id}.json`)).json(), tag: f.tag, start: f.start })));
+        if (STATE_URL) try {
+          const live = await fetchLive();
+          if (live && live.festival) {
+            const tagL = T.festTag(live.festival.name, live.festival.startDate);
+            festivals.unshift({ id: live.festivalId || T.FESTIVAL, tag: tagL, start: live.festival.startDate, name: live.festival.name, live: true });
+            parts.unshift({ state: live, tag: tagL, start: live.festival.startDate });
+          }
+        } catch (e) { console.warn('live festival unavailable', e); }
+        raw = state = T.mergeStates(parts);
+        fillFestFilter();
+      }
+      loaded = true; ghAt = raw.updatedAt || 0; lastErr = null;
+      showBrand(); fillFx();
+    } catch (e) { lastErr = String(e.message || e); }
+    refresh();
+  }
+  function showBrand() {
+    const h = document.querySelector('.brand h1 a'), sub = document.querySelector('.brand span');
+    const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    if (MODE === 'archive' && raw.festival) {
+      const f = raw.festival;
+      h.textContent = T.festTag(f.name, f.startDate).replace(/ '\d\d$/, '');
+      sub.innerHTML = '';
+      const a = el('a', '', `${fmt(f.startDate)} – ${fmt(f.endDate)}`); a.href = `https://tritonpoker.plus/festival/${FEST}`; a.target = '_blank'; a.rel = 'noopener';
+      sub.appendChild(a);
+      document.title = `Triton ${f.name.replace(/^\d{4}\s+/, '').replace(/^Triton\s+/, '')} ${f.startDate.slice(0, 4)}`;
+    } else if (MODE === 'all') {
+      h.textContent = 'Triton'; sub.textContent = `All-time · ${festivals.length} festivals`;
+      document.title = 'Triton All-time';
+    }
+  }
   async function loadGitHub() {
+    if (MODE !== 'live') return loadStatic();
     if (!STATE_URL) return;
     try {
       let url = STATE_URL + '?t=' + Math.floor(Date.now() / 60000);
@@ -483,11 +616,12 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       if (s && s.v === 1 && (s.updatedAt || 0) > ghAdopted) {
         T.repair(s);
         freshSince = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
-        state = s; ghAdopted = s.updatedAt; persist(); render();
+        raw = s; ghAdopted = s.updatedAt; persist(); refresh();
       }
     } catch (e) { console.warn('GitHub history unavailable', e); }
   }
   async function poll() {
+    if (MODE !== 'live') return;
     if (polling) return;
     polling = true; setStatus();
     const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
@@ -498,7 +632,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       freshSince = before;
     } catch (e) { lastErr = String(e.message || e); }
     polling = false;
-    render();
+    refresh();
     schedule();
   }
   function schedule() {
@@ -512,6 +646,11 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   }
   function setStatus() {
     const dot = $('#dot'), txt = $('#status-text');
+    if (MODE !== 'live') {
+      dot.className = 'dot' + (lastErr ? ' err' : '');
+      txt.textContent = lastErr || (!loaded ? 'Loading…' : fxBusy ? 'Loading exchange rates…' : (MODE === 'archive' ? 'Past festival · results as published by Triton' : 'All festivals since 2018') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
+      return;
+    }
     const iv = Number(prefs.interval);
     dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
     const parts = [];
@@ -523,6 +662,27 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     txt.textContent = parts.join(' · ');
   }
   setInterval(setStatus, 1000);
+
+  /* ---------- all-time festival filter ---------- */
+  // "": every festival; "y2025": a year; otherwise a festival tag ("Jeju II '26")
+  let festPick = '';
+  function festOnly() {
+    if (MODE !== 'all' || !festPick) return null;
+    const tagOf = (num) => String(num).split('@')[1] || '';
+    if (festPick.startsWith('y')) { const yr = festPick.slice(1); const tags = new Set(festivals.filter((f) => String(f.start).startsWith(yr)).map((f) => f.tag)); return (num) => tags.has(tagOf(num)); }
+    return (num) => tagOf(num) === festPick;
+  }
+  function fillFestFilter() {
+    const sel = $('#players-fest'); sel.hidden = false;
+    const years = [...new Set(festivals.map((f) => String(f.start).slice(0, 4)))].sort().reverse();
+    const gy = document.createElement('optgroup'); gy.label = 'Year';
+    for (const y of years) gy.appendChild(new Option(y, 'y' + y));
+    const gf = document.createElement('optgroup'); gf.label = 'Festival';
+    for (const f of festivals) gf.appendChild(new Option(f.tag + (f.live ? ' (live)' : ''), f.tag));
+    sel.replaceChildren(new Option('All festivals', ''), gy, gf);
+    sel.value = festPick;
+  }
+  $('#players-fest').addEventListener('change', (e) => { festPick = e.target.value; playersLimit = 60; renderPlayers(); });
 
   /* ---------- shared bits ---------- */
   function resultIndex() {
@@ -807,11 +967,11 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       prefs.sort === 'seated' ? 'playing now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
     h.className = 'note' + (!prefs.fromStart && rows.some((p) => p.partial) ? ' warn' : '');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : (rows.some((p) => p.partial) ? 'Some events were not watched from their start: rebuys bought before tracking are missing there' : (prefs.finished ? 'all days ended' : 'All events')));
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : (rows.some((p) => p.partial) ? '≥ Before Sep 2026 Triton kept no record of who re-entered: buy-ins there count one bullet per player per event' : (prefs.finished ? 'all days ended' : 'All events')));
   }
 
   function renderPlayers() {
-    const all = T.players(state, { fromStart: !!prefs.fromStart, finished: !!prefs.finished });
+    const all = T.players(state, { fromStart: !!prefs.fromStart, finished: !!prefs.finished, only: festOnly() });
     $('#n-players').textContent = all.length ? nf.format(all.length) : '';
     const q = $('#players-q').value.trim().toLowerCase();
     fillCountries($('#players-country'), all.map((p) => p.cc));
@@ -837,7 +997,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       meta.appendChild(el('span', '', `${plural(p.bullets, 'bullet', 'bullets')} · ${plural(p.events, 'event', 'events')}`));
       meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${Math.round(p.itm * 100)}% ITM` : 'no cash'));
       if (p.seatedIn.length) meta.appendChild(el('span', 'tag seat', 'Playing ' + p.seatedIn.join(', ')));
-      else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + fTime.format(new Date(p.lastBust * 1000))));
+      else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + (MODE === 'live' ? fTime : fDate).format(new Date(p.lastBust * 1000))));
       left.appendChild(meta);
       const right = el('div', 'num');
       right.appendChild(el('div', 'big', p.prizes ? short(p.prizes) : '—'));
@@ -922,11 +1082,13 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       add('text', { x: m.l - 6, y: y(v) + 3.5, 'text-anchor': 'end', class: 'lbl' }, short(v));
     }
     let prevDay = '', lastLabelX = -99;
+    // A career spans hundreds of days: one divider per day would be a blur, so draw them only for short spans
+    const dayLines = new Set(pts.slice(1).map((p) => (p.it.t ? fDate.format(new Date(p.it.t * 1000)) : ''))).size <= 24;
     pts.slice(1).forEach((p) => {
       const d = p.it.t ? fDate.format(new Date(p.it.t * 1000)) : '';
       if (d && d !== prevDay) {
         const xx = x(p.i - 1) + (x(p.i) - x(p.i - 1)) / 2;
-        if (prevDay) add('line', { x1: xx, x2: xx, y1: m.t, y2: H - m.b, class: 'day' });
+        if (prevDay && dayLines) add('line', { x1: xx, x2: xx, y1: m.t, y2: H - m.b, class: 'day' });
         const w = d.length * 6.2;
         const left = Math.min(Math.max(m.l, xx - w / 2), W - m.r - w);
         if (left > lastLabelX + 8) { add('text', { x: left, y: H - 6, class: 'lbl', 'text-anchor': 'start' }, d); lastLabelX = left + w; }
@@ -994,7 +1156,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       tile(st, 'Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); tile(st, 'Prizes', short(p.prizes), '', 'gold'); tile(st, 'Net', signed(p.net), '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
       tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM', Math.round(p.itm * 100) + '%');
     }
-    $('#sheet-hint').textContent = p && p.partial ? '≥ Some events were not watched from the start; one bullet is counted there.' : '';
+    $('#sheet-hint').textContent = p && p.partial ? '≥ Before Sep 2026 Triton kept no record of who re-entered: one bullet is counted per event there.' : '';
     const tl = $('#sheet-tl'); tl.replaceChildren();
     const items = T.playerTimeline(state, name);
     $('#sheet-chart-wrap').hidden = !items.some((i) => i.amt);
@@ -1039,11 +1201,12 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
   /* ---------- controls ---------- */
   function selectTab(tab) {
-    prefs.tab = tab; savePrefs();
+    if (MODE === 'live') { prefs.tab = tab; savePrefs(); } // the live view keeps its own last tab
     document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     for (const t of ['feed', 'events', 'players']) $('#view-' + t).hidden = t !== tab;
     if (tab === 'players') renderPlayers();
-    if (window.innerWidth >= 980 && tab === 'events') selectTab('feed');
+    if (MODE === 'all' && tab === 'feed') return selectTab('players');
+    if (window.innerWidth >= 980 && tab === 'events') selectTab(HOME_TAB);
   }
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
   document.querySelectorAll('.chip[data-kind]').forEach((c) => {
@@ -1084,8 +1247,17 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   });
 
   /* ---------- boot ---------- */
-  selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
+  fillFx();
+  if (fxCur) setTimeout(refresh, 0);
+  if (MODE === 'archive') for (const id of ['#events', '#soon']) { const box = $(id); box.hidden = true; box.previousElementSibling.hidden = true; }
+  if (MODE !== 'live') {
+    // Saved festivals don't change: no polling controls; all-time has no bust feed (players are the point)
+    $('#interval').hidden = true; $('#refresh').hidden = true;
+    if (MODE === 'all') { document.querySelector('.tab[data-tab="feed"]').hidden = true; $('#sheet-feed').hidden = true; }
+  }
+  selectTab(MODE === 'all' ? 'players' : prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
   render();
+  if (MODE !== 'live') { loadStatic(); return; }
   (async () => {
     await loadGitHub();
     setInterval(loadGitHub, 5 * 60 * 1000);

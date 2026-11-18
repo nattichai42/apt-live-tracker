@@ -82,3 +82,22 @@ Triton Poker+ app loads (`prod-public-serverless.triton-poker.com/graphql`, no l
 (by the series dates in its venue's time zone), with live counts from each tracker's `meta.json` (events running and
 finished, players, bullets, prizes paid). Trackers live at `docs/apt/`, `docs/glpc/` and `docs/triton/`; each page's title
 links home. To add a series, add its tracker and one entry to `SERIES` in `docs/index.html`.
+
+## Past Triton festivals and all-time view
+
+`node tools/triton-archive.js` saves every finished Triton tournament festival (2018 onwards) to
+`docs/triton/archive/<festival id>.json` plus `index.json`. Run it again only to add a festival that has since ended
+(`--only <id>`, `--force` to refetch). The Triton page shows one with `?f=<festival id>` and all of them together, plus the
+live festival, with `?view=all`; the home page lists them under Past.
+
+- Every festival has players, entries, named payouts and each player's final bust time. Per-player buy-ins (bullets) exist
+  only from Jeju II (Sep 2026): earlier events count one bullet per player and show buy-ins as a minimum (≥).
+- Buy-ins are what players pay, read from the event name or the listed amount when that is the name's amount plus fee
+  (Triton's own transaction amounts leave the fee out).
+
+## Currency switch
+
+Every tracker has a currency menu at the top (remembered across the trackers). `docs/fx.js` converts each amount at the
+rate of its own date — a buy-in at the event's start, a prize at its finish — using ECB rates via Frankfurter (history back
+to 1999) and, for TWD and VND, daily rates on jsDelivr (from March 2024; earlier dates use the first available day).
+Rates are cached in the browser. The all-time Triton view always picks one currency (USD by default).

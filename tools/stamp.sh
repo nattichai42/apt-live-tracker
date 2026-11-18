@@ -13,3 +13,9 @@ stamp() { # page engine-file
 stamp docs/apt/index.html docs/apt/tracker.js
 stamp docs/glpc/index.html docs/glpc/glpc.js
 stamp docs/triton/index.html docs/triton/triton.js
+# The shared exchange-rate helper, used by every tracker page as ../fx.js
+h=$(sha256sum docs/fx.js | cut -c1-10)
+for page in docs/apt/index.html docs/glpc/index.html docs/triton/index.html; do
+  sed -i -E "s#<script src=\"\.\./fx\.js(\?v=[0-9a-f]+)?\"></script>#<script src=\"../fx.js?v=${h}\"></script>#" "$page"
+  grep -q "fx.js?v=${h}" "$page" && echo "$page -> fx.js?v=${h}"
+done

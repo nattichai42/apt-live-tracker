@@ -86,11 +86,35 @@
   }
   const canon = (state, n) => { let k = 0; while (state.aliases && state.aliases[n] && k++ < 8) n = state.aliases[n]; return n; };
   const personOf = (state, k) => canon(state, String(k).replace(/ \(\d+\)$/, ''));
-  const label = (num) => (num == null ? '' : '#' + num);
+  // "3" -> "#3"; in the all-time view events carry their festival: "3@Jeju II '26" -> "#3 · Jeju II '26"
+  const label = (num) => { if (num == null) return ''; const [n, f] = String(num).split('@'); return '#' + n + (f ? ' · ' + f : ''); };
+  // "2026 Triton Jeju II" -> "Jeju II '26", "2019 Triton SHR Series London" -> "London '19", "2026 Triton One Jeju" -> "One Jeju '26"
+  function festTag(name, startDate) {
+    const yr = String(startDate || '').slice(2, 4) || (String(name).match(/\b20(\d\d)\b/) || [])[1] || '';
+    const place = clean(String(name || '').replace(/\b(19|20)\d\d\b/g, '').replace(/\bTriton\b/gi, '').replace(/\bSHR Series\b/gi, '').replace(/\bSuper High Roller Series\b/gi, ''));
+    return (place || 'Triton') + (yr ? " '" + yr : '');
+  }
 
   /* ---------- event metadata ---------- */
-  // "$40K NLH Mystery Bounty" -> 40000 (the name is what players see; the schedule's buyIn field is sometimes stale)
-  const nameBuyin = (name) => { const m = String(name || '').match(/^\$\s?([\d.]+)\s?([KkMm])?\b/); if (!m) return null; return Math.round(Number(m[1]) * (/[Mm]/.test(m[2] || '') ? 1e6 : /[Kk]/.test(m[2] || '') ? 1e3 : 1)); };
+  // "$40K NLH Mystery Bounty", "£1.05M ...", "€20k ...", "500K HKD ...", "50K USD ..." -> the amount in the name
+  const nameBuyin = (name) => {
+    const m = String(name || '').match(/^\s*(?:HK\$|[$£€])?\s?([\d.,]+)\s?([KkMm])?\b/); if (!m) return null;
+    const v = Number(m[1].replace(/,/g, '')) * (/[Mm]/.test(m[2] || '') ? 1e6 : /[Kk]/.test(m[2] || '') ? 1e3 : 1);
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+  };
+  // The name is what players see; the schedule's buyIn field is sometimes wrong (HK$318M for a 2M HKD event).
+  // Keep the listed amount only when it is the name's amount plus a fee of up to 10% (€20k listed as €21,200).
+  const pickBuyin = (name, listed) => { const n = nameBuyin(name); if (!n) return listed || 0; return listed >= n && listed <= n * 1.1 ? listed : n; };
+  // Rough USD value of one unit, for the all-time view (HKD is pegged; others at the festival's time)
+  function usdRate(currency, startDate) {
+    const y = Number(String(startDate || '').slice(0, 4));
+    switch (currency) {
+      case 'HKD': return 1 / 7.8;
+      case 'GBP': return y <= 2019 ? 1.22 : 1.27;
+      case 'EUR': return y <= 2022 ? 1.06 : 1.08;
+      default: return 1;
+    }
+  }
 
   function mergeFestival(state, f, now) {
     if (!f) return;
@@ -101,7 +125,7 @@
       e.num = String(t.eventNo); e.ord = Number(t.eventNo) || 999;
       e.base = clean(t.name) + (t.flight ? ' ' + clean(t.flight) : '');
       e.buyinListed = Math.round((Number(t.buyIn) || 0) + (Number(t.registrationFee) || 0));
-      e.buyin = nameBuyin(t.name) || e.buyinListed;
+      e.buyin = pickBuyin(t.name, e.buyinListed);
       e.days = (t.days || []).map((d) => ({ name: clean(d.name), date: d.date, t: zoned(d.date, d.startTime || '12:00', tz) }));
       e.start = (e.days[0] && e.days[0].t) || zoned(t.startDate, '12:00', tz);
       e.status = t.tournamentStatus; e.reg = t.registrationStatus; e.clock = t.clockStatus; e.note = clean(t.statusNote);
@@ -147,7 +171,7 @@
     const first = !e.firstPoll;
     if (first) { e.firstPoll = now; if ((t.tournamentStatus || e.status) === 'COMPLETED') e.backfilled = 1; }
     e.ids = e.ids || {};
-    let late = false;
+    let late = false, txAll = 0;
     for (const r of rows) {
       const uid = r.user.uuid || r.uuid, name = clean(r.user.nickname), cc = (r.user.countryCode || '').toUpperCase();
       let k = e.ids[uid];
@@ -161,6 +185,7 @@
       }
       const n = personOf(state, k);
       const tx = (r.transactions || []).map((x) => Number(x.amount) || 0);
+      txAll += tx.length;
       const bullets = Math.max(1, tx.length);
       const bust = r.bustedAt ? Math.floor(Number(r.bustedAt) / 1000) : null;
       let p = e.p[k];
@@ -192,6 +217,8 @@
     if (late) sortFeed(state);
     if (t.noOfEntries != null) e.entries = t.noOfEntries;
     if (t.noOfPlayersRemaining != null) e.remaining = t.noOfPlayersRemaining;
+    // Before Sep 2026 Triton kept no per-player buy-ins: bullets there are 1 per player, re-entries unattributed
+    e.txMissing = e.entries != null && txAll < e.entries ? e.entries - txAll : 0;
     const lv = t.currentBlindLevel; if (lv) { e.level = lv.levelNo; e.blinds = lv.bigBlind ? [lv.smallBlind, lv.bigBlind, lv.ante] : [lv.smallAnte, lv.bigAnte, null]; }
     if (t.tournamentStatus) e.status = t.tournamentStatus;
     e.alive = Object.values(e.p).filter((p) => p.st === 's').length;
@@ -273,7 +300,8 @@
     };
     state.res = state.res || {}; state.aliases = state.aliases || {};
     if (!state.listAt || now - state.listAt >= (opts.listEvery || 60) || !Object.keys(state.events).length) {
-      try { mergeFestival(state, (await gql(fetchFn, 'festival', { festivalId: FESTIVAL })).festival, now); }
+      const fid = opts.festival || state.festivalId || FESTIVAL; state.festivalId = fid;
+      try { mergeFestival(state, (await gql(fetchFn, 'festival', { festivalId: fid })).festival, now); }
       catch (err) { note({ error: 'festival: ' + err.message, status: err.status, retryAfter: err.retryAfter }); }
     }
     // Finished events never watched: load them once (bullets, last busts and payouts are all on record)
@@ -311,6 +339,77 @@
 
   function repair() { return 0; }
 
+  /* ---------- archive ---------- */
+  // A finished festival as a small static file: drop what only live polling needs
+  function slim(state) {
+    // Results of a finished festival are final; the bust feed is rebuilt from bust times on load (feedFromBusts)
+    const results = {}; for (const [k, r] of Object.entries(state.results || {})) results[k] = { ...r, final: true };
+    const out = { v: 1, series: SERIES, archive: true, festivalId: state.festivalId, festival: state.festival, updatedAt: state.updatedAt,
+      events: {}, results, feed: [], aliases: state.aliases || {} };
+    for (const e of Object.values(state.events)) {
+      if (!e.polls) continue;
+      const { ids, days, blinds, level, note, clock, reg, ongoing, lastPoll, listed, ...keep } = e;
+      keep.p = {};
+      for (const [k, p] of Object.entries(e.p)) {
+        const q = { uid: p.uid, b: p.b, st: p.st, f: p.f, x: p.x, cc: p.cc };
+        if (p.paid) q.paid = p.paid; if (p.won) q.won = 1; if (p.early) q.early = p.early; if (p.r && p.r.length) q.r = p.r; if (p.bounties) q.bounties = p.bounties;
+        keep.p[k] = q;
+      }
+      out.events[e.kid] = keep;
+    }
+    return out;
+  }
+
+  // Bust and re-entry feed from the players' recorded times (archived festivals don't store the feed)
+  function feedFromBusts(state) {
+    const feed = [];
+    for (const e of Object.values(state.events || {})) for (const [k, p] of Object.entries(e.p || {})) {
+      const n = personOf(state, k);
+      const xs = (p.x || []).slice().sort((a, b) => a - b), rs = (p.r || []).slice().sort((a, b) => a - b);
+      const known = (p.b || 1) - rs.length; // bullets whose start time we don't know
+      xs.forEach((t, i) => feed.push({ t, kid: e.kid, num: e.num, n, k: 'bust', b: i === xs.length - 1 ? (p.b || 1) : Math.min(p.b || 1, known + i), cc: p.cc }));
+      rs.forEach((t, i) => feed.push({ t, kid: e.kid, num: e.num, n, k: 'reentry', b: known + i + 1, cc: p.cc }));
+    }
+    state.feed = feed.sort((a, b) => a.t - b.t);
+    return state;
+  }
+
+  // Several festivals as one state (all-time view). parts: [{state, tag, start}]. Event numbers become "3@Jeju II '26";
+  // a player is one person across festivals by their Triton profile, under their latest nickname.
+  function mergeStates(parts, opts = {}) {
+    const out = emptyState(); out.merged = true; out.festivals = [];
+    const latest = new Map(); // uid -> [start, name]
+    for (const { state, tag, start } of parts) {
+      out.festivals.push({ tag, start, name: state.festival && state.festival.name, id: state.festivalId });
+      for (const e of Object.values(state.events || {})) for (const [k, p] of Object.entries(e.p || {})) {
+        if (!p.uid) continue; const n = personOf(state, k); const cur = latest.get(p.uid);
+        if (!cur || (start || '') >= cur[0]) latest.set(p.uid, [start || '', n]);
+      }
+    }
+    for (const { state, tag, rate = 1 } of parts) {
+      for (const [a, b] of Object.entries(state.aliases || {})) out.aliases[a] = b;
+      for (const e0 of Object.values(state.events || {})) {
+        // Amounts stay in the festival's currency (e.cur); the page converts them at each date's rate
+        const e = { ...e0, num: `${e0.num}@${tag}`, fest: tag, cur: (state.festival && state.festival.currency) || 'USD',
+          buyin: Math.round((e0.buyin || 0) * rate), prizePool: Math.round((e0.prizePool || 0) * rate) };
+        e.p = {};
+        for (const [k, p] of Object.entries(e0.p || {})) {
+          const n = personOf(state, k); const want = p.uid && latest.get(p.uid) ? latest.get(p.uid)[1] : n;
+          if (want !== n && !out.aliases[n]) out.aliases[n] = want; // older nickname -> latest
+          e.p[k] = p;
+        }
+        out.events[e.kid] = e;
+      }
+      for (const [num, r] of Object.entries(state.results || {})) out.results[`${num}@${tag}`] = rate === 1 ? r : { ...r, rows: r.rows.map(([pos, n, cc, prize]) => [pos, n, cc, Math.round(prize * rate)]) };
+      if (opts.feed) for (const f of state.feed || []) out.feed.push({ ...f, num: `${f.num}@${tag}` });
+      out.updatedAt = Math.max(out.updatedAt, state.updatedAt || 0);
+    }
+    // No alias may point at itself through a chain
+    for (const a of Object.keys(out.aliases)) { let n = out.aliases[a], k = 0; while (out.aliases[n] && k++ < 8) n = out.aliases[n]; if (n === a) delete out.aliases[a]; }
+    if (opts.feed) out.feed.sort((a, b) => a.t - b.t);
+    return out;
+  }
+
   /* ---------- derived views ---------- */
   const kidsOf = (state, num) => Object.values(state.events).filter((e) => e.num === String(num));
   const fromStart = (e) => !!(e.firstPoll && e.start && e.firstPoll - e.start < 900);
@@ -321,17 +420,19 @@
   function players(state, opts = {}) {
     const cache = new Map();
     const keep = (num) => {
+      if (opts.only && !opts.only(num)) return false;
       if (!opts.fromStart && !opts.finished) return true;
       if (!cache.has(num)) cache.set(num, (!opts.fromStart || watchedFromStart(state, num)) && (!opts.finished || eventFinished(state, num)));
       return cache.get(num);
     };
     const map = new Map();
-    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Set(), bullets: 0, buyins: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [] }), map.get(n));
+    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Set(), bullets: 0, buyins: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], partial: false }), map.get(n));
     for (const e of Object.values(state.events)) {
       if (!e.polls || !keep(e.num)) continue;
       for (const [k, p] of Object.entries(e.p)) {
         const r = get(personOf(state, k)); if (p.cc) r.cc = p.cc;
         r.nums.add(e.num); r.bullets += p.b || 1;
+        if (e.txMissing && !(p.paid > 0)) r.partial = true; // re-entries here are not on record: at least this many
         // Bullets x buy-in from the name (the site's transaction amounts leave out the fee)
         r.buyins += (p.b || 1) * (e.buyin || 0);
         r.busts += Math.max((p.x || []).length, p.st === 'x' ? (p.b || 1) : Math.max(0, (p.b || 1) - 1));
@@ -354,7 +455,7 @@
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
         buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: entered ? cashedNums.size / entered : 0,
-        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: false, cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
+        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: !!r.partial, cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
     return out;
@@ -447,6 +548,6 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.base, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, API, SERIES, SERIES_URL, FESTIVAL, BROWSER_POLL, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, eventFinished,
+  return { SITE, API, SERIES, SERIES_URL, FESTIVAL, BROWSER_POLL, festTag, slim, mergeStates, feedFromBusts, pickBuyin, usdRate, gql, Q, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, eventFinished,
     repair, canon, label, emptyState, pollOnce, applySnapshot, players, playerTimeline, liveEvents, zoned };
 });

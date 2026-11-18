@@ -38,7 +38,12 @@ h2 { font: 600 24px/1.1 var(--head); margin: 28px 0 14px; letter-spacing: .01em;
 .banner:hover { transform: translateY(-2px); }
 @media (prefers-reduced-motion: reduce) { .banner { transition: none; } .banner:hover { transform: none; } .badge .dot { animation: none !important; } }
 .art { position: relative; aspect-ratio: 16 / 8; overflow: hidden; }
-.past .art { aspect-ratio: 16 / 9; }
+.past .art { aspect-ratio: 16 / 6; }
+.past .go, .past .chips { display: none; } /* the whole card is the link; dates say the length */
+.past .stats { margin-top: 8px; }
+.past .mark b { font-size: clamp(24px, 7vw, 40px); white-space: normal; max-width: 92vw; }
+.past .mark i { margin-top: 5px; }
+.past .watermark { font-size: clamp(60px, 18vw, 140px); }
 @media (min-width: 760px) { .banners .art { aspect-ratio: 16 / 5.5; } }
 .past .empty { grid-column: 1 / -1; }
 .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, .55) 75%, #000 100%); }
@@ -85,6 +90,16 @@ h2 { font: 600 24px/1.1 var(--head); margin: 28px 0 14px; letter-spacing: .01em;
     radial-gradient(55% 80% at 50% 40%, rgba(214, 178, 106, .28), transparent 65%),
     linear-gradient(180deg, #0d1018 0%, #05060a 100%); }
 .art.triton .mark b { color: #e7cf98; letter-spacing: .14em; text-shadow: 0 8px 24px rgba(0, 0, 0, .7); }
+.art.tone { background:
+    radial-gradient(60% 90% at 85% 30%, rgba(60, 90, 255, .35), transparent 60%),
+    linear-gradient(120deg, #06104a 0%, #0b1d7a 55%, #07114f 100%); }
+.art.tone .mark b { color: #f0c46a; text-shadow: 0 6px 20px rgba(0, 0, 0, .5); }
+.art.tone .swoosh { position: absolute; right: -10%; top: -30%; width: 60%; height: 160%; border-radius: 50%; border: 18px solid rgba(255, 255, 255, .05); }
+.art.all { background:
+    radial-gradient(70% 90% at 20% 20%, rgba(214, 178, 106, .35), transparent 60%),
+    radial-gradient(60% 80% at 90% 90%, rgba(60, 90, 255, .25), transparent 60%),
+    linear-gradient(160deg, #10131c 0%, #05060a 100%); }
+.art.all .mark b { color: #e7cf98; }
 .art.triton .lines { position: absolute; inset: 0; background:
     linear-gradient(90deg, transparent 49.6%, rgba(214, 178, 106, .35) 50%, transparent 50.4%),
     repeating-linear-gradient(115deg, rgba(214, 178, 106, .08) 0 1px, transparent 1px 28px); mask-image: radial-gradient(60% 80% at 50% 45%, #000, transparent); -webkit-mask-image: radial-gradient(60% 80% at 50% 45%, #000, transparent); }
@@ -98,6 +113,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
     <p>Live bust and re-entry trackers. Tap a series to follow it.</p>
   </header>
   <section aria-labelledby="h-live"><h2 id="h-live">Running now</h2><div class="banners" id="live"></div></section>
+  <section aria-labelledby="h-alltime" id="alltime-wrap" hidden><h2 id="h-alltime">All-time</h2><div class="banners" id="alltime"></div></section>
   <section aria-labelledby="h-soon" id="soon-wrap" hidden><h2 id="h-soon">Coming up</h2><div class="banners" id="soon"></div></section>
   <section aria-labelledby="h-past"><h2 id="h-past">Past</h2><div class="past" id="past"></div></section>
   <footer>Data from each organiser's public live pages, saved by pollers on GitHub. Not affiliated with the organisers.</footer>
@@ -142,21 +158,22 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
     const a = el('div', 'art ' + s.art);
     if (s.art === 'apt') a.insertAdjacentHTML('beforeend', '<svg class="skyline" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true"><path fill="#0b0d16" d="M0 120V70h18v-22h14v30h12V40h16v38h10V58h20v62h8V30l8-8 8 8v90h10V64h14V20h6V6l3-6 3 6v14h6v100h10V52h18v68h12V36h20v84h10V62h16v58h14V44h12v76h18V58h22v62h20V74h12v46z"/></svg>');
     if (s.art === 'glpc') a.appendChild(el('div', 'rays'));
-    if (s.art === 'triton') a.appendChild(el('div', 'lines'));
+    if (s.art === 'triton' || s.art === 'all') a.appendChild(el('div', 'lines'));
+    if (s.art === 'tone') a.appendChild(el('div', 'swoosh'));
     a.appendChild(el('div', 'watermark', s.watermark));
     const m = el('div', 'mark'); m.appendChild(el('b', '', s.mark)); m.appendChild(el('i', '', s.sub)); a.appendChild(m);
     return a;
   }
 
   function banner(s, meta) {
-    const st = status(s);
+    const st = s.fixed || status(s);
     const card = el('a', 'banner'); card.href = s.path;
     card.setAttribute('aria-label', `${s.title}, ${fMon.format(asDate(s.start))} to ${fMon.format(asDate(s.end))}`);
     card.appendChild(art(s));
     const running = meta && meta.running;
     const b = el('span', 'badge ' + (st === 'live' ? '' : st === 'soon' ? 'soon' : 'done'));
     b.appendChild(el('span', 'dot'));
-    b.append(st === 'past' ? 'Finished' : st === 'soon' ? 'Coming up' : running ? `Live · ${running} running` : 'Live');
+    b.append(s.badge || (st === 'past' ? 'Finished' : st === 'soon' ? 'Coming up' : running ? `Live · ${running} running` : 'Live'));
     card.appendChild(b);
     card.appendChild(el('span', 'go', 'Open tracker →'));
     const info = el('div', 'info');
@@ -168,10 +185,12 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
     if (meta) {
       const stats = el('div', 'stats');
       const add = (v, label, cls) => { const sp = el('span'); sp.appendChild(el('b', cls || '', v)); sp.append(' ' + label); stats.appendChild(sp); };
-      if (meta.finished) add(nf.format(meta.finished), meta.finished === 1 ? 'event finished' : 'events finished');
+      if (meta.festivals) add(nf.format(meta.festivals), 'festivals');
+      if (meta.finished) add(nf.format(meta.finished), s.archived ? (meta.finished === 1 ? 'event' : 'events') : meta.finished === 1 ? 'event finished' : 'events finished');
       if (meta.players) add(nf.format(meta.players), 'players');
       if (meta.bullets) add(nf.format(meta.bullets), 'bullets');
       if (meta.paid) add(`${s.currency} ${short(meta.paid)}`, 'paid out', 'gold');
+      if (meta.note) { const sp = el('span', '', meta.note); stats.appendChild(sp); }
       if (meta.updatedAt && st === 'live') { const sp = el('span'); sp.append('updated '); sp.appendChild(el('b', '', ago(meta.updatedAt))); stats.appendChild(sp); }
       if (stats.childNodes.length) info.appendChild(stats);
     }
@@ -180,9 +199,31 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
   }
 
   const metas = {};
+  // Past Triton festivals, saved by tools/triton-archive.js (newest first), shown under Past
+  let tritonPast = [], allTime = null;
+  async function loadTriton() {
+    try {
+      const idx = await (await fetch('triton/archive/index.json', { cache: 'no-cache' })).json();
+      tritonPast = (idx.festivals || []).map((f) => {
+        const yr = f.start.slice(0, 4);
+        const s = { id: 'tr-' + f.id, path: `triton/?f=${f.id}`, title: f.name.replace(/^(\d{4}) (.*)$/, '$2 $1').replace(/Triton SHR Series /, 'Triton '),
+          mark: f.place, sub: (f.one ? 'Triton One' : 'Triton') + ' · ' + yr, art: f.one ? 'tone' : 'triton', watermark: yr,
+          start: f.start, end: f.end, tz: f.tz || 'UTC', currency: f.currency || 'USD', fixed: 'past', archived: true };
+        metas[s.id] = { finished: f.events, players: f.players, paid: f.paid, note: f.bullets === 'all' ? 'bullets on record' : f.bullets === 'some' ? 'some bullets on record' : '' };
+        return s;
+      });
+      const usd = (idx.festivals || []).reduce((a, f) => a + (f.paid || 0) * (f.usd || 1), 0);
+      const first = (idx.festivals || []).map((f) => f.start).sort()[0];
+      allTime = { id: 'tr-all', path: 'triton/?view=all', title: 'Triton, every festival', mark: 'Triton', sub: `All-time · since ${(first || '').slice(0, 4)}`, art: 'all', watermark: 'ALL',
+        start: first, end: new Date().toISOString().slice(0, 10), tz: 'UTC', currency: 'USD', fixed: 'live', badge: 'All-time stats', archived: true };
+      metas['tr-all'] = { festivals: (idx.festivals || []).length + 1, finished: (idx.festivals || []).reduce((a, f) => a + f.events, 0), paid: usd };
+    } catch {}
+    render();
+  }
   function render() {
     const groups = { live: [], soon: [], past: [] };
     for (const s of SERIES) groups[status(s)].push(s);
+    groups.past.push(...tritonPast);
     groups.live.sort((a, b) => (b.start < a.start ? -1 : 1));
     groups.soon.sort((a, b) => (a.start < b.start ? -1 : 1));
     groups.past.sort((a, b) => (b.end < a.end ? -1 : 1));
@@ -194,6 +235,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
     fill('live', groups.live, 'No series is running right now.');
     $('#soon-wrap').hidden = !groups.soon.length; fill('soon', groups.soon);
     fill('past', groups.past, 'Series appear here once they end.');
+    $('#alltime-wrap').hidden = !allTime; if (allTime) fill('alltime', [allTime]);
   }
 
   async function load() {
@@ -208,6 +250,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
   }
   render();
   load();
+  loadTriton();
   setInterval(load, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 })();

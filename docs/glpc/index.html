@@ -249,6 +249,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       <a class="home" href="../" aria-label="Back to all series"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
       <div class="brand"><h1><a href="../" title="All series">GLPC VI</a></h1><span><a href="https://grandloyal.vn/series/121" target="_blank" rel="noopener">Grand Loyal</a></span></div>
       <div class="ctl">
+        <select id="fx" class="sel" aria-label="Currency shown"></select>
         <button id="theme" class="btn" type="button"></button>
         <select id="interval" class="sel" aria-label="How often this page polls">
           <option value="15">15s</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2m</option><option value="0">Off</option>
@@ -374,6 +375,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
 </aside>
 
+<script src="../fx.js?v=f81f1587bd"></script>
 <script src="glpc.js?v=2a9e1dc408"></script>
 <script>
 (function () {
@@ -398,8 +400,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const REPO = repoSlug();
   const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/glpc-data/state.json` : null;
 
-  let state = T.emptyState();
-  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); state = s; } } catch {}
+  let raw = T.emptyState(), state = raw; // raw: as polled and saved; state: what's shown (maybe converted)
+  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
   const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
   const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
   // Dark by default; the ☀/☾ button switches and is remembered on this device
@@ -429,7 +431,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const dayKey = (t) => fDay.format(new Date(t * 1000));
   const nf = new Intl.NumberFormat('en-US');
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(v) : '—');
-  const money = (v) => 'VND ' + nf.format(Math.round(v || 0));
+  const money = (v) => curLabel() + ' ' + nf.format(Math.round(v || 0));
   // 3,500 -> 3.5K, 16,500 -> 16.5K, 165,000 -> 165K, 1,555,940 -> 1.56M (never round a buy-in to a different number)
   const short = (v) => {
     const a = Math.abs(v), s = v < 0 ? '−' : '';
@@ -454,11 +456,74 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const evShort = (e) => e ? `${tag(e.num)} ${baseOf(e.name)}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
   const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
   const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
+  const NATIVE_OF = () => 'VND', NATIVE_LABEL = () => 'VND', FIXED_FX = false, FX_FALLBACK = null;
+
+  /* ---------- currency ---------- */
+  // Amounts in each event's own currency, or in one picked at the top (shared by all the trackers):
+  // a buy-in converted at the rate of the event's start date, a prize at the rate of its finish date.
+  let fxCur = FX.pick();
+  if (FIXED_FX && !fxCur) fxCur = 'USD'; // several currencies at once: pick one
+  let fxShown = '', fxBusy = false, fxTried = '';
+  const evEnd = (e) => e.doneAt || e.lastPoll || e.start;
+  function fxNeeds(src) {
+    const dates = [], curs = new Set([fxCur]);
+    for (const e of Object.values(src.events || {})) { if (!e.polls && !e.start) continue; curs.add(NATIVE_OF(e)); if (e.start) dates.push(FX.ymd(e.start)); const end = evEnd(e); if (end) dates.push(FX.ymd(end)); }
+    return { dates, curs: [...curs] };
+  }
+  // A converted copy for display: raw keeps polling and saving in its own currency
+  function display(src) {
+    if (!fxCur) return { s: src, ok: true };
+    const out = { ...src, events: {}, results: {} }, byNum = new Map();
+    let ok = true, approx = false;
+    const fac = (from, d) => {
+      let f = FX.factor(from, fxCur, d);
+      if (f != null && !FX.exact(from, fxCur, d)) approx = true;
+      if (f == null && FX_FALLBACK) { f = FX_FALLBACK(from, fxCur, d); approx = true; }
+      if (f == null) ok = false;
+      return f == null ? 1 : f;
+    };
+    for (const [k, e] of Object.entries(src.events || {})) {
+      const from = NATIVE_OF(e), d = FX.ymd(e.start || src.updatedAt || Date.now() / 1000);
+      const f = fac(from, d);
+      out.events[k] = f === 1 ? e : { ...e, buyin: Math.round((e.buyin || 0) * f), prizePool: Math.round((e.prizePool || 0) * f), ...(e.gtd ? { gtd: Math.round(e.gtd * f) } : {}) };
+      const key = String(e.num), end = evEnd(e) || 0, cur = byNum.get(key);
+      if (!cur || end > cur.end) byNum.set(key, { end, from });
+    }
+    for (const [num, r] of Object.entries(src.results || {})) {
+      const info = byNum.get(String(num));
+      if (!info) { out.results[num] = r; continue; }
+      const f = fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000));
+      out.results[num] = f === 1 ? r : { ...r, rows: r.rows.map((row) => [row[0], row[1], row[2], Math.round(row[3] * f), ...row.slice(4)]) };
+    }
+    return { s: ok ? out : src, ok, approx };
+  }
+  // Rebuild what's shown from raw (after new data or a currency change), loading missing rates if needed
+  function refresh() {
+    const v = display(raw);
+    // Switching to a currency whose rates haven't loaded yet: keep showing the previous currency meanwhile
+    if (v.ok || !fxShown) { state = v.s; fxShown = v.ok ? fxCur : ''; }
+    render();
+    const sig = fxCur + '|' + Object.keys(raw.events || {}).length + '|' + Object.keys(raw.results || {}).length;
+    if ((!v.ok || v.approx) && fxCur && !fxBusy && fxTried !== sig) {
+      fxBusy = true; fxTried = sig; setStatus();
+      const n = fxNeeds(raw);
+      FX.ensure(n.dates, n.curs).catch(() => {}).then(() => { fxBusy = false; refresh(); });
+    }
+  }
+  const curLabel = () => fxShown || NATIVE_LABEL();
+  function fillFx() {
+    const sel = $('#fx'); const nat = NATIVE_LABEL();
+    const opts = [];
+    if (!FIXED_FX) { const o = new Option(nat, ''); o.title = 'Each event in its own currency'; opts.push(o); }
+    for (const c of FX.LIST) if (FIXED_FX || c !== nat) opts.push(new Option(c, c));
+    sel.replaceChildren(...opts); sel.value = fxCur;
+  }
+  $('#fx').addEventListener('change', (e) => { fxCur = e.target.value; FX.choose(fxCur); fxTried = ''; refresh(); });
 
   /* ---------- data plumbing ---------- */
   function persist() {
-    if (!store.set(LS_STATE, JSON.stringify(state))) {
-      const slim = { ...state, feed: state.feed.slice(-1500) };
+    if (!store.set(LS_STATE, JSON.stringify(raw))) {
+      const slim = { ...raw, feed: raw.feed.slice(-1500) };
       store.set(LS_STATE, JSON.stringify(slim));
     }
   }
@@ -475,7 +540,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       if (s && s.v === 1 && (s.updatedAt || 0) > ghAdopted) {
         T.repair(s);
         freshSince = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
-        state = s; ghAdopted = s.updatedAt; persist(); render();
+        raw = s; ghAdopted = s.updatedAt; persist(); refresh();
       }
     } catch (e) { console.warn('GitHub history unavailable', e); }
   }
@@ -484,7 +549,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     polling = true; setStatus();
     const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
     try {
-      const s = await T.pollOnce(state, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 60, finalEvery: 300, concurrency: 4 });
+      const s = await T.pollOnce(raw, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 60, finalEvery: 300, concurrency: 4 });
       lastErr = s.errors.length && !s.events ? s.errors[0] : null;
       // If the site refuses requests, wait longer (2 min, doubling to 10 min) until it accepts them again
       backoff = s.throttled ? Math.min(600, Math.max(120, backoff * 2, s.retryAfter || 0)) : 0;
@@ -493,7 +558,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       persist();
     } catch (e) { lastErr = String(e.message || e); }
     polling = false;
-    render();
+    refresh();
     schedule();
   }
   function schedule() {
@@ -1077,6 +1142,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   });
 
   /* ---------- boot ---------- */
+  fillFx();
+  if (fxCur) setTimeout(refresh, 0);
   selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
   render();
   (async () => {
