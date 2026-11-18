@@ -95,8 +95,13 @@
   // Is there a rate within a week of d for both (else factor() used the nearest day known)?
   const exact = (from, to, d) => !from || !to || from === to || (have(from, d) && have(to, d));
 
+  // Rates shipped with a page's data (e.g. the Triton all-time file): add the days this browser doesn't have
+  function seed(t) {
+    for (const [d, x] of Object.entries(t || {})) for (const [c, v] of Object.entries(x || {})) if (!(table[d] && table[d][c])) put(d, c, v);
+  }
+
   const pick = () => store.get(PREF) || '';
   const choose = (c) => store.set(PREF, c || '');
 
-  root.FX = { LIST, ECB, ensure, factor, exact, perUsd, ymd, pick, choose };
+  root.FX = { LIST, ECB, ensure, seed, factor, exact, perUsd, ymd, pick, choose };
 })(typeof self !== 'undefined' ? self : this);

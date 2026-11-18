@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Runs a tracker engine in a loop and periodically publishes its state to a data branch.
-// Usage: node poller/poll.js --state state/state.json --minutes 345 --min-interval 10 --budget 1 --publish-every 3 [--engine docs/glpc/glpc.js --branch glpc-data] [--no-publish]
+// Usage: node poller/poll.js --series <id from docs/series.js> --state state/state.json --minutes 345 [--min-interval 10 --budget 1 --publish-every 3] [--no-publish]
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -9,17 +9,22 @@ const { execFileSync } = require('child_process');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const flag = (k) => args.includes('--' + k);
-// Which tracker: docs/apt/tracker.js (APT, default) or docs/glpc/glpc.js (GLPC), and the branch its record goes to
-const T = require(path.resolve(opt('engine', path.join(__dirname, '../docs/apt/tracker.js'))));
-const branch = opt('branch', 'data');
+// Which series (docs/series.js): its organiser's engine, set up for it, and the branch its record goes to
+const Series = require('../docs/series.js');
+const entry = Series.byId(opt('series', ''));
+if (!entry) { console.error(`Unknown series "${opt('series', '')}". Known: ${Series.LIST.map((s) => s.id).join(', ')}`); process.exit(2); }
+const T = require(path.join(__dirname, '../docs', Series.ORGANISERS[entry.org].engine)).configure(entry.source);
+const branch = entry.branch;
 const statePath = opt('state', 'state/state.json');
 const minutes = Number(opt('minutes', 55));
 // Poll as fast as the request budget allows: interval = requests in a round / budget, clamped to [min, max].
 // The site refused nothing at 6 req/s in a short test; 1 req/s on average keeps a wide margin.
-const minInterval = Number(opt('min-interval', 10));
-const maxInterval = Number(opt('max-interval', 60));
-const budget = Number(opt('budget', 1)); // requests per second, on average
-const publishEvery = Number(opt('publish-every', 3));
+// Defaults from the series' organiser (docs/series.js); flags override
+const pace = Series.pollOpts(entry);
+const minInterval = Number(opt('min-interval', pace.minInterval));
+const maxInterval = Number(opt('max-interval', pace.maxInterval));
+const budget = Number(opt('budget', pace.budget)); // requests per second, on average
+const publishEvery = Number(opt('publish-every', pace.publishEvery));
 const noPublish = flag('no-publish');
 
 // Engines may POST (Triton's GraphQL): pass method/body/headers through

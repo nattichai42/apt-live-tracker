@@ -20,9 +20,10 @@
 
   const SITE = 'https://grandloyal.vn';
   const API = 'https://apitracker.grandloyal.vn';
-  const SERIES = 'glpc-vi';
-  const SERIES_URL = `${SITE}/series/121`;
-  const FROM = '2026-11-18', TO = '2026-11-30'; // series dates, Vietnam time
+  // The series polled and shown; configure() switches to another (docs/series.js holds every series' settings)
+  let SERIES = 'glpc-vi';
+  let SERIES_URL = `${SITE}/series/121`;
+  let FROM = '2026-11-18', TO = '2026-11-30'; // series dates, Vietnam time: the tournaments listed between them
   const TZ_OFF = 7 * 3600; // Vietnam is UTC+7
   const FEED_CAP = 6000;
   const REG_GRACE = 300; // seconds after the scheduled registration close that a re-entry is still accepted
@@ -578,8 +579,8 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       const { missed } = eventCounts(e);
       for (const [k, p] of Object.entries(e.p)) {
         const r = get(personOf(state, k)); if (p.cc) r.cc = p.cc;
-        const s = r.nums.get(e.num) || { num: e.num, bullets: 0 };
-        s.bullets += p.b || 0; r.nums.set(e.num, s);
+        const s = r.nums.get(e.num) || { num: e.num, bullets: 0, buyin: 0 };
+        s.bullets += p.b || 0; s.buyin += (p.b || 0) * (e.buyin || 0); r.nums.set(e.num, s);
         r.bullets += p.b || 0; r.buyins += (p.b || 0) * (e.buyin || 0);
         r.busts += (p.x || []).length + (p.pre ? 1 : 0);
         if (p.st === 's' && e.phase !== 'Completed') r.seatedIn.push(label(e.num));
@@ -593,11 +594,11 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       for (const [pos, n, cc, prize] of res.rows) {
         const r = get(canon(state, n)); if (!r.cc && cc) r.cc = cc;
         r.cashes.push({ num, pos, prize, cc, final: res.final });
-        if (!r.nums.has(num)) { r.nums.set(num, { num, bullets: 1 }); r.bullets += 1; r.buyins += maxBuyin(state, num); r.partial = true; }
+        if (!r.nums.has(num)) { r.nums.set(num, { num, bullets: 1, buyin: maxBuyin(state, num) }); r.bullets += 1; r.buyins += maxBuyin(state, num); r.partial = true; }
       }
     }
     // Seen only as a carry-over into a later day: one bullet in the flight we did not watch
-    for (const r of map.values()) for (const s of r.nums.values()) if (s.bullets === 0) { s.bullets = 1; r.bullets += 1; r.buyins += maxBuyin(state, s.num); r.partial = true; }
+    for (const r of map.values()) for (const s of r.nums.values()) if (s.bullets === 0) { s.bullets = 1; s.buyin += maxBuyin(state, s.num); r.bullets += 1; r.buyins += maxBuyin(state, s.num); r.partial = true; }
     const out = [];
     for (const r of map.values()) {
       const prizes = r.cashes.reduce((a, c) => a + c.prize, 0);
@@ -606,10 +607,19 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
         buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
         seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.partial,
-        cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
+        cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length,
+        ...(opts.detail ? { ev: detailOf(r.nums.values(), r.cashes) } : {}) });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
     return out;
+  }
+
+  // opts.detail: each player's events as [{ num, b: bullets, buyin, prize, pos }] (for the all-series page)
+  function detailOf(nums, cashes) {
+    const out = new Map();
+    for (const k of nums) out.set(String(k.num), { num: k.num, b: k.bullets, buyin: k.buyin || 0, prize: 0, pos: null });
+    for (const c of cashes) { const d = out.get(String(c.num)); if (!d) continue; d.prize += c.prize; if (d.pos == null || c.pos < d.pos) d.pos = c.pos; }
+    return [...out.values()];
   }
 
   function pOf(state, e, name) {
@@ -752,6 +762,13 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat, gtd: e.gtd, regClose: e.regCloseSched }));
   }
 
-  return { SITE, API, SERIES, SERIES_URL, ACTIVE, TZ_OFF, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, canon,
+  const api = { SITE, API, SERIES, SERIES_URL, ACTIVE, TZ_OFF, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, canon,
     emptyState, pollOnce, applySnapshot, applyDetail, mergeList, settle, buildResults, players, playerTimeline, liveEvents, isLaterDay, parseName, label, ccOf, regCloseOf, titleCase };
+  // source: the series' entry in docs/series.js ({ series, seriesUrl, from, to })
+  api.configure = (source) => {
+    if (source) { if (source.series) SERIES = source.series; if (source.seriesUrl) SERIES_URL = source.seriesUrl; if (source.from) FROM = source.from; if (source.to) TO = source.to; }
+    Object.assign(api, { SERIES, SERIES_URL });
+    return api;
+  };
+  return api;
 });

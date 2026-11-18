@@ -17,8 +17,9 @@
   'use strict';
 
   const SITE = 'https://www.theasianpokertour.com';
-  const SERIES = 'apt-championship-taipei-2026';
-  const BASE = `${SITE}/series/${SERIES}/events`;
+  // The series polled and shown; configure() switches to another (docs/series.js holds every series' settings)
+  let SERIES = 'apt-championship-taipei-2026';
+  let BASE = `${SITE}/series/${SERIES}/events`;
   const ACTIVE = new Set(['Late Reg', 'Running', 'In The Money', 'Reg Open', 'Final Table', 'Break', 'Paused']);
   const FEED_CAP = 5000;
   const REG_GRACE = 300; // seconds after the published registration close that a re-entry is still accepted
@@ -593,10 +594,19 @@
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
         buyins, prizes, net: prizes - buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
         seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0 || r.unknown,
-        cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
+        cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length,
+        ...(opts.detail ? { ev: detailOf(r.nums.values(), r.cashes, (k) => k.bullets * (k.buyin || 0)) } : {}) });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
     return out;
+  }
+
+  // opts.detail: each player's events as [{ num, b: bullets, buyin, prize, pos }] (for the all-series page)
+  function detailOf(nums, cashes, buyinOf) {
+    const out = new Map();
+    for (const k of nums) out.set(String(k.num), { num: k.num, b: k.bullets, buyin: buyinOf(k), prize: 0, pos: null });
+    for (const c of cashes) { const d = out.get(String(c.num)); if (!d) continue; d.prize += c.prize; if (d.pos == null || c.pos < d.pos) d.pos = c.pos; }
+    return [...out.values()];
   }
 
   // A player's record in one event, under whatever spelling that event used
@@ -794,5 +804,12 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  const api = { SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  // source: the series' entry in docs/series.js ({ series: '<slug in the APT site's /series/ URLs>' })
+  api.configure = (source) => {
+    if (source && source.series) { SERIES = source.series; BASE = `${SITE}/series/${SERIES}/events`; }
+    Object.assign(api, { SERIES, BASE });
+    return api;
+  };
+  return api;
 });

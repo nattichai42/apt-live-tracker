@@ -1,47 +1,76 @@
-name: Poll APT live seating
+name: Poll series
+run-name: ${{ inputs.series && format('Poll {0}', inputs.series) || 'Start pollers' }}
+
+# One workflow for every series in docs/series.js.
+# - Every 15 minutes (and when run by hand with no series) it starts a poller for each series in its dates.
+# - Run with a series id, it polls that series for 5 h 45 min, saving to the series' data branch, and queues its own
+#   next run first. A run waits in its series' concurrency group and starts the moment the previous one ends, so
+#   polling continues even when GitHub delays or skips the schedule; the scheduled start is only the fallback.
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # backup trigger: a queued run waits in the concurrency group and starts as soon as the running job ends
+    - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      series:
+        description: Series id from docs/series.js (leave empty to start every series in its dates)
+        required: false
+        default: ''
 
 permissions:
   contents: write
-  actions: write   # lets a run queue the next run of this workflow
+  actions: write   # lets a run start or queue runs of this workflow
 
 concurrency:
-  group: apt-poller
+  group: poll-${{ inputs.series || 'start' }}
   cancel-in-progress: false
 
 jobs:
+  start:
+    if: ${{ !inputs.series }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start a poller for each series in its dates
+        # A series already polling gets a run queued behind the current one (its group keeps at most one waiting)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for id in $(node poller/ctl.js active); do
+            gh workflow run poll.yml --ref main -f series="$id" && echo "queued $id" || echo "::warning::could not queue $id"
+          done
+
   poll:
+    if: ${{ inputs.series }}
     runs-on: ubuntu-latest
     timeout-minutes: 358   # GitHub's hard cap is 360
+    env:
+      SERIES: ${{ inputs.series }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Restore state from the data branch
+      - name: Restore state from the series' data branch
         run: |
+          BRANCH=$(node poller/ctl.js branch "$SERIES")
           mkdir -p state
-          if git fetch --depth=1 origin data 2>/dev/null; then
-            git show origin/data:state.json > state/state.json && echo "restored $(wc -c < state/state.json) bytes"
+          if git fetch --depth=1 origin "$BRANCH" 2>/dev/null; then
+            git show "origin/$BRANCH:state.json" > state/state.json && echo "restored $(wc -c < state/state.json) bytes from $BRANCH"
           else
-            echo "no previous state, starting fresh"
+            echo "no previous state on $BRANCH, starting fresh"
           fi
       - name: Queue the next run
-        # Each run queues its successor, which waits in the concurrency group and starts the moment this one
-        # ends, so polling continues even when GitHub delays or skips the cron schedule. Stops once the series is over.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -f state/state.json ] && node -e 'const s=require("./state/state.json"); const ev=Object.values(s.events||{}); process.exit(ev.length && ev.every(e=>e.phase==="Completed") ? 0 : 1)'; then
-            echo "Every event is completed; not queueing another run."
+          if node poller/ctl.js over "$SERIES" state/state.json; then
+            echo "Not queueing another run."
           else
-            gh workflow run poll.yml --ref main && echo "Queued the next run." || echo "::warning::Could not queue the next run; the cron schedule is the fallback."
+            gh workflow run poll.yml --ref main -f series="$SERIES" && echo "Queued the next run." || echo "::warning::Could not queue the next run; the schedule is the fallback."
           fi
       - name: Poll for 5 h 45 min
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node poller/poll.js --state state/state.json --minutes 345 --min-interval 10 --max-interval 60 --budget 1 --publish-every 3
+        run: node poller/poll.js --series "$SERIES" --state state/state.json --minutes 345

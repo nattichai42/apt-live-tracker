@@ -327,7 +327,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       <li>This page reads the APT site's live seating for every running event, from your browser (every 60 s by default). A player whose seat disappears is logged as busted; a busted player who sits down again while registration is open is a re-entry.</li>
       <li>A poller on GitHub does the same around the clock and saves its record every few minutes. This page loads that record on open, then continues live.</li>
       <li>Payouts (places and prizes) come from the site's payout pages, checked every minute while an event is in the money. Chip counts on the site are not live, so they are not shown.</li>
-      <li>Times are Taipei time. A bust is stamped at the poll that first saw the seat empty.</li>
+      <li>Times are the venue's local time. A bust is stamped at the poll that first saw the seat empty.</li>
     </ul>
     <h4>Event cards</h4>
     <ul>
@@ -393,14 +393,17 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
 </aside>
 
-<script src="../fx.js?v=f81f1587bd"></script>
-<script src="tracker.js?v=200699f108"></script>
+<script src="../fx.js?v=913361b8f8"></script>
+<script src="../series.js?v=c0c4785bcf"></script>
+<script src="tracker.js?v=141e5f6c44"></script>
 <script>
 (function () {
   'use strict';
-  const T = window.APTTracker;
+  // Which series this page shows (docs/series.js): ?s=<id>, else the organiser's running one
+  const SER = Series.pick('apt', new URLSearchParams(location.search).get('s'));
+  const T = window.APTTracker.configure(SER.source);
   const $ = (s) => document.querySelector(s);
-  const LS_STATE = 'apt-live-state-v1', LS_PREFS = 'apt-live-prefs-v1';
+  const LS_STATE = Series.storageKey(SER), LS_PREFS = Series.ORGANISERS.apt.prefs;
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -416,7 +419,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     return null;
   }
   const REPO = repoSlug();
-  const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/data/state.json` : null;
+  const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/${SER.branch}/state.json` : null;
 
   let raw = T.emptyState(), state = raw; // raw: as polled and saved; state: what's shown (maybe converted)
   try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
@@ -427,7 +430,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null, openEvent = null, eventSeg = 'seated', backToEvent = null;
 
   /* ---------- formatting ---------- */
-  const tz = 'Asia/Taipei';
+  const tz = SER.tz;
   const fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
   const fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
   const fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short' });
@@ -583,7 +586,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const parts = [];
     if (polling) parts.push('Updating…');
     else if (lastErr) parts.push(lastErr);
-    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + fTime.format(new Date(state.updatedAt * 1000)) + ' Taipei');
+    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + fTime.format(new Date(state.updatedAt * 1000)) + ' ' + SER.place);
     if (iv && nextAt && !polling) parts.push('next ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
     parts.push(STATE_URL ? (ghAt ? 'history ' + ago(ghAt) : 'loading history') : 'no history (?repo=owner/name)');
     txt.textContent = parts.join(' · ');
@@ -1183,6 +1186,15 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     if (openEvent) renderEventSheet();
     else if (openPlayer) { const back = backToEvent; openSheet(openPlayer); if (back) { backToEvent = back; $('#sheet-back').hidden = false; } }
     setStatus();
+    openLinked();
+  }
+  // Linked from the all-series page: ?player=<name> or ?event=<event id> opens that panel once the data has it
+  const LINKED = (() => { const q = new URLSearchParams(location.search); return { player: q.get('player'), event: q.get('event') }; })();
+  function openLinked() {
+    if (!LINKED.player && !LINKED.event) return;
+    if (LINKED.event ? !state.events[LINKED.event] : !Object.keys(state.events || {}).length) return;
+    const { player, event } = LINKED; LINKED.player = LINKED.event = null;
+    if (event) showEvent(event); else openSheet(player);
   }
 
   /* ---------- controls ---------- */
@@ -1243,6 +1255,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#refresh').addEventListener('click', () => setMenu(false));
 
   /* ---------- boot ---------- */
+  Series.fillBrand(SER); Series.fillNav($('nav.others'), SER, '../');
   fillFx();
   if (fxCur) setTimeout(refresh, 0);
   selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);

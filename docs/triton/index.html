@@ -345,7 +345,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <ul>
       <li>Triton Poker+ publishes, for every event, each player's entry count and buy-ins, whether they are still in, the time of their latest bust, live chip counts, and who finished in each paid place. Bullets, buy-ins and prizes here are those numbers, not estimates.</li>
       <li>Triton's data only answers pages on its own site, so a poller on GitHub reads it every 15 seconds or so and saves a record every 2 minutes. This page loads each new save (checked every 60 s by default), so it runs about 1–3 minutes behind.</li>
-      <li>Times are Cyprus time. Amounts are in USD; buy-ins are the amount in each event's name.</li>
+      <li>Times are the venue's local time. Amounts are in the festival's currency; buy-ins are the amount in each event's name.</li>
     </ul>
     <h4>Bust feed</h4>
     <ul>
@@ -406,14 +406,17 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
 </aside>
 
-<script src="../fx.js?v=f81f1587bd"></script>
-<script src="triton.js?v=411494a4f8"></script>
+<script src="../fx.js?v=913361b8f8"></script>
+<script src="../series.js?v=c0c4785bcf"></script>
+<script src="triton.js?v=421b8f312a"></script>
 <script>
 (function () {
   'use strict';
-  const T = window.TritonTracker;
+  // Which festival the live view shows (docs/series.js): ?s=<id>, else Triton's running one
+  const SER = Series.pick('triton', new URLSearchParams(location.search).get('s'));
+  const T = window.TritonTracker.configure(SER.source);
   const $ = (s) => document.querySelector(s);
-  const LS_STATE = 'triton-live-state-v1', LS_PREFS = 'triton-live-prefs-v1';
+  const LS_STATE = Series.storageKey(SER), LS_PREFS = Series.ORGANISERS.triton.prefs;
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -434,7 +437,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const FEST = /^[0-9a-f-]{36}$/.test(params.get('f') || '') ? params.get('f') : null;
   const MODE = FEST ? 'archive' : params.get('view') === 'all' ? 'all' : 'live';
   const HOME_TAB = MODE === 'all' ? 'players' : 'feed';
-  const BRANCH = 'triton-data';
+  const BRANCH = SER.branch;
   const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/${BRANCH}/state.json` : null;
   // The raw file host serves a branch file up to 5 minutes old. Asking GitHub for the branch's latest commit
   // (free when unchanged: the browser revalidates with its ETag) and fetching that commit's file is fresh.
@@ -475,7 +478,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short', ...(MODE === 'all' ? { year: '2-digit' } : {}) });
     fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', ...(MODE === 'live' ? {} : { year: 'numeric' }), hour: '2-digit', minute: '2-digit' });
   }
-  setTz(MODE === 'all' ? null : 'Europe/Athens');
+  setTz(MODE === 'all' ? null : SER.tz);
   const dayKey = (t) => fDay.format(new Date(t * 1000));
   const nf = new Intl.NumberFormat('en-US');
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(v) : '—');
@@ -580,10 +583,11 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       store.set(LS_STATE, JSON.stringify(slim));
     }
   }
-  async function fetchLive() {
-    let url = STATE_URL + '?t=' + Math.floor(Date.now() / 60000);
+  // A festival's latest save on its data branch (the newest commit's file: fresh, unlike the branch file)
+  async function fetchLive(branch) {
+    let url = `https://raw.githubusercontent.com/${REPO}/${branch}/state.json?t=${Math.floor(Date.now() / 60000)}`;
     try {
-      const g = await fetch(REF_URL, { cache: 'no-cache', headers: { Accept: 'application/vnd.github+json' } });
+      const g = await fetch(`https://api.github.com/repos/${REPO}/git/ref/heads/${branch}`, { cache: 'no-cache', headers: { Accept: 'application/vnd.github+json' } });
       if (g.ok) { const sha = ((await g.json()).object || {}).sha; if (sha) url = `https://raw.githubusercontent.com/${REPO}/${sha}/state.json`; }
     } catch {}
     const r = await fetch(url, { cache: url.includes('?') ? 'no-store' : 'default' });
@@ -601,16 +605,22 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
         raw = state = T.feedFromBusts(await r.json());
         setTz(raw.festival && raw.festival.timeZone);
       } else {
-        festivals = (await (await fetch('archive/index.json')).json()).festivals || [];
-        const parts = await Promise.all(festivals.map(async (f) => ({ state: await (await fetch(`archive/${f.id}.json`)).json(), tag: f.tag, start: f.start })));
-        if (STATE_URL) try {
-          const live = await fetchLive();
-          if (live && live.festival) {
-            const tagL = T.festTag(live.festival.name, live.festival.startDate);
-            festivals.unshift({ id: live.festivalId || T.FESTIVAL, tag: tagL, start: live.festival.startDate, name: live.festival.name, live: true });
-            parts.unshift({ state: live, tag: tagL, start: live.festival.startDate });
-          }
-        } catch (e) { console.warn('live festival unavailable', e); }
+        // Every past festival, merged ahead of time into one file (tools/triton-archive.js), plus the festivals in
+        // docs/series.js not archived yet (running, or ended since the archive was last built), from their data branches
+        const tracked = REPO ? Series.ofOrg('triton').filter((s) => Series.status(s) !== 'soon') : [];
+        const [all, ...lives] = await Promise.all([
+          fetch('archive/all.json').then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+          ...tracked.map((s) => fetchLive(s.branch).catch((e) => { console.warn(s.id + ' unavailable', e); return null; }))]);
+        FX.seed(all.fx);
+        festivals = (all.index || []).slice();
+        const archived = new Set(festivals.map((f) => f.id));
+        const parts = [{ state: T.unpack(all) }];
+        for (const live of lives) {
+          if (!live || !live.festival || archived.has(live.festivalId)) continue;
+          const tagL = T.festTag(live.festival.name, live.festival.startDate);
+          festivals.unshift({ id: live.festivalId, tag: tagL, start: live.festival.startDate, name: live.festival.name, live: true });
+          parts.unshift({ state: live, tag: tagL, start: live.festival.startDate });
+        }
         raw = state = T.mergeStates(parts);
         fillFestFilter();
       }
@@ -697,7 +707,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const parts = [];
     if (polling) parts.push('Updating…');
     else if (lastErr) parts.push(lastErr);
-    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + 'updated ' + fTime.format(new Date(state.updatedAt * 1000)) + ' Cyprus');
+    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + 'updated ' + fTime.format(new Date(state.updatedAt * 1000)) + ' ' + SER.place);
     if (iv && nextAt && !polling) parts.push('next ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
     parts.push(STATE_URL ? (ghAt ? 'saved ' + ago(ghAt) : 'loading') : 'no data (?repo=owner/name)');
     txt.textContent = parts.join(' · ');
@@ -1315,6 +1325,15 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     if (openEvent) renderEventSheet();
     else if (openPlayer) { const back = backToEvent; openSheet(openPlayer); if (back) { backToEvent = back; $('#sheet-back').hidden = false; } }
     setStatus();
+    openLinked();
+  }
+  // Linked from the all-series page: ?player=<name> or ?event=<event id> opens that panel once the data has it
+  const LINKED = (() => { const q = new URLSearchParams(location.search); return { player: q.get('player'), event: q.get('event') }; })();
+  function openLinked() {
+    if (!LINKED.player && !LINKED.event) return;
+    if (LINKED.event ? !state.events[LINKED.event] : !Object.keys(state.events || {}).length) return;
+    const { player, event } = LINKED; LINKED.player = LINKED.event = null;
+    if (event) showEvent(event); else openSheet(player);
   }
 
   /* ---------- controls ---------- */
@@ -1376,6 +1395,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#refresh').addEventListener('click', () => setMenu(false));
 
   /* ---------- boot ---------- */
+  if (MODE === 'live') Series.fillBrand(SER);
+  Series.fillNav($('nav.others'), MODE === 'live' ? SER : null, '../');
   fillFx();
   if (fxCur) setTimeout(refresh, 0);
   if (MODE === 'archive') for (const id of ['#events', '#soon']) { const box = $(id); box.hidden = true; box.previousElementSibling.hidden = true; }

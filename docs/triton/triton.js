@@ -16,9 +16,10 @@
 
   const SITE = 'https://tritonpoker.plus';
   const API = 'https://prod-public-serverless.triton-poker.com/graphql';
-  const FESTIVAL = 'daca20f2-506a-4377-9c73-2651390b6782';
-  const SERIES = 'triton-n-cyprus-2026';
-  const SERIES_URL = `${SITE}/festival/${FESTIVAL}`;
+  // The festival polled and shown; configure() switches to another (docs/series.js holds every series' settings)
+  let FESTIVAL = 'daca20f2-506a-4377-9c73-2651390b6782';
+  let SERIES = 'triton-n-cyprus-2026';
+  let SERIES_URL = `${SITE}/festival/${FESTIVAL}`;
   const BROWSER_POLL = false; // the API refuses other sites' pages (CORS)
   const FEED_CAP = 6000;
 
@@ -403,28 +404,42 @@
 
   // Several festivals as one state (all-time view). parts: [{state, tag, start}]. Event numbers become "3@Jeju II '26";
   // a player is one person across festivals by their Triton profile, under their latest nickname.
+  // A part can itself be merged already (archive/all.json, built by tools/triton-archive.js): its events keep their
+  // numbers, and its players' profiles come from state.ids (name -> first 8 characters of the profile id).
   function mergeStates(parts, opts = {}) {
     const out = emptyState(); out.merged = true; out.festivals = [];
-    const latest = new Map(); // uid -> [start, name]
+    const latest = new Map(); // profile -> [start, name]
+    const uidOf = (state, k, p) => (p.uid ? p.uid.slice(0, 8) : state.ids ? state.ids[personOf(state, k)] : null);
     for (const { state, tag, start } of parts) {
-      out.festivals.push({ tag, start, name: state.festival && state.festival.name, id: state.festivalId });
+      if (state.merged) out.festivals.push(...(state.festivals || []));
+      else out.festivals.push({ tag, start, name: state.festival && state.festival.name, id: state.festivalId });
       for (const e of Object.values(state.events || {})) for (const [k, p] of Object.entries(e.p || {})) {
-        if (!p.uid) continue; const n = personOf(state, k); const cur = latest.get(p.uid);
-        if (!cur || (start || '') >= cur[0]) latest.set(p.uid, [start || '', n]);
+        const u = uidOf(state, k, p); if (!u) continue;
+        const n = personOf(state, k), when = (state.merged ? e.startDate : start) || '', cur = latest.get(u);
+        if (!cur || when >= cur[0]) latest.set(u, [when, n]);
       }
     }
+    // An older nickname points at the latest one
+    const rename = (state, k, p) => {
+      const n = personOf(state, k), u = uidOf(state, k, p);
+      const want = u && latest.get(u) ? latest.get(u)[1] : n;
+      if (want !== n && !out.aliases[n]) out.aliases[n] = want;
+    };
     for (const { state, tag, rate = 1 } of parts) {
       for (const [a, b] of Object.entries(state.aliases || {})) out.aliases[a] = b;
+      if (state.merged) {
+        for (const e of Object.values(state.events || {})) { for (const [k, p] of Object.entries(e.p || {})) rename(state, k, p); out.events[e.kid] = e; }
+        Object.assign(out.results, state.results || {});
+        if (opts.feed) out.feed.push(...(state.feed || []));
+        out.updatedAt = Math.max(out.updatedAt, state.updatedAt || 0);
+        continue;
+      }
       for (const e0 of Object.values(state.events || {})) {
         // Amounts stay in the festival's currency (e.cur); the page converts them at each date's rate
         const e = { ...e0, num: `${e0.num}@${tag}`, fest: tag, cur: (state.festival && state.festival.currency) || 'USD',
           buyin: Math.round((e0.buyin || 0) * rate), prizePool: Math.round((e0.prizePool || 0) * rate) };
         e.p = {};
-        for (const [k, p] of Object.entries(e0.p || {})) {
-          const n = personOf(state, k); const want = p.uid && latest.get(p.uid) ? latest.get(p.uid)[1] : n;
-          if (want !== n && !out.aliases[n]) out.aliases[n] = want; // older nickname -> latest
-          e.p[k] = p;
-        }
+        for (const [k, p] of Object.entries(e0.p || {})) { rename(state, k, p); e.p[k] = p; }
         out.events[e.kid] = e;
       }
       for (const [num, r] of Object.entries(state.results || {})) out.results[`${num}@${tag}`] = rate === 1 ? r : { ...r, rows: r.rows.map(([pos, n, cc, prize]) => [pos, n, cc, Math.round(prize * rate)]) };
@@ -437,6 +452,30 @@
     return out;
   }
 
+  // Every archived festival as one compact file (archive/all.json) for the all-time view: merged once here instead of
+  // in every browser. Profile ids shrink to 8 characters in one name -> id table, and a player's first-seen time is
+  // left out when it is the event's first poll (unpack() puts it back).
+  function pack(parts) {
+    const m = mergeStates(parts);
+    const ids = {};
+    const out = { ...m, events: {}, ids };
+    for (const e of Object.values(m.events)) {
+      const p = {};
+      for (const [k, q] of Object.entries(e.p || {})) {
+        const { uid, f, ...rest } = q;
+        if (uid) ids[personOf(m, k)] = uid.slice(0, 8);
+        if (f !== e.firstPoll) rest.f = f;
+        p[k] = rest;
+      }
+      out.events[e.kid] = { ...e, p, known: bulletsKnown(e) ? 1 : 0 };
+    }
+    return out;
+  }
+  function unpack(all) {
+    for (const e of Object.values(all.events || {})) for (const p of Object.values(e.p || {})) if (p.f == null) p.f = e.firstPoll;
+    return all;
+  }
+
   /* ---------- derived views ---------- */
   const kidsOf = (state, num) => Object.values(state.events).filter((e) => e.num === String(num));
   const fromStart = (e) => !!(e.firstPoll && e.start && e.firstPoll - e.start < 900);
@@ -444,7 +483,13 @@
   // or nobody re-entered). Used by the players' "All bullets known" filter (opts.fromStart).
   // With Triton's per-player entry counts, a gap of a couple of entries is bookkeeping (e.g. a cancelled entry), not an
   // unknown re-entry: allow 2 or 1%, whichever is more. Without them (or with a bigger gap), the counts are a minimum.
+  const knownMemo = new WeakMap(); // per event object: players() asks once per player otherwise
   const bulletsKnown = (e) => {
+    if (knownMemo.has(e)) return knownMemo.get(e);
+    const v = bulletsKnown0(e); knownMemo.set(e, v); return v;
+  };
+  const bulletsKnown0 = (e) => {
+    if (e.known != null) return !!e.known; // worked out when the all-time file was built
     if (!e.polls || !(e.entries > 0)) return false;
     const seen = Object.values(e.p || {}).reduce((a, p) => a + (p.b || 1), 0);
     // Triton's own per-player figures (entry counts, or buy-in records for every player) leave a small gap as bookkeeping
@@ -465,15 +510,18 @@
       return cache.get(num);
     };
     const map = new Map();
-    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Set(), bullets: 0, buyins: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], partial: false }), map.get(n));
+    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, buyins: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], partial: false }), map.get(n));
     for (const e of Object.values(state.events)) {
       if (!e.polls || !keep(e.num)) continue;
+      const known = bulletsKnown(e);
       for (const [k, p] of Object.entries(e.p)) {
         const r = get(personOf(state, k)); if (p.cc) r.cc = p.cc;
-        r.nums.add(e.num); r.bullets += p.b || 1;
+        const d = r.nums.get(e.num) || { num: e.num, bullets: 0, buyin: 0 }; r.nums.set(e.num, d);
+        d.bullets += p.b || 1; d.buyin += (p.b || 1) * (e.buyin || 0);
+        r.bullets += p.b || 1;
         // The event's buy-ins on record don't add up to its entries (no records before Sep 2026, or flights whose early
         // days Triton doesn't list): anyone's count there may be short, so totals are a minimum
-        if (!bulletsKnown(e)) r.partial = true;
+        if (!known) r.partial = true;
         // Bullets x buy-in from the name (the site's transaction amounts leave out the fee)
         r.buyins += (p.b || 1) * (e.buyin || 0);
         r.busts += Math.max((p.x || []).length, p.st === 'x' ? (p.b || 1) : Math.max(0, (p.b || 1) - 1));
@@ -486,7 +534,7 @@
       for (const [pos, n, cc, prize] of res.rows) {
         const r = get(canon(state, n)); if (!r.cc && cc) r.cc = cc;
         r.cashes.push({ num, pos, prize, cc, final: res.final });
-        if (!r.nums.has(num)) { r.nums.add(num); r.bullets += 1; r.buyins += buyinOf(state, num); }
+        if (!r.nums.has(num)) { r.nums.set(num, { num, bullets: 1, buyin: buyinOf(state, num) }); r.bullets += 1; r.buyins += buyinOf(state, num); }
       }
     }
     const out = [];
@@ -496,10 +544,19 @@
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
         buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
-        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: !!r.partial, cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
+        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: !!r.partial, cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length,
+        ...(opts.detail ? { ev: detailOf(r.nums.values(), r.cashes) } : {}) });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
     return out;
+  }
+
+  // opts.detail: each player's events as [{ num, b: bullets, buyin, prize, pos }] (for the all-series page)
+  function detailOf(nums, cashes) {
+    const out = new Map();
+    for (const k of nums) out.set(String(k.num), { num: k.num, b: k.bullets, buyin: k.buyin || 0, prize: 0, pos: null });
+    for (const c of cashes) { const d = out.get(String(c.num)); if (!d) continue; d.prize += c.prize; if (d.pos == null || c.pos < d.pos) d.pos = c.pos; }
+    return [...out.values()];
   }
 
   function pOf(state, e, name) {
@@ -589,6 +646,14 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.base, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  return { SITE, API, SERIES, SERIES_URL, FESTIVAL, BROWSER_POLL, festTag, slim, mergeStates, feedFromBusts, pickBuyin, usdRate, gql, Q, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, eventFinished,
+  const api = { SITE, API, SERIES, SERIES_URL, FESTIVAL, BROWSER_POLL, festTag, slim, mergeStates, pack, unpack, bulletsKnown, feedFromBusts, pickBuyin, usdRate, gql, Q, activeKids, eventPlayers, upcoming, completedEvents, watchedFromStart, eventFinished,
     repair, canon, label, emptyState, pollOnce, applySnapshot, players, playerTimeline, liveEvents, zoned };
+  // source: the series' entry in docs/series.js ({ festival: '<Triton festival id>', series })
+  api.configure = (source) => {
+    if (source && source.festival) { FESTIVAL = source.festival; SERIES_URL = `${SITE}/festival/${FESTIVAL}`; }
+    if (source && source.series) SERIES = source.series;
+    Object.assign(api, { SERIES, SERIES_URL, FESTIVAL });
+    return api;
+  };
+  return api;
 });
