@@ -27,74 +27,68 @@ a { color: inherit; text-decoration: none; }
 header { padding: 22px 0 6px; }
 header h1 { margin: 0; font: 700 34px/1.05 var(--head); letter-spacing: .01em; }
 header p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; }
-h2 { font: 600 24px/1.1 var(--head); margin: 28px 0 14px; letter-spacing: .01em; }
+h2 { font: 600 21px/1.1 var(--head); margin: 24px 0 10px; letter-spacing: .01em; }
 .empty { color: var(--dim); font-size: 14px; background: var(--card); border-radius: 14px; padding: 22px 16px; text-align: center; }
 
-/* Banner card */
-.banners { display: grid; gap: 18px; }
-.past { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
-.banner { position: relative; display: block; border-radius: 16px; overflow: hidden; background: var(--card); isolation: isolate;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .35); transition: transform .2s ease; }
+/* Banner card: a short strip. Name top-left, status top-right, dates and a line of numbers at the bottom. */
+.banners { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.past { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.past .empty, .banners .empty { grid-column: 1 / -1; }
+.banner { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-height: 112px; border-radius: 12px; overflow: hidden;
+  background: var(--card); isolation: isolate; transition: transform .2s ease; }
+.past .banner { min-height: 90px; border-radius: 10px; }
 .banner:hover { transform: translateY(-2px); }
 @media (prefers-reduced-motion: reduce) { .banner { transition: none; } .banner:hover { transform: none; } .badge .dot { animation: none !important; } }
-.art { position: relative; aspect-ratio: 16 / 8; overflow: hidden; }
-.past .art { aspect-ratio: 16 / 6; }
-.past .go, .past .chips { display: none; } /* the whole card is the link; dates say the length */
-.past .stats { margin-top: 8px; }
-.past .mark b { font-size: clamp(24px, 7vw, 40px); white-space: normal; max-width: 92vw; }
-.past .mark i { margin-top: 5px; }
-.past .watermark { font-size: clamp(60px, 18vw, 140px); }
-@media (min-width: 760px) { .banners .art { aspect-ratio: 16 / 5.5; } }
-.past .empty { grid-column: 1 / -1; }
-.art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, .55) 75%, #000 100%); }
-.mark { position: absolute; z-index: 1; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; line-height: .9; }
-.mark b { display: block; font: 700 clamp(30px, 9vw, 74px)/.9 var(--head); letter-spacing: .02em; text-transform: uppercase; }
-.mark i { display: block; font: 600 clamp(11px, 2.4vw, 16px)/1 var(--head); font-style: normal; letter-spacing: .32em; text-transform: uppercase; margin-top: 8px; opacity: .85; }
-.watermark { position: absolute; right: -2%; bottom: -8%; font: 700 clamp(80px, 26vw, 220px)/1 var(--head); opacity: .08; letter-spacing: -.02em; pointer-events: none; }
-.info { position: relative; z-index: 2; margin-top: -30px; padding: 0 18px 18px; background: linear-gradient(180deg, transparent, #000 30px); }
-.past .info { margin-top: -24px; padding: 0 14px 14px; background: linear-gradient(180deg, transparent, #000 24px); }
-.title { font: 700 clamp(24px, 6.4vw, 38px)/1.05 var(--head); margin: 0; letter-spacing: .005em; }
-.past .title { font-size: 22px; }
-.dates { color: var(--gold); font-size: clamp(16px, 4.2vw, 21px); margin-top: 6px; }
-.past .dates { font-size: 15px; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #3a3a42; border-radius: 9px; padding: 6px 11px; font-size: 13px; color: var(--fg2); background: rgba(255, 255, 255, .03); }
-.chip b { font-weight: 600; color: var(--fg); font-size: 14.5px; }
-.chip small { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.chip svg { width: 16px; height: 16px; flex: none; color: var(--gold); }
-.badge { position: absolute; z-index: 2; top: 14px; left: 14px; display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 11px;
-  font: 600 12px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; background: rgba(0, 0, 0, .55); backdrop-filter: blur(6px); color: var(--fg); }
-.badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: pulse 2s infinite; }
+.art { position: absolute; inset: 0; overflow: hidden; }
+.art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, .6) 0%, rgba(0, 0, 0, .25) 65%, rgba(0, 0, 0, .1) 100%); }
+.mark { position: absolute; z-index: 1; left: 16px; top: 13px; right: 96px; line-height: 1; }
+.mark b { display: block; font: 700 24px/1 var(--head); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mark i { display: block; font: 600 10.5px/1 var(--sans); font-style: normal; letter-spacing: .18em; text-transform: uppercase; margin-top: 6px; color: rgba(255, 255, 255, .7); }
+.past .mark { left: 14px; top: 11px; }
+.past .mark b { font-size: 19px; }
+.past .mark i { font-size: 10px; margin-top: 5px; }
+.watermark { position: absolute; right: -1%; bottom: -14%; font: 700 96px/1 var(--head); opacity: .07; letter-spacing: -.02em; pointer-events: none; }
+.past .watermark { font-size: 76px; }
+.info { position: relative; z-index: 2; padding: 56px 16px 12px; }
+.past .info { padding: 46px 14px 10px; }
+.title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } /* the name is in the art; kept for screen readers */
+.dates { color: var(--gold); font-size: 13px; font-weight: 500; }
+.past .dates { font-size: 12px; }
+.chips, .go { display: none; }
+.badge { position: absolute; z-index: 2; top: 11px; right: 11px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 9px;
+  font: 600 10.5px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; background: rgba(0, 0, 0, .5); backdrop-filter: blur(6px); color: var(--fg); }
+.past .badge { display: none; } /* the section says they're finished */
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); animation: pulse 2s infinite; }
 .badge.done .dot { background: var(--dim); animation: none; }
 .badge.soon .dot { background: var(--gold); animation: none; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, .6); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
-.stats { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, .6); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.stats { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; font-size: 12px; color: rgba(255, 255, 255, .72); }
+.past .stats { font-size: 11.5px; gap: 2px 10px; margin-top: 3px; }
 .stats b { color: var(--fg); font-weight: 600; }
 .stats .gold { color: var(--gold); }
-.go { position: absolute; z-index: 2; top: 14px; right: 14px; font: 600 12.5px var(--sans); color: var(--fg); background: rgba(0, 0, 0, .55); backdrop-filter: blur(6px); border-radius: 999px; padding: 5px 11px; }
 
 /* Series art: drawn here, in each organiser's colours */
 .art.apt { background:
     radial-gradient(60% 70% at 72% 18%, rgba(255, 196, 120, .45), transparent 60%),
     radial-gradient(70% 80% at 20% 90%, rgba(220, 38, 38, .55), transparent 60%),
     linear-gradient(160deg, #1b2440 0%, #2a1f3a 45%, #4a1c1c 100%); }
-.art.apt .mark b { color: #f3c77a; text-shadow: 0 2px 0 #7a3a10, 0 8px 24px rgba(0, 0, 0, .6); }
-.art.apt .skyline { position: absolute; inset: auto 0 0 0; height: 62%; opacity: .55; }
+.art.apt .mark b { color: #f3c77a; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.art.apt .skyline { position: absolute; inset: auto 0 0 0; height: 55%; opacity: .45; }
 .art.glpc { background:
     radial-gradient(70% 90% at 50% 0%, rgba(242, 200, 120, .55), transparent 60%),
     radial-gradient(60% 60% at 85% 85%, rgba(156, 111, 30, .6), transparent 60%),
     linear-gradient(180deg, #3b2a12 0%, #1c140a 100%); }
-.art.glpc .mark b { color: #ffe3a8; text-shadow: 0 2px 0 #6b4a14, 0 10px 26px rgba(0, 0, 0, .55); }
+.art.glpc .mark b { color: #ffe3a8; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
 .art.glpc .rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg at 50% 30%, rgba(255, 227, 168, .07) 0 6deg, transparent 6deg 18deg); }
 .art.triton { background:
     radial-gradient(55% 80% at 50% 40%, rgba(214, 178, 106, .28), transparent 65%),
     linear-gradient(180deg, #0d1018 0%, #05060a 100%); }
-.art.triton .mark b { color: #e7cf98; letter-spacing: .14em; text-shadow: 0 8px 24px rgba(0, 0, 0, .7); }
+.art.triton .mark b { color: #e7cf98; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
 .art.tone { background:
     radial-gradient(60% 90% at 85% 30%, rgba(60, 90, 255, .35), transparent 60%),
     linear-gradient(120deg, #06104a 0%, #0b1d7a 55%, #07114f 100%); }
-.art.tone .mark b { color: #f0c46a; text-shadow: 0 6px 20px rgba(0, 0, 0, .5); }
-.art.tone .swoosh { position: absolute; right: -10%; top: -30%; width: 60%; height: 160%; border-radius: 50%; border: 18px solid rgba(255, 255, 255, .05); }
+.art.tone .mark b { color: #f0c46a; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.art.tone .swoosh { position: absolute; right: -8%; top: -60%; width: 45%; height: 220%; border-radius: 50%; border: 14px solid rgba(255, 255, 255, .05); }
 .art.all { background:
     radial-gradient(70% 90% at 20% 20%, rgba(214, 178, 106, .35), transparent 60%),
     radial-gradient(60% 80% at 90% 90%, rgba(60, 90, 255, .25), transparent 60%),
@@ -124,7 +118,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
   'use strict';
   // One entry per tracker. start/end: series dates in the venue's time zone (inclusive).
   const SERIES = [
-    { id: 'apt', path: 'apt/', branch: 'data', title: 'APT Championship, Taipei 2026', mark: 'APT Championship', sub: 'Taipei · 2026', art: 'apt', watermark: '2026',
+    { id: 'apt', path: 'apt/', branch: 'data', title: 'APT Championship, Taipei 2026', mark: 'APT Taipei', sub: 'Championship · 2026', art: 'apt', watermark: '2026',
       start: '2026-11-12', end: '2026-11-29', tz: 'Asia/Taipei', currency: 'TWD' },
     { id: 'triton', path: 'triton/', branch: 'triton-data', title: 'Triton, Northern Cyprus 2026', mark: 'Triton', sub: 'Northern Cyprus · 2026', art: 'triton', watermark: 'TRITON',
       start: '2026-11-15', end: '2026-11-30', tz: 'Europe/Athens', currency: 'USD' },
@@ -178,7 +172,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
     card.appendChild(el('span', 'go', 'Open tracker →'));
     const info = el('div', 'info');
     info.appendChild(el('h3', 'title', s.title));
-    info.appendChild(el('div', 'dates', `${fMon.format(asDate(s.start))} to ${fMon.format(asDate(s.end))}`));
+    info.appendChild(el('div', 'dates', s.datesText || `${fMon.format(asDate(s.start))} to ${fMon.format(asDate(s.end))}`));
     const chips = el('div', 'chips');
     const c = el('span', 'chip'); c.innerHTML = calIcon; c.appendChild(el('b', '', String(days(s.start, s.end)))); c.appendChild(el('small', '', 'days')); chips.appendChild(c);
     info.appendChild(chips);
@@ -190,7 +184,6 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
       if (meta.players) add(nf.format(meta.players), 'players');
       if (meta.bullets) add(nf.format(meta.bullets), 'bullets');
       if (meta.paid) add(`${s.currency} ${short(meta.paid)}`, 'paid out', 'gold');
-      if (meta.note) { const sp = el('span', '', meta.note); stats.appendChild(sp); }
       if (meta.updatedAt && st === 'live') { const sp = el('span'); sp.append('updated '); sp.appendChild(el('b', '', ago(meta.updatedAt))); stats.appendChild(sp); }
       if (stats.childNodes.length) info.appendChild(stats);
     }
@@ -214,8 +207,9 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
       });
       const usd = (idx.festivals || []).reduce((a, f) => a + (f.paid || 0) * (f.usd || 1), 0);
       const first = (idx.festivals || []).map((f) => f.start).sort()[0];
-      allTime = { id: 'tr-all', path: 'triton/?view=all', title: 'Triton, every festival', mark: 'Triton', sub: `All-time · since ${(first || '').slice(0, 4)}`, art: 'all', watermark: 'ALL',
-        start: first, end: new Date().toISOString().slice(0, 10), tz: 'UTC', currency: 'USD', fixed: 'live', badge: 'All-time stats', archived: true };
+      allTime = { id: 'tr-all', path: 'triton/?view=all', title: 'Triton, every festival', mark: 'Triton', sub: 'Every festival', art: 'all', watermark: 'ALL',
+        start: first, end: new Date().toISOString().slice(0, 10), tz: 'UTC', currency: 'USD', fixed: 'live', badge: 'All-time', archived: true,
+        datesText: first ? `${new Date(first + 'T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })} to now` : '' };
       metas['tr-all'] = { festivals: (idx.festivals || []).length + 1, finished: (idx.festivals || []).reduce((a, f) => a + f.events, 0), paid: usd };
     } catch {}
     render();
