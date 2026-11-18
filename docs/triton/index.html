@@ -220,7 +220,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 .kv .v { font-size: 16px; font-weight: 600; color: var(--fg); }
 .kv .s { font-size: 11px; color: var(--dim); margin-top: 1px; overflow-wrap: anywhere; }
 .more-h { margin: 18px 0 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-#sheet-more .kv { margin-top: 8px; }
+#sheet-more { margin-top: 12px; }
 .gtable { width: 100%; border-collapse: collapse; margin: 8px 0 4px; background: var(--card); border-radius: var(--r); overflow: hidden; font-size: 12.5px; }
 .gtable th, .gtable td { padding: 8px 6px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
 .gtable th:first-child, .gtable td:first-child { padding-left: 12px; } .gtable th:last-child, .gtable td:last-child { padding-right: 12px; }
@@ -324,7 +324,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
         <select id="players-fest" class="sel small" aria-label="Festival" hidden><option value="">All festivals</option></select>
         <select id="players-sort" class="sel small" aria-label="Sort players">
           <option value="prizes">Prizes</option><option value="net">Net</option><option value="bullets">Bullets</option>
-          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM / bullet</option>
+          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM %</option>
           <option value="lastBust">Latest bust</option><option value="seated">Playing now</option><option value="name">Name</option>
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
@@ -377,16 +377,15 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <select id="sheet-fest" class="sel small" aria-label="Festival" hidden></select>
   </div>
   <div class="kv" id="sheet-stats"></div>
+  <div id="sheet-more" hidden>
+    <div class="summary" id="sheet-more-stats"></div>
+  </div>
   <div id="sheet-chart-wrap" hidden>
     <div class="chart-h"><h3>Bankroll</h3><span><span style="color:var(--rose)">●</span> buy-in &nbsp;<span style="color:var(--gold)">●</span> cash</span></div>
     <div class="chart" id="sheet-chart"></div>
   </div>
-  <div id="sheet-more" hidden>
-    <h3 class="more-h">Career</h3>
-    <div class="kv" id="sheet-more-stats"></div>
-    <h3 class="more-h">By game</h3>
-    <table class="gtable" id="sheet-games"></table>
-  </div>
+  <div id="sheet-games-wrap"><h3 class="more-h">By game</h3>
+    <table class="gtable" id="sheet-games"></table></div>
   <div class="hint" id="sheet-hint"></div>
   <div id="sheet-event" hidden>
     <div class="seg" id="sheet-seg" role="group" aria-label="Player status">
@@ -924,7 +923,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const now = Math.floor(Date.now() / 1000);
     const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
     $('#sheet-back').hidden = true;
-    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true; $('#sheet-pfilters').hidden = true; $('#sheet-more').hidden = true;
+    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true; $('#sheet-pfilters').hidden = true; $('#sheet-more').hidden = true; $('#sheet-games-wrap').hidden = true; $('#sheet-stats').hidden = false;
     $('#sheet-name').textContent = tag(e.num) + ' ' + e.name;
     $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.prizePool ? 'pool ' + short(e.prizePool) : '', info.regOpen ? 'late reg open' : e.note || '', e.level ? 'level ' + e.level : '',
       ].filter(Boolean).join(' · ');
@@ -992,8 +991,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       ['Field', [['Players', nf.format(n), ''], ['Bullets', nf.format(bullets), n ? (bullets / n).toFixed(2) + ' each' : ''], ['Re-entries', nf.format(Math.max(0, bullets - entered)), pct(bullets - entered, entered)]]],
       ['Money', [['Buy-in', (partial ? '≥' : '') + short(buyins), n ? short(buyins / n) + ' each' : ''], ['Prizes', short(prizes), cashes ? short(prizes / cashes) + ' per cash' : '', 'gold'],
         ['Net', signed(net), buyins ? 'ROI ' + pct(net, buyins) : '', net > 0 ? 'pos' : net < 0 ? 'neg' : '']]],
-      ['Results', [['Cashes', nf.format(cashes), wins ? plural(wins, 'win', 'wins') : ''], ['Players ITM', pct(itmPlayers, n), nf.format(itmPlayers) + ' players'],
-        ['ITM per event', pct(cashedEvents, entered), `${nf.format(cashedEvents)}/${nf.format(entered)}`], ['ITM per bullet', pct(cashedEvents, bullets), `${nf.format(cashedEvents)}/${nf.format(bullets)}`],
+      ['Results', [['Cashes', nf.format(cashes), wins ? plural(wins, 'win', 'wins') : ''], ['ITM', pct(cashedEvents, bullets), `${nf.format(cashedEvents)}/${nf.format(bullets)} bullets`], ['Cashing players', nf.format(itmPlayers), ''],
         ['Winning', pct(winners, n), nf.format(winners) + ' players', 'pos'], ['Losing', pct(losers, n), nf.format(losers) + ' players', 'neg']]],
     ];
     const box = $('#players-summary'); box.replaceChildren();
@@ -1035,7 +1033,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
       const meta = el('div', 'meta');
       meta.appendChild(el('span', '', `${plural(p.bullets, 'bullet', 'bullets')} · ${plural(p.events, 'event', 'events')}`));
-      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${p.partial ? '≤' : ''}${Math.round(p.itm * 100)}% ITM/bullet` : 'no cash'));
+      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${p.partial ? '≤' : ''}${Math.round(p.itm * 100)}% ITM` : 'no cash'));
       if (p.seatedIn.length) meta.appendChild(el('span', 'tag seat', 'Playing ' + p.seatedIn.join(', ')));
       else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + (MODE === 'live' ? fTime : fDate).format(new Date(p.lastBust * 1000))));
       left.appendChild(meta);
@@ -1210,11 +1208,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const p = T.players(view).find((x) => x.name === name);
     $('#sheet-name').textContent = withFlag(p && p.cc, name);
     $('#sheet-sub').textContent = p ? [p.cc ? regionName(p.cc) : '', p.seatedIn.length ? 'playing now in ' + p.seatedIn.join(', ') : p.lastBust ? 'last bust ' + fFull.format(new Date(p.lastBust * 1000)) : ''].filter(Boolean).join(' · ') : '';
-    const st = $('#sheet-stats'); st.replaceChildren();
-    if (p) {
-      tile(st, 'Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); tile(st, 'Prizes', short(p.prizes), '', 'gold'); tile(st, 'Net', signed(p.net), '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
-      tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM / bullet', (p.partial ? '≤' : '') + Math.round(p.itm * 100) + '%', p.events ? Math.round(p.itmEvent * 100) + '% per event' : '');
-    }
+    const st = $('#sheet-stats'); st.replaceChildren(); st.hidden = true; // the player's numbers are the summary cards below
     $('#sheet-hint').textContent = p && p.partial ? '≥ Some of these events have incomplete entry records at Triton (2018–19, or Triton One flights): bullets there are a minimum.' : '';
     const tl = $('#sheet-tl'); tl.replaceChildren();
     const items = T.playerTimeline(view, name);
@@ -1251,48 +1245,50 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   };
   function renderMore(p, items) {
     const box = $('#sheet-more');
-    if (!p || !items.length) { box.hidden = true; return; }
-    box.hidden = false;
+    if (!p || !items.length) { box.hidden = true; $('#sheet-games-wrap').hidden = true; return; }
+    box.hidden = false; $('#sheet-games-wrap').hidden = false;
+    // Per event: what was spent, won, bullets fired and the best place
     const byNum = new Map();
     for (const it of items) {
       if (!it.num && it.num !== 0) continue;
-      const k = String(it.num), r = byNum.get(k) || { name: it.ev || '', spent: 0, prize: 0, pos: null, t: it.t };
-      if (it.amt < 0) r.spent -= it.amt;
-      if (it.k === 'cash') { r.prize += it.prize || 0; if (r.pos == null || it.pos < r.pos) r.pos = it.pos; }
+      const k = String(it.num), r = byNum.get(k) || { name: it.ev || '', spent: 0, prize: 0, bullets: 0, cashed: false };
+      if (it.amt < 0) { r.spent -= it.amt; r.bullets++; }
+      if (it.k === 'cash') { r.prize += it.prize || 0; r.cashed = true; }
       if (!r.name && it.ev) r.name = it.ev;
-      if (it.t && (!r.t || it.t < r.t)) r.t = it.t;
       byNum.set(k, r);
     }
-    const evs = [...byNum.entries()];
     const cashes = items.filter((it) => it.k === 'cash');
     const best = cashes.slice().sort((a, b) => a.pos - b.pos || b.prize - a.prize)[0];
     const big = cashes.slice().sort((a, b) => b.prize - a.prize)[0];
     const top9 = cashes.filter((c) => c.pos <= 9).length;
-    const firstT = Math.min(...items.filter((i) => i.t).map((i) => i.t));
-    const ge = (s) => (p.partial ? '≥' : '') + s, le = (s) => (p.partial ? '≤' : '') + s;
     const tagOf = (n) => (typeof tag === 'function' ? tag(n) : '#' + n); // APT has no tag() helper
-    const evLabel = (it) => it ? `${tagOf(it.num)} ${baseOf(it.ev || '')}`.trim() : '';
-    const st = $('#sheet-more-stats'); st.replaceChildren();
-    tile(st, 'ROI', p.buyins ? (p.partial ? '≤' : '') + (p.net >= 0 ? '+' : '−') + Math.abs(Math.round(p.net / p.buyins * 100)) + '%' : '—', '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
-    tile(st, 'Wins', String(p.wins || 0), top9 ? `${top9} top-9 finish${top9 === 1 ? '' : 'es'}` : '');
-    tile(st, 'Best finish', best ? ord(best.pos) : '—', best ? evLabel(best) : '');
-    tile(st, 'Biggest cash', big ? short(big.prize) : '—', big ? evLabel(big) : '', big ? 'gold' : '');
-    tile(st, 'Avg buy-in', p.bullets ? short(p.buyins / p.bullets) : '—', ge(nf.format(p.bullets)) + ' bullets');
-    tile(st, 'Re-entries', ge(nf.format(Math.max(0, p.bullets - p.events))), p.events ? ge((p.bullets / p.events).toFixed(2)) + ' bullets / event' : '');
-    tile(st, 'ITM / event', Math.round((p.itmEvent || 0) * 100) + '%', `${p.cashedEvents || 0} of ${p.events} events`);
-    tile(st, 'Avg cash', p.cashes ? short(p.prizes / p.cashes) : '—', p.cashes ? plural(p.cashes, 'cash', 'cashes') : '');
+    const ge = p.partial ? '≥' : '', le = p.partial ? '≤' : '';
+    const pctS = (a, b) => (b ? Math.round(a / b * 100) + '%' : '—');
     const fests = new Set([...byNum.keys()].map((k) => k.split('@')[1]).filter(Boolean));
-    if (fests.size) tile(st, 'Festivals', String(fests.size), '');
-    tile(st, 'Playing since', Number.isFinite(firstT) ? fDate.format(new Date(firstT * 1000)) : '—', '');
-    // By game
+    const groups = [
+      ['Money', [['Buy-in', ge + short(p.buyins), p.bullets ? short(p.buyins / p.bullets) + ' / bullet' : ''], ['Prizes', short(p.prizes), p.cashes ? short(p.prizes / p.cashes) + ' / cash' : '', 'gold'],
+        ['Net', signed(p.net), p.buyins ? 'ROI ' + le + (p.net >= 0 ? '+' : '−') + Math.abs(Math.round(p.net / p.buyins * 100)) + '%' : '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '']]],
+      ['Field', [['Events', nf.format(p.events), fests.size ? plural(fests.size, 'festival', 'festivals') : ''], ['Bullets', ge + nf.format(p.bullets), p.events ? (p.bullets / p.events).toFixed(2) + ' / event' : ''],
+        ['Re-entries', ge + nf.format(Math.max(0, p.bullets - p.events)), '']]],
+      ['Results', [['Cashes', nf.format(p.cashes), p.wins ? plural(p.wins, 'win', 'wins') : top9 ? top9 + ' top-9' : ''], ['ITM', le + pctS(p.cashedEvents || 0, p.bullets), `${p.cashedEvents || 0}/${p.bullets} bullets`],
+        ['Best', best ? ord(best.pos) : '—', best ? tagOf(best.num) : ''], ['Biggest cash', big ? short(big.prize) : '—', big ? tagOf(big.num) : '', big ? 'gold' : ''],
+        ['Top-9', nf.format(top9), ''], ['Since', (() => { const t = Math.min(...items.filter((i) => i.t).map((i) => i.t)); return Number.isFinite(t) ? fDate.format(new Date(t * 1000)) : '—'; })(), '']]],
+    ];
+    const sum = $('#sheet-more-stats'); sum.replaceChildren();
+    for (const [title, tiles] of groups) {
+      const g = el('div', 'sum-group'); g.appendChild(el('h3', '', title));
+      const grid = el('div', 'sum-grid'); for (const [k, v, sub, cls] of tiles) tile(grid, k, v, sub, cls);
+      g.appendChild(grid); sum.appendChild(g);
+    }
+    // By game, ITM per bullet
     const games = new Map();
-    for (const [, r] of evs) { const g = gameOf(r.name), x = games.get(g) || { events: 0, spent: 0, prize: 0, cashes: 0 }; x.events++; x.spent += r.spent; x.prize += r.prize; if (r.prize) x.cashes++; games.set(g, x); }
+    for (const [, r] of byNum) { const g = gameOf(r.name), x = games.get(g) || { events: 0, bullets: 0, spent: 0, prize: 0, cashes: 0 }; x.events++; x.bullets += r.bullets; x.spent += r.spent; x.prize += r.prize; if (r.cashed) x.cashes++; games.set(g, x); }
     const tb = $('#sheet-games'); tb.replaceChildren();
     const head = el('tr'); for (const h of ['Game', 'Events', 'ITM', 'Buy-in', 'Prizes', 'Net']) head.appendChild(el('th', '', h)); tb.appendChild(head);
     for (const [g, x] of [...games.entries()].sort((a, b) => b[1].spent - a[1].spent)) {
       const tr = el('tr'); const net = x.prize - x.spent;
-      tr.appendChild(el('td', '', g)); tr.appendChild(el('td', '', String(x.events))); tr.appendChild(el('td', '', Math.round(x.cashes / x.events * 100) + '%'));
-      tr.appendChild(el('td', '', (p.partial ? '≥' : '') + short(x.spent))); tr.appendChild(el('td', 'gold', x.prize ? short(x.prize) : '—'));
+      tr.appendChild(el('td', '', g)); tr.appendChild(el('td', '', String(x.events))); tr.appendChild(el('td', '', le + pctS(x.cashes, x.bullets)));
+      tr.appendChild(el('td', '', ge + short(x.spent))); tr.appendChild(el('td', 'gold', x.prize ? short(x.prize) : '—'));
       tr.appendChild(el('td', net > 0 ? 'pos' : net < 0 ? 'neg' : '', signed(net)));
       tb.appendChild(tr);
     }
