@@ -12,3 +12,4 @@ stamp() { # page engine-file
 }
 stamp docs/index.html docs/tracker.js
 stamp docs/glpc/index.html docs/glpc/glpc.js
+stamp docs/triton/index.html docs/triton/triton.js

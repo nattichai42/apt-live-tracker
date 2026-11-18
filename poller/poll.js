@@ -22,7 +22,8 @@ const budget = Number(opt('budget', 1)); // requests per second, on average
 const publishEvery = Number(opt('publish-every', 3));
 const noPublish = flag('no-publish');
 
-const fetchFn = (url) => fetch(url, { headers: { 'User-Agent': 'apt-live-tracker (github actions)', Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(30000) });
+// Engines may POST (Triton's GraphQL): pass method/body/headers through
+const fetchFn = (url, o = {}) => fetch(url, { ...o, headers: { 'User-Agent': 'apt-live-tracker (github actions)', Accept: 'application/json', ...(o.headers || {}) }, cache: 'no-store', signal: AbortSignal.timeout(30000) });
 
 function load() {
   try { return JSON.parse(fs.readFileSync(statePath, 'utf8')); } catch { return T.emptyState(); }

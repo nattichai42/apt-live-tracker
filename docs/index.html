@@ -169,6 +169,7 @@ main { padding-block: 16px 48px; }
 .tag.out { background: var(--card2); color: var(--muted); }
 
 /* Notes */
+.others { margin-top: 24px; font-size: 13px; color: var(--dim); } .others a { color: var(--muted); }
 details.notes { margin-top: 24px; color: var(--muted); font-size: 13px; background: var(--card); border-radius: var(--r); padding: 12px 16px; }
 details.notes summary { cursor: pointer; color: var(--fg); font: 600 14px var(--head); letter-spacing: .05em; text-transform: uppercase; }
 details.notes h4 { margin: 14px 0 4px; color: var(--fg2); font-size: 13px; }
@@ -225,7 +226,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <div class="brand"><h1>APT Taipei 2026</h1><span>Live tracker · <a href="glpc/">GLPC →</a></span></div>
+      <div class="brand"><h1>APT Taipei 2026</h1><span>Live tracker</span></div>
       <div class="ctl">
         <select id="interval" class="sel" aria-label="How often this page polls">
           <option value="15">15s</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2m</option><option value="0">Off</option>
@@ -289,6 +290,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     </section>
   </div>
 
+  <nav class="others" aria-label="Other trackers">Other trackers: <a href="glpc/">GLPC VI</a> · <a href="triton/">Triton N. Cyprus</a></nav>
   <details class="notes">
     <summary>How the numbers work</summary>
     <h4>Where the data comes from</h4>
