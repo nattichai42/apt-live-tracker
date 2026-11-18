@@ -215,6 +215,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 .sheet-head .spacer { flex: 1; }
 .sheet h2 { margin: 0; font: 600 22px/1.15 var(--head); letter-spacing: .02em; overflow-wrap: anywhere; }
 .sheet .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.sheet-pf { margin: 12px 0 0; }
 .kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
 .kv .v { font-size: 16px; font-weight: 600; color: var(--fg); }
 .hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
@@ -363,6 +364,10 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   </div>
   <h2 id="sheet-name"></h2>
   <div class="sub" id="sheet-sub"></div>
+  <div class="filters sheet-pf" id="sheet-pfilters" hidden>
+    <label class="chip toggle"><input type="checkbox" id="sheet-finished"> Finished events only</label>
+    <label class="chip toggle"><input type="checkbox" id="sheet-known"> All bullets known</label>
+  </div>
   <div class="kv" id="sheet-stats"></div>
   <div id="sheet-chart-wrap" hidden>
     <div class="chart-h"><h3>Bankroll</h3><span><span style="color:var(--rose)">●</span> buy-in &nbsp;<span style="color:var(--gold)">●</span> cash</span></div>
@@ -799,7 +804,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const now = Math.floor(Date.now() / 1000);
     const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
     $('#sheet-back').hidden = true;
-    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true;
+    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true; $('#sheet-pfilters').hidden = true;
     $('#sheet-name').textContent = tag(e.num) + ' ' + e.name;
     $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.gtd ? 'GTD ' + short(e.gtd) : '', info.regClose ? (info.regOpen ? 'reg closes ' + fTime.format(new Date(info.regClose * 1000)) : 'reg closed') : '',
       e.firstPoll ? (info.trackedFromStart ? 'watched from the start' : 'watched since ' + fTime.format(new Date(e.firstPoll * 1000))) : ''].filter(Boolean).join(' · ');
@@ -1055,11 +1060,29 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     svg.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') { tip.hidden = true; hl.setAttribute('opacity', 0); } });
   }
 
+  // The Players tab's filters (finished events, all bullets known) as a smaller state,
+  // so a player's panel shows the same events as the list it was opened from
+  function scoped(src) {
+    const only = null;
+    if (!prefs.fromStart && !prefs.finished && !only) return src;
+    const memo = new Map();
+    const ok = (num) => { const k = String(num); if (!memo.has(k)) memo.set(k, (!only || only(num)) && (!prefs.fromStart || T.watchedFromStart(src, num)) && (!prefs.finished || T.eventFinished(src, num))); return memo.get(k); };
+    const out = { ...src, events: {}, results: {} };
+    for (const [k, e] of Object.entries(src.events || {})) if (ok(e.num)) out.events[k] = e;
+    for (const [n, r] of Object.entries(src.results || {})) if (ok(n)) out.results[n] = r;
+    return out;
+  }
+  function syncFilters() {
+    $('#players-finished').checked = $('#sheet-finished').checked = !!prefs.finished;
+    $('#players-fromstart').checked = $('#sheet-known').checked = !!prefs.fromStart;
+  }
   function openSheet(name) {
     name = T.canon(state, name);
     openPlayer = name; openEvent = null; backToEvent = null;
     $('#sheet-event').hidden = true; $('#sheet-tl-wrap').hidden = false; $('#sheet-back').hidden = true;
-    const p = T.players(state).find((x) => x.name === name);
+    $('#sheet-pfilters').hidden = false; syncFilters();
+    const view = scoped(state);
+    const p = T.players(view).find((x) => x.name === name);
     $('#sheet-name').textContent = withFlag(p && p.cc, name);
     $('#sheet-sub').textContent = p ? [p.cc ? regionName(p.cc) : '', p.seatedIn.length ? 'playing now in ' + p.seatedIn.join(', ') : p.lastBust ? 'last bust ' + fFull.format(new Date(p.lastBust * 1000)) : ''].filter(Boolean).join(' · ') : '';
     const st = $('#sheet-stats'); st.replaceChildren();
@@ -1069,7 +1092,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     }
     $('#sheet-hint').textContent = p && p.partial ? '≥ Some events were not watched from the start; one bullet is counted there.' : '';
     const tl = $('#sheet-tl'); tl.replaceChildren();
-    const items = T.playerTimeline(state, name);
+    const items = T.playerTimeline(view, name);
+    if (!p && view !== state) $('#sheet-hint').textContent = 'No events of this player match these filters.';
     $('#sheet-chart-wrap').hidden = !items.some((i) => i.amt);
     if (!items.length) tl.appendChild(el('li', 'empty', 'No tracked activity yet.'));
     for (const it of items.slice().reverse()) {
@@ -1142,9 +1166,12 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
   $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
   $('#players-finished').checked = !!prefs.finished;
-  $('#players-finished').addEventListener('change', (e) => { prefs.finished = e.target.checked; savePrefs(); playersLimit = 60; renderPlayers(); });
+  const filtersChanged = () => { savePrefs(); playersLimit = 60; syncFilters(); if (!$('#view-players').hidden) renderPlayers(); if (openPlayer) { const b = backToEvent; openSheet(openPlayer); if (b) { backToEvent = b; $('#sheet-back').hidden = false; } } };
+  $('#players-finished').addEventListener('change', (e) => { prefs.finished = e.target.checked; filtersChanged(); });
+  $('#sheet-finished').addEventListener('change', (e) => { prefs.finished = e.target.checked; filtersChanged(); });
+  $('#sheet-known').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; filtersChanged(); });
   $('#players-fromstart').checked = !!prefs.fromStart;
-  $('#players-fromstart').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; savePrefs(); playersLimit = 60; renderPlayers(); });
+  $('#players-fromstart').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; filtersChanged(); });
   $('#done-more').addEventListener('click', () => { doneLimit = 1e9; renderDone(); });
   $('#interval').value = String(prefs.interval);
   $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
