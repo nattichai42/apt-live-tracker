@@ -304,7 +304,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
         <label class="chip toggle"><input type="checkbox" id="players-finished"> Finished events only</label>
-        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> Watched from start only</label>
+        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> All bullets known</label>
       </div>
       <p class="note" id="summary-h"></p>
       <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
@@ -335,7 +335,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <ul>
       <li>Buy-in = bullets seen × buy-in. A ≥ means some of that player's events were not watched from the start while rebuys there are unattributed.</li>
       <li>"Finished events only" counts an event once every flight and day has ended, so prizes still to be won (and buy-ins of events still running) are left out.</li>
-      <li>Tick "Watched from start only" for totals from events tracked from their first minute.</li>
+      <li>Tick "All bullets known" for totals from events tracked from their first minute, where re-entries were seen as they happened.</li>
       <li>Players are matched by name; a name edited by the floor follows the same player id.</li>
     </ul>
   </details>
@@ -866,7 +866,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       prefs.sort === 'seated' ? 'playing now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
     h.className = 'note' + (!prefs.fromStart && rows.some((p) => p.partial) ? ' warn' : '');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : (rows.some((p) => p.partial) ? 'Some events were not watched from their start: rebuys bought before tracking are missing there' : (prefs.finished ? 'all days ended' : 'All events')));
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is known (watched from their start)' : (rows.some((p) => p.partial) ? 'Some events were not watched from their start: rebuys bought before tracking are missing there' : (prefs.finished ? 'all days ended' : 'All events')));
   }
 
   function renderPlayers() {

@@ -305,7 +305,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
         <label class="chip toggle"><input type="checkbox" id="players-finished"> Finished events only</label>
-        <label class="chip toggle" hidden><input type="checkbox" id="players-fromstart"> Watched from start only</label>
+        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> All bullets known</label>
       </div>
       <p class="note" id="summary-h"></p>
       <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
@@ -331,6 +331,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <h4>Players</h4>
     <ul>
       <li>"Finished events only" counts an event once it is over, so prizes still to be won (and buy-ins of events still running) are left out.</li>
+      <li>"All bullets known" keeps only events whose buy-ins on record add up to the official entries: Triton's records are complete from Jeju II (Sep 2026), and earlier events count only if nobody re-entered.</li>
       <li>Players are matched by their Triton profile, then by name across events.</li>
     </ul>
   </details>
@@ -371,7 +372,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=f81f1587bd"></script>
-<script src="triton.js?v=0445fb62a2"></script>
+<script src="triton.js?v=f1e4e1b7c3"></script>
 <script>
 (function () {
   'use strict';
@@ -967,7 +968,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       prefs.sort === 'seated' ? 'playing now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
     h.className = 'note' + (!prefs.fromStart && rows.some((p) => p.partial) ? ' warn' : '');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : (rows.some((p) => p.partial) ? '≥ Before Sep 2026 Triton kept no record of who re-entered: buy-ins there count one bullet per player per event' : (prefs.finished ? 'all days ended' : 'All events')));
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is on record (buy-ins add up to the entries)' : (rows.some((p) => p.partial) ? '≥ Before Sep 2026 Triton kept no record of who re-entered: buy-ins there count one bullet per player per event' : (prefs.finished ? 'all days ended' : 'All events')));
   }
 
   function renderPlayers() {

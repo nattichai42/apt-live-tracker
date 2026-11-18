@@ -286,7 +286,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
         <label class="chip toggle"><input type="checkbox" id="players-finished"> Finished events only</label>
-        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> Watched from start only</label>
+        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> All bullets known</label>
       </div>
       <p class="note" id="summary-h"></p>
       <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
@@ -319,7 +319,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <ul>
       <li>Buy-in = bullets seen × buy-in. A ≥ means some of that player's events were not watched from the start; there one bullet is counted.</li>
       <li>"Finished events only" counts an event once every flight and day has ended, so prizes still to be won (and buy-ins of events still running) are left out.</li>
-      <li>Events played before tracking began only show their cashers, so ITM and net look far better than reality. Tick "Watched from start only" for honest totals.</li>
+      <li>Events played before tracking began only show their cashers, so ITM and net look far better than reality. Tick "All bullets known" for honest totals: only events watched from their first minute, where every player and re-entry was seen.</li>
       <li>Players are matched by name; name edits by the floor (e.g. reordered names) are merged.</li>
     </ul>
   </details>
@@ -833,7 +833,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       prefs.sort === 'seated' ? 'seated now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
     h.className = 'note' + (prefs.fromStart ? '' : ' warn');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : '⚠ Includes events played before tracking (only cashers known): ITM and net look better than reality');
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is known (watched from their start)' : '⚠ Includes events played before tracking (only cashers known): ITM and net look better than reality');
   }
 
   function renderPlayers() {

@@ -413,7 +413,10 @@
   /* ---------- derived views ---------- */
   const kidsOf = (state, num) => Object.values(state.events).filter((e) => e.num === String(num));
   const fromStart = (e) => !!(e.firstPoll && e.start && e.firstPoll - e.start < 900);
-  function watchedFromStart(state, num) { const k = kidsOf(state, num); return k.length > 0 && k.every((e) => fromStart(e)); }
+  // Every bullet known: the buy-ins on record add up to the official entries (complete records since Sep 2026,
+  // or nobody re-entered). Used by the players' "All bullets known" filter (opts.fromStart).
+  const bulletsKnown = (e) => !!e.polls && e.entries > 0 && Object.values(e.p || {}).reduce((a, p) => a + (p.b || 1), 0) >= e.entries;
+  function watchedFromStart(state, num) { const k = kidsOf(state, num); return k.length > 0 && k.every(bulletsKnown); }
   function eventFinished(state, num) { const k = kidsOf(state, num); return k.length > 0 && k.every((e) => e.phase === 'Completed'); }
   const buyinOf = (state, num) => Math.max(0, ...kidsOf(state, num).map((e) => e.buyin || 0));
 
@@ -432,7 +435,7 @@
       for (const [k, p] of Object.entries(e.p)) {
         const r = get(personOf(state, k)); if (p.cc) r.cc = p.cc;
         r.nums.add(e.num); r.bullets += p.b || 1;
-        if (e.txMissing && !(p.paid > 0)) r.partial = true; // re-entries here are not on record: at least this many
+        if (!(p.paid > 0) && !bulletsKnown(e)) r.partial = true; // re-entries here are not on record: at least this many
         // Bullets x buy-in from the name (the site's transaction amounts leave out the fee)
         r.buyins += (p.b || 1) * (e.buyin || 0);
         r.busts += Math.max((p.x || []).length, p.st === 'x' ? (p.b || 1) : Math.max(0, (p.b || 1) - 1));
