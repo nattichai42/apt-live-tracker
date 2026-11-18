@@ -333,7 +333,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <summary>How the numbers work</summary>
     <h4>Where the data comes from</h4>
     <ul>
-      <li>Triton Poker+ publishes, for every event, each player's buy-ins, whether they are still in, the time of their latest bust, live chip counts, and who finished in each paid place. Bullets, buy-ins and prizes here are those numbers, not estimates.</li>
+      <li>Triton Poker+ publishes, for every event, each player's entry count and buy-ins, whether they are still in, the time of their latest bust, live chip counts, and who finished in each paid place. Bullets, buy-ins and prizes here are those numbers, not estimates.</li>
       <li>Triton's data only answers pages on its own site, so a poller on GitHub reads it every 15 seconds or so and saves a record every 2 minutes. This page loads each new save (checked every 60 s by default), so it runs about 1–3 minutes behind.</li>
       <li>Times are Cyprus time. Amounts are in USD; buy-ins are the amount in each event's name.</li>
     </ul>
@@ -345,7 +345,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <h4>Players</h4>
     <ul>
       <li>"Finished events only" counts an event once it is over, so prizes still to be won (and buy-ins of events still running) are left out.</li>
-      <li>"All bullets known" keeps only events whose buy-ins on record add up to the official entries: Triton's records are complete from Jeju II (Sep 2026), and earlier events count only if nobody re-entered.</li>
+      <li>Bullets come from Triton's own per-player entry counts (complete in most events since 2019) and, from Sep 2026, its buy-in records.</li>
+      <li>"All bullets known" keeps only events whose per-player counts add up to the official entries, allowing a gap of 2 entries or 1% for Triton's own bookkeeping. Triton One events played over several flights list only part of the field, and 2018–19 records are incomplete: counts there are a minimum (≥).</li>
       <li>Players are matched by their Triton profile, then by name across events.</li>
     </ul>
   </details>
@@ -391,7 +392,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=f81f1587bd"></script>
-<script src="triton.js?v=2a99cdf83a"></script>
+<script src="triton.js?v=8beff2801b"></script>
 <script>
 (function () {
   'use strict';
@@ -990,7 +991,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       prefs.sort === 'seated' ? 'playing now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
     h.className = 'note' + (!prefs.fromStart && rows.some((p) => p.partial) ? ' warn' : '');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is on record (buy-ins add up to the entries)' : (rows.some((p) => p.partial) ? '≥ Before Sep 2026 Triton kept no record of who re-entered: buy-ins there count one bullet per player per event' : (prefs.finished ? 'all days ended' : 'All events')));
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is on record (buy-ins add up to the entries)' : (rows.some((p) => p.partial) ? '≥ Some events have incomplete entry records at Triton (2018–19, and Triton One events played over several flights): counts there are a minimum' : (prefs.finished ? 'all days ended' : 'All events')));
   }
 
   function renderPlayers() {
@@ -1198,7 +1199,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       tile(st, 'Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); tile(st, 'Prizes', short(p.prizes), '', 'gold'); tile(st, 'Net', signed(p.net), '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
       tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM / bullet', (p.partial ? '≤' : '') + Math.round(p.itm * 100) + '%', p.events ? Math.round(p.itmEvent * 100) + '% per event' : '');
     }
-    $('#sheet-hint').textContent = p && p.partial ? '≥ Before Sep 2026 Triton kept no record of who re-entered: one bullet is counted per event there.' : '';
+    $('#sheet-hint').textContent = p && p.partial ? '≥ Some of these events have incomplete entry records at Triton (2018–19, or Triton One flights): bullets there are a minimum.' : '';
     const tl = $('#sheet-tl'); tl.replaceChildren();
     const items = T.playerTimeline(view, name);
     if (!p && view !== state) $('#sheet-hint').textContent = 'No events of this player match these filters.';

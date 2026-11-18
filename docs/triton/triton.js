@@ -26,7 +26,8 @@
   const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 
   /* ---------- GraphQL (the queries the Triton Poker+ app itself sends) ---------- */
-  const PARTICIPANT = `uuid currentChips alive isHidden noOfBounties noOfUnusedBullets
+  // noOfEntries: the player's entries in this event (not asked for by the Triton+ app, but served by the API)
+  const PARTICIPANT = `uuid currentChips alive isHidden noOfBounties noOfUnusedBullets noOfEntries
         user { uuid nickname countryCode } transactions { amount }`;
   const Q = {
     festival: `query GetFestival($festivalId: String!) { festival(festivalId: $festivalId) {
@@ -182,7 +183,12 @@
     const first = !e.firstPoll;
     if (first) { e.firstPoll = now; if ((t.tournamentStatus || e.status) === 'COMPLETED') e.backfilled = 1; }
     e.ids = e.ids || {};
-    let late = false, txAll = 0;
+    let late = false;
+    // Per-player entry counts, when they look sane for this event (one event has a count summing to 25x its entries)
+    const entriesOf = (r) => (Number.isInteger(r.noOfEntries) && r.noOfEntries > 0 ? r.noOfEntries : 0);
+    const sumEntries = rows.reduce((a, r) => a + entriesOf(r), 0);
+    const officialN = t.noOfEntries ?? e.entries;
+    const trustEntries = sumEntries > 0 && (!officialN || sumEntries <= officialN * 1.1 + 3);
     for (const r of rows) {
       const uid = r.user.uuid || r.uuid, name = clean(r.user.nickname), cc = (r.user.countryCode || '').toUpperCase();
       let k = e.ids[uid];
@@ -196,8 +202,8 @@
       }
       const n = personOf(state, k);
       const tx = (r.transactions || []).map((x) => Number(x.amount) || 0);
-      txAll += tx.length;
-      const bullets = Math.max(1, tx.length);
+      // Bullets: the larger of the buy-ins on record and the player's entry count (records start Sep 2026; counts go back to 2019)
+      const bullets = Math.max(1, tx.length, trustEntries ? entriesOf(r) : 0);
       let bust = r.bustedAt ? Math.floor(Number(r.bustedAt) / 1000) : null;
       // Pre-2020 festivals carry a placeholder (every bust on 21 Apr 2021, the import date): keep only times within the event
       if (bust && e.start && (bust < e.start - 86400 || bust > e.start + 10 * 86400)) bust = null;
@@ -231,7 +237,9 @@
     if (t.noOfEntries != null) e.entries = t.noOfEntries;
     if (t.noOfPlayersRemaining != null) e.remaining = t.noOfPlayersRemaining;
     // Before Sep 2026 Triton kept no per-player buy-ins: bullets there are 1 per player, re-entries unattributed
-    e.txMissing = e.entries != null && txAll < e.entries ? e.entries - txAll : 0;
+    const known = Object.values(e.p).reduce((a, p) => a + (p.b || 1), 0);
+    e.txMissing = e.entries != null && known < e.entries ? e.entries - known : 0;
+    e.entryCounts = trustEntries ? 1 : 0;
     const lv = t.currentBlindLevel; if (lv) { e.level = lv.levelNo; e.blinds = lv.bigBlind ? [lv.smallBlind, lv.bigBlind, lv.ante] : [lv.smallAnte, lv.bigAnte, null]; }
     if (t.tournamentStatus) e.status = t.tournamentStatus;
     e.alive = Object.values(e.p).filter((p) => p.st === 's').length;
@@ -430,7 +438,14 @@
   const fromStart = (e) => !!(e.firstPoll && e.start && e.firstPoll - e.start < 900);
   // Every bullet known: the buy-ins on record add up to the official entries (complete records since Sep 2026,
   // or nobody re-entered). Used by the players' "All bullets known" filter (opts.fromStart).
-  const bulletsKnown = (e) => !!e.polls && e.entries > 0 && Object.values(e.p || {}).reduce((a, p) => a + (p.b || 1), 0) >= e.entries;
+  // With Triton's per-player entry counts, a gap of a couple of entries is bookkeeping (e.g. a cancelled entry), not an
+  // unknown re-entry: allow 2 or 1%, whichever is more. Without them (or with a bigger gap), the counts are a minimum.
+  const bulletsKnown = (e) => {
+    if (!e.polls || !(e.entries > 0)) return false;
+    const seen = Object.values(e.p || {}).reduce((a, p) => a + (p.b || 1), 0);
+    const slack = e.entryCounts ? Math.max(2, Math.round(e.entries * 0.01)) : 0;
+    return seen >= e.entries - slack;
+  };
   function watchedFromStart(state, num) { const k = kidsOf(state, num); return k.length > 0 && k.every(bulletsKnown); }
   function eventFinished(state, num) { const k = kidsOf(state, num); return k.length > 0 && k.every((e) => e.phase === 'Completed'); }
   const buyinOf = (state, num) => Math.max(0, ...kidsOf(state, num).map((e) => e.buyin || 0));

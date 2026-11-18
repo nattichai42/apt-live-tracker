@@ -17,7 +17,7 @@
    "players": 533,
    "paid": 25907313,
    "bullets": "some",
-   "bytes": 291493
+   "bytes": 292669
   },
   {
    "id": "0d8822ab-4d9b-42d0-a1be-03ed97da371b",
@@ -36,7 +36,7 @@
    "players": 189,
    "paid": 103204998,
    "bullets": "all",
-   "bytes": 183991
+   "bytes": 184225
   },
   {
    "id": "e454487b-ece9-4c99-bf22-e1a12cefd1f8",
@@ -54,8 +54,8 @@
    "entries": 1528,
    "players": 154,
    "paid": 103490000,
-   "bullets": "none",
-   "bytes": 142408
+   "bullets": "all",
+   "bytes": 146690
   },
   {
    "id": "9df5e070-5d8c-4f18-834d-663085b147aa",
@@ -73,8 +73,8 @@
    "entries": 2080,
    "players": 236,
    "paid": 110429999,
-   "bullets": "none",
-   "bytes": 194892
+   "bullets": "some",
+   "bytes": 200635
   },
   {
    "id": "3c14154b-1055-441c-9bc2-4ea2d9814f3b",
@@ -92,8 +92,8 @@
    "entries": 5315,
    "players": 792,
    "paid": 29419838,
-   "bullets": "none",
-   "bytes": 384703
+   "bullets": "some",
+   "bytes": 394502
   },
   {
    "id": "e52e1d01-8337-43e2-a12b-31b1d3ecd2f0",
@@ -111,8 +111,8 @@
    "entries": 742,
    "players": 204,
    "paid": 98150000,
-   "bullets": "none",
-   "bytes": 69201
+   "bullets": "all",
+   "bytes": 71228
   },
   {
    "id": "46e41d6d-450e-48f6-b187-f67b5f1c5a08",
@@ -130,8 +130,8 @@
    "entries": 2060,
    "players": 307,
    "paid": 134725000,
-   "bullets": "none",
-   "bytes": 183566
+   "bullets": "some",
+   "bytes": 189208
   },
   {
    "id": "763a7a7c-8e3a-4257-8c0c-75530c6e8db0",
@@ -149,8 +149,8 @@
    "entries": 3541,
    "players": 639,
    "paid": 20876308,
-   "bullets": "none",
-   "bytes": 270806
+   "bullets": "some",
+   "bytes": 277191
   },
   {
    "id": "9fbe717e-e647-4259-b5ca-f72a2895a1ed",
@@ -168,8 +168,8 @@
    "entries": 1637,
    "players": 165,
    "paid": 110405000,
-   "bullets": "none",
-   "bytes": 146093
+   "bullets": "some",
+   "bytes": 150679
   },
   {
    "id": "0f5e072f-6f4a-4382-8700-f3ca270c307e",
@@ -187,8 +187,8 @@
    "entries": 3350,
    "players": 344,
    "paid": 148730000,
-   "bullets": "none",
-   "bytes": 293795
+   "bullets": "some",
+   "bytes": 302045
   },
   {
    "id": "98690670-731b-48d5-82a4-6f4cdc8e99d0",
@@ -206,8 +206,8 @@
    "entries": 278,
    "players": 141,
    "paid": 66200000,
-   "bullets": "none",
-   "bytes": 27914
+   "bullets": "all",
+   "bytes": 28643
   },
   {
    "id": "2b3bc7ab-d23b-4e52-a7b8-7db97ed6c605",
@@ -225,8 +225,8 @@
    "entries": 1664,
    "players": 177,
    "paid": 121380000,
-   "bullets": "none",
-   "bytes": 151754
+   "bullets": "some",
+   "bytes": 156474
   },
   {
    "id": "35ba8806-8fd0-460c-91a5-eee8a2963594",
@@ -244,8 +244,8 @@
    "entries": 1574,
    "players": 172,
    "paid": 99815000,
-   "bullets": "none",
-   "bytes": 142309
+   "bullets": "all",
+   "bytes": 146921
   },
   {
    "id": "b818fd8d-ca13-4f15-8e3f-735baac5fb37",
@@ -263,8 +263,8 @@
    "entries": 2553,
    "players": 261,
    "paid": 108360000,
-   "bullets": "none",
-   "bytes": 225388
+   "bullets": "some",
+   "bytes": 232803
   },
   {
    "id": "a6bb41f6-eaed-43e2-a445-2e7978aeeee2",
@@ -282,8 +282,8 @@
    "entries": 1268,
    "players": 175,
    "paid": 78025000,
-   "bullets": "none",
-   "bytes": 121244
+   "bullets": "some",
+   "bytes": 124738
   },
   {
    "id": "5a69b68f-dac2-484c-a0ec-5f54d18ca652",
@@ -301,8 +301,8 @@
    "entries": 1439,
    "players": 217,
    "paid": 107345000,
-   "bullets": "none",
-   "bytes": 140085
+   "bullets": "some",
+   "bytes": 144052
   },
   {
    "id": "28bf3bef-84a2-400b-a33b-7ccbb3705ada",
@@ -320,8 +320,8 @@
    "entries": 1252,
    "players": 149,
    "paid": 64735000,
-   "bullets": "none",
-   "bytes": 115342
+   "bullets": "some",
+   "bytes": 118871
   },
   {
    "id": "ef91d547-6e91-4bb0-af2f-367474058dfe",
@@ -339,8 +339,8 @@
    "entries": 1359,
    "players": 176,
    "paid": 55500000,
-   "bullets": "none",
-   "bytes": 127217
+   "bullets": "some",
+   "bytes": 130875
   },
   {
    "id": "1f95d60a-d1ce-490f-9ab2-b766d2c56d70",
@@ -358,8 +358,8 @@
    "entries": 855,
    "players": 151,
    "paid": 59154500,
-   "bullets": "none",
-   "bytes": 82370
+   "bullets": "all",
+   "bytes": 84801
   },
   {
    "id": "e5d259c2-2310-44a6-ae67-8885c481833f",
@@ -377,8 +377,8 @@
    "entries": 827,
    "players": 102,
    "paid": 44245000,
-   "bullets": "none",
-   "bytes": 74583
+   "bullets": "all",
+   "bytes": 77057
   },
   {
    "id": "4dc11b8c-8399-4b2d-8615-a40415f15bd9",
@@ -396,8 +396,8 @@
    "entries": 284,
    "players": 50,
    "paid": 19231000,
-   "bullets": "none",
-   "bytes": 25535
+   "bullets": "all",
+   "bytes": 26390
   },
   {
    "id": "98e8da7a-346f-489b-baf7-f448bbfcf055",
@@ -415,8 +415,8 @@
    "entries": 696,
    "players": 135,
    "paid": 113381500,
-   "bullets": "none",
-   "bytes": 58923
+   "bullets": "some",
+   "bytes": 60635
   },
   {
    "id": "5ec63167-def3-4a7e-826f-1bc587f5cd4f",
@@ -434,8 +434,8 @@
    "entries": 693,
    "players": 98,
    "paid": 325950000,
-   "bullets": "none",
-   "bytes": 56522
+   "bullets": "some",
+   "bytes": 58254
   },
   {
    "id": "592d2ca7-5abf-490e-838a-7140768908aa",
@@ -453,8 +453,8 @@
    "entries": 406,
    "players": 82,
    "paid": 310435000,
-   "bullets": "none",
-   "bytes": 32767
+   "bullets": "some",
+   "bytes": 33066
   },
   {
    "id": "2895f978-451f-4149-a320-c987b385ca30",
@@ -473,7 +473,7 @@
    "players": 10,
    "paid": 4760031,
    "bullets": "all",
-   "bytes": 3113
+   "bytes": 3145
   },
   {
    "id": "32386076-fac7-4c87-90d5-dfd9fb925481",
@@ -491,8 +491,8 @@
    "entries": 259,
    "players": 56,
    "paid": 217600000,
-   "bullets": "none",
-   "bytes": 19362
+   "bullets": "some",
+   "bytes": 19452
   },
   {
    "id": "d4acb7ea-99f7-4fca-91b7-e384aacd806e",
@@ -511,8 +511,8 @@
    "players": 48,
    "paid": 178752000,
    "bullets": "none",
-   "bytes": 15338
+   "bytes": 15401
   }
  ],
- "updatedAt": 1794997737
+ "updatedAt": 1794998895
 }

@@ -90,8 +90,11 @@ links home. To add a series, add its tracker and one entry to `SERIES` in `docs/
 (`--only <id>`, `--force` to refetch). The Triton page shows one with `?f=<festival id>` and all of them together, plus the
 live festival, with `?view=all`; the home page lists them under Past.
 
-- Every festival has players, entries, named payouts and each player's final bust time. Per-player buy-ins (bullets) exist
-  only from Jeju II (Sep 2026): earlier events count one bullet per player and show buy-ins as a minimum (≥).
+- Every festival has players, entries, named payouts and each player's final bust time. Bullets per player come from the
+  participants' `noOfEntries` field (served by the API though the Triton+ app doesn't request it; the same numbers
+  MTTDB.com publishes) and, from Sep 2026, buy-in transactions. They add up to the official entries in most events since
+  2019; Triton One multi-flight events list only part of the field and 2018–19 are incomplete, so those show a minimum (≥).
+  A count summing far above the entries (one event) is ignored.
 - Buy-ins are what players pay, read from the event name or the listed amount when that is the name's amount plus fee
   (Triton's own transaction amounts leave the fee out).
 
