@@ -391,7 +391,11 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
   /* ---------- payouts ---------- */
   async function fetchPayouts(fetchFn, state, e, now) {
     const rows = await getJSON(fetchFn, `${API}/tournaments/${e.kid}/payouts`);
-    const pay = (rows || []).map((r) => [Number(r.rank), Math.round((Number(r.prize) || 0) * 1000)]).filter((r) => r[0] > 0).sort((a, b) => a[0] - b[0]);
+    // Prizes are entered in thousands of VND, but some rows are typed in full VND (S1's 1st: 14,520,000 = 14.5M, next to
+    // 2nd: 2,200 = 2.2M). A row that would exceed the whole prize pool once multiplied is already in VND.
+    const pool = (e.prizePool || 0) || (e.gtd || 0) || (e.buyin || 0) * (e.entries || 0);
+    const vnd = (x) => { const v = Number(x) || 0; return pool && v * 1000 > pool * 1.05 ? Math.round(v) : Math.round(v * 1000); };
+    const pay = (rows || []).map((r) => [Number(r.rank), vnd(r.prize)]).filter((r) => r[0] > 0).sort((a, b) => a[0] - b[0]);
     const prev = state.res[e.kid];
     const same = !!prev && JSON.stringify(prev.pay) === JSON.stringify(pay);
     const since = same ? (prev.since || prev.at || now) : now;
@@ -444,7 +448,18 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
     }).map((e) => e.kid);
   }
 
-  function repair() { return 0; }
+  // Payout rows saved before the unit fix: any prize above the whole pool was already in VND, not thousands
+  function repair(state) {
+    let fixed = 0;
+    for (const [kid, r] of Object.entries(state.res || {})) {
+      const e = state.events && state.events[kid]; if (!e || !r.pay) continue;
+      const pool = (e.prizePool || 0) || (e.gtd || 0) || (e.buyin || 0) * (e.entries || 0);
+      if (!pool) continue;
+      for (const row of r.pay) if (row[1] > pool * 1.05 && row[1] % 1000 === 0) { row[1] = row[1] / 1000; fixed++; }
+    }
+    if (fixed) buildResults(state);
+    return fixed;
+  }
 
   const THROTTLE = new Set([403, 429, 503]);
 
@@ -454,7 +469,7 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
   async function pollOnce(state, opts = {}) {
     const baseFetch = opts.fetchFn || ((u) => fetch(u, { cache: 'no-store' }));
     const now = nowSec();
-    const summary = { at: now, events: 0, busts: 0, reentries: 0, entries: 0, errors: [], requests: 0, throttled: 0, retryAfter: 0, repaired: 0 };
+    const summary = { at: now, events: 0, busts: 0, reentries: 0, entries: 0, errors: [], requests: 0, throttled: 0, retryAfter: 0, repaired: repair(state) };
     const fetchFn = (u) => { summary.requests++; return baseFetch(u); };
     const note = (err) => {
       summary.errors.push(err.error || err.message || String(err));

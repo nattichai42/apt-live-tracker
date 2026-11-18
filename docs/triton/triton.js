@@ -264,7 +264,11 @@
   function settle(state, e, now) {
     if (e.status !== 'COMPLETED') { if (e.doneAt && e.status === 'IN_PROGRESS') delete e.doneAt; return; }
     // Finished before we first looked: it ended around its last bust
-    if (!e.doneAt) e.doneAt = e.backfilled ? (Math.max(0, ...Object.values(e.p).flatMap((p) => p.x || [])) + 60 || now) : now;
+    if (!e.doneAt) {
+      const lastBust = Math.max(0, ...Object.values(e.p).flatMap((p) => p.x || []));
+      // Finished before we first looked: it ended around its last bust (or, with no bust times on record, a day after it began)
+      e.doneAt = e.backfilled ? (lastBust ? lastBust + 60 : (e.start ? e.start + 86400 : now)) : now;
+    }
     const win = ((state.res[e.kid] || {}).rows || []).find((r) => r[0] === 1);
     for (const [k, p] of Object.entries(e.p)) {
       if (p.st === 's') { p.st = 'end'; if (win && (win[4] === p.uid || win[1] === personOf(state, k))) p.won = 1; }

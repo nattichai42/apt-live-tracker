@@ -218,6 +218,16 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 .sheet-pf { margin: 12px 0 0; }
 .kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
 .kv .v { font-size: 16px; font-weight: 600; color: var(--fg); }
+.kv .s { font-size: 11px; color: var(--dim); margin-top: 1px; overflow-wrap: anywhere; }
+.more-h { margin: 18px 0 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#sheet-more .kv { margin-top: 8px; }
+.gtable { width: 100%; border-collapse: collapse; margin: 8px 0 4px; background: var(--card); border-radius: var(--r); overflow: hidden; font-size: 12.5px; }
+.gtable th, .gtable td { padding: 8px 6px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
+.gtable th:first-child, .gtable td:first-child { padding-left: 12px; } .gtable th:last-child, .gtable td:last-child { padding-right: 12px; }
+@media (max-width: 420px) { .gtable { font-size: 11.5px; } }
+.gtable th { font-weight: 500; color: var(--dim); font-size: 11px; border-top: 0; }
+.gtable th:first-child, .gtable td:first-child { text-align: left; }
+.gtable td:first-child { color: var(--fg2); font-weight: 600; }
 .hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
 .chart-h { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
 .chart-h h3, .tl-h { margin: 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -373,6 +383,12 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <div class="chart-h"><h3>Bankroll</h3><span><span style="color:var(--rose)">●</span> buy-in &nbsp;<span style="color:var(--gold)">●</span> cash</span></div>
     <div class="chart" id="sheet-chart"></div>
   </div>
+  <div id="sheet-more" hidden>
+    <h3 class="more-h">Career</h3>
+    <div class="kv" id="sheet-more-stats"></div>
+    <h3 class="more-h">By game</h3>
+    <table class="gtable" id="sheet-games"></table>
+  </div>
   <div class="hint" id="sheet-hint"></div>
   <div id="sheet-event" hidden>
     <div class="seg" id="sheet-seg" role="group" aria-label="Player status">
@@ -394,7 +410,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=f81f1587bd"></script>
-<script src="glpc.js?v=e0814d7b3d"></script>
+<script src="glpc.js?v=589f8683f4"></script>
 <script>
 (function () {
   'use strict';
@@ -804,7 +820,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const now = Math.floor(Date.now() / 1000);
     const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
     $('#sheet-back').hidden = true;
-    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true; $('#sheet-pfilters').hidden = true;
+    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true; $('#sheet-pfilters').hidden = true; $('#sheet-more').hidden = true;
     $('#sheet-name').textContent = tag(e.num) + ' ' + e.name;
     $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.gtd ? 'GTD ' + short(e.gtd) : '', info.regClose ? (info.regOpen ? 'reg closes ' + fTime.format(new Date(info.regClose * 1000)) : 'reg closed') : '',
       e.firstPoll ? (info.trackedFromStart ? 'watched from the start' : 'watched since ' + fTime.format(new Date(e.firstPoll * 1000))) : ''].filter(Boolean).join(' · ');
@@ -1111,7 +1127,66 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const wasHidden = $('#sheet').hidden;
     $('#sheet').hidden = false; $('#sheet-bg').hidden = false;
     drawBankroll($('#sheet-chart'), items); // measure now that the sheet is visible
+    renderMore(p, items);
     if (wasHidden) $('#sheet-close').focus();
+  }
+
+  /* ---------- career stats in the player panel ---------- */
+  // Game from the event name: Triton and APT spell these out ("PLO", "Short Deck Ante-Only", "NLH/PLO", "Mixed Games")
+  const gameOf = (name) => {
+    const n = String(name || '');
+    if (/mixed|\b\d+[- ]game\b|h\.?o\.?r\.?s\.?e|nlh\s*\/\s*plo|plo\s*\/\s*nlh/i.test(n)) return 'Mixed';
+    if (/short ?deck|\bSD\b|ante[- ]only|6\+/i.test(n)) return 'Short Deck';
+    if (/\bPLO\b|omaha|pot[- ]limit/i.test(n)) return 'PLO';
+    return 'NLH';
+  };
+  function renderMore(p, items) {
+    const box = $('#sheet-more');
+    if (!p || !items.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const byNum = new Map();
+    for (const it of items) {
+      if (!it.num && it.num !== 0) continue;
+      const k = String(it.num), r = byNum.get(k) || { name: it.ev || '', spent: 0, prize: 0, pos: null, t: it.t };
+      if (it.amt < 0) r.spent -= it.amt;
+      if (it.k === 'cash') { r.prize += it.prize || 0; if (r.pos == null || it.pos < r.pos) r.pos = it.pos; }
+      if (!r.name && it.ev) r.name = it.ev;
+      if (it.t && (!r.t || it.t < r.t)) r.t = it.t;
+      byNum.set(k, r);
+    }
+    const evs = [...byNum.entries()];
+    const cashes = items.filter((it) => it.k === 'cash');
+    const best = cashes.slice().sort((a, b) => a.pos - b.pos || b.prize - a.prize)[0];
+    const big = cashes.slice().sort((a, b) => b.prize - a.prize)[0];
+    const top9 = cashes.filter((c) => c.pos <= 9).length;
+    const firstT = Math.min(...items.filter((i) => i.t).map((i) => i.t));
+    const ge = (s) => (p.partial ? '≥' : '') + s, le = (s) => (p.partial ? '≤' : '') + s;
+    const tagOf = (n) => (typeof tag === 'function' ? tag(n) : '#' + n); // APT has no tag() helper
+    const evLabel = (it) => it ? `${tagOf(it.num)} ${baseOf(it.ev || '')}`.trim() : '';
+    const st = $('#sheet-more-stats'); st.replaceChildren();
+    tile(st, 'ROI', p.buyins ? (p.partial ? '≤' : '') + (p.net >= 0 ? '+' : '−') + Math.abs(Math.round(p.net / p.buyins * 100)) + '%' : '—', '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
+    tile(st, 'Wins', String(p.wins || 0), top9 ? `${top9} top-9 finish${top9 === 1 ? '' : 'es'}` : '');
+    tile(st, 'Best finish', best ? ord(best.pos) : '—', best ? evLabel(best) : '');
+    tile(st, 'Biggest cash', big ? short(big.prize) : '—', big ? evLabel(big) : '', big ? 'gold' : '');
+    tile(st, 'Avg buy-in', p.bullets ? short(p.buyins / p.bullets) : '—', ge(nf.format(p.bullets)) + ' bullets');
+    tile(st, 'Re-entries', ge(nf.format(Math.max(0, p.bullets - p.events))), p.events ? ge((p.bullets / p.events).toFixed(2)) + ' bullets / event' : '');
+    tile(st, 'ITM / event', Math.round((p.itmEvent || 0) * 100) + '%', `${p.cashedEvents || 0} of ${p.events} events`);
+    tile(st, 'Avg cash', p.cashes ? short(p.prizes / p.cashes) : '—', p.cashes ? plural(p.cashes, 'cash', 'cashes') : '');
+    const fests = new Set([...byNum.keys()].map((k) => k.split('@')[1]).filter(Boolean));
+    if (fests.size) tile(st, 'Festivals', String(fests.size), '');
+    tile(st, 'Playing since', Number.isFinite(firstT) ? fDate.format(new Date(firstT * 1000)) : '—', '');
+    // By game
+    const games = new Map();
+    for (const [, r] of evs) { const g = gameOf(r.name), x = games.get(g) || { events: 0, spent: 0, prize: 0, cashes: 0 }; x.events++; x.spent += r.spent; x.prize += r.prize; if (r.prize) x.cashes++; games.set(g, x); }
+    const tb = $('#sheet-games'); tb.replaceChildren();
+    const head = el('tr'); for (const h of ['Game', 'Events', 'ITM', 'Buy-in', 'Prizes', 'Net']) head.appendChild(el('th', '', h)); tb.appendChild(head);
+    for (const [g, x] of [...games.entries()].sort((a, b) => b[1].spent - a[1].spent)) {
+      const tr = el('tr'); const net = x.prize - x.spent;
+      tr.appendChild(el('td', '', g)); tr.appendChild(el('td', '', String(x.events))); tr.appendChild(el('td', '', Math.round(x.cashes / x.events * 100) + '%'));
+      tr.appendChild(el('td', '', (p.partial ? '≥' : '') + short(x.spent))); tr.appendChild(el('td', 'gold', x.prize ? short(x.prize) : '—'));
+      tr.appendChild(el('td', net > 0 ? 'pos' : net < 0 ? 'neg' : '', signed(net)));
+      tb.appendChild(tr);
+    }
   }
   function closeSheet() { openPlayer = null; openEvent = null; backToEvent = null; $('#sheet').hidden = true; $('#sheet-bg').hidden = true; }
   $('#sheet-back').addEventListener('click', () => { if (backToEvent) { const k = backToEvent; showEvent(k); } });
