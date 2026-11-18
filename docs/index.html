@@ -183,7 +183,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
       if (meta.finished) add(nf.format(meta.finished), s.archived ? (meta.finished === 1 ? 'event' : 'events') : meta.finished === 1 ? 'event finished' : 'events finished');
       if (meta.players) add(nf.format(meta.players), 'players');
       if (meta.bullets) add(nf.format(meta.bullets), 'bullets');
-      if (meta.paid) add(`${s.currency} ${short(meta.paid)}`, 'paid out', 'gold');
+      if (meta.paid) add(`${({ USD: '$', EUR: '€', GBP: '£', HKD: 'HK$', TWD: 'NT$', VND: '₫', THB: '฿' })[s.currency] || s.currency + ' '}${short(meta.paid)}`, 'paid out', 'gold');
       if (meta.updatedAt && st === 'live') { const sp = el('span'); sp.append('updated '); sp.appendChild(el('b', '', ago(meta.updatedAt))); stats.appendChild(sp); }
       if (stats.childNodes.length) info.appendChild(stats);
     }
