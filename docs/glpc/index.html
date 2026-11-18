@@ -313,7 +313,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
         <select id="players-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
         <select id="players-sort" class="sel small" aria-label="Sort players">
           <option value="prizes">Prizes</option><option value="net">Net</option><option value="bullets">Bullets</option>
-          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM %</option>
+          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM / bullet</option>
           <option value="lastBust">Latest bust</option><option value="seated">Playing now</option><option value="name">Name</option>
         </select>
         <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
@@ -394,7 +394,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=f81f1587bd"></script>
-<script src="glpc.js?v=2a9e1dc408"></script>
+<script src="glpc.js?v=e0814d7b3d"></script>
 <script>
 (function () {
   'use strict';
@@ -914,7 +914,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
       const meta = el('div', 'meta');
       meta.appendChild(el('span', '', `${plural(p.bullets, 'bullet', 'bullets')} · ${plural(p.events, 'event', 'events')}`));
-      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${Math.round(p.itm * 100)}% ITM` : 'no cash'));
+      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${p.partial ? '≤' : ''}${Math.round(p.itm * 100)}% ITM/bullet` : 'no cash'));
       if (p.seatedIn.length) meta.appendChild(el('span', 'tag seat', 'Playing ' + p.seatedIn.join(', ')));
       else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + fTime.format(new Date(p.lastBust * 1000))));
       left.appendChild(meta);
@@ -1088,7 +1088,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const st = $('#sheet-stats'); st.replaceChildren();
     if (p) {
       tile(st, 'Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); tile(st, 'Prizes', short(p.prizes), '', 'gold'); tile(st, 'Net', signed(p.net), '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
-      tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM', Math.round(p.itm * 100) + '%');
+      tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM / bullet', (p.partial ? '≤' : '') + Math.round(p.itm * 100) + '%', p.events ? Math.round(p.itmEvent * 100) + '% per event' : '');
     }
     $('#sheet-hint').textContent = p && p.partial ? '≥ Some events were not watched from the start; one bullet is counted there.' : '';
     const tl = $('#sheet-tl'); tl.replaceChildren();

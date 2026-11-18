@@ -243,6 +243,14 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       if (f.kid === kid && f.n === n && f.k === 'bust' && f.t === t) { state.feed.splice(j, 1); break; }
     }
   }
+  // Is there an official rebuy not yet attached to anyone? (falls back to "the entry count rose since the bust")
+  // A return is a re-entry when the entry count rose since this player's bust AND an official rebuy is still unclaimed
+  // (with hundreds of players either alone is weak: someone else's rebuy raises the count; an old missed rebuy stays spare)
+  function spareRebuy(e, p, xe) {
+    const rose = xe == null || e.entries == null || e.entries > xe;
+    if (e.rebuys == null) return rose;
+    return rose && e.rebuys > Object.values(e.p || {}).reduce((a, q) => a + Math.max(0, (q.b || 0) - 1), 0);
+  }
   function countReentry(state, e, n, p, t, cc) {
     p.b = (p.b || 0) + 1; (p.r || (p.r = [])).push(t);
     pushFeed(state, { t, kid: e.kid, num: e.num, n: personOf(state, n), k: 'reentry', b: p.b, cc: cc || p.cc });
@@ -267,6 +275,7 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
     e.ids = e.ids || {};
     const first = !e.firstPoll;
     if (first) { e.firstPoll = now; e.entriesAtFirst = e.entries; e.rebuysAtFirst = e.rebuys; }
+    if (!regOpenAt(e, now) && !e.regClosedAt) e.regClosedAt = now; // when we first saw registration closed
     const claimed = new Set(); // records taken over by a new registration id in this snapshot
     for (const r of rows) {
       const id = String(r.playerId), name = titleCase(r.playerName), cc = ccOf(r.countryId), busted = !!r.isBusted;
@@ -314,9 +323,12 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       if (!busted && p.st === 'x') {
         // Back in: a re-entry if the entry count rose since the bust, otherwise a correction by the floor
         const last = p.x.length ? p.x[p.x.length - 1] : null;
-        const grew = p.xe == null || e.entries == null || e.entries > p.xe;
+        // With hundreds of players, any rebuy raises the count: only a rebuy nobody has claimed can be this one
+        const grew = spareRebuy(e, p, p.xe);
         res.changed = true;
-        if (!regOpenAt(e, now) && !grew) { if (last != null) { undoBust(state, kid, personOf(state, k), p, last); res.busts--; } }
+        // After registration has closed (plus a few minutes for a last-second rebuy), a return is always a correction
+        const lateOk = regOpenAt(e, now) || (e.regClosedAt && now - e.regClosedAt <= REG_GRACE);
+        if (!lateOk || (!grew && !regOpenAt(e, now))) { if (last != null) { undoBust(state, kid, personOf(state, k), p, last); res.busts--; } }
         else if (!grew) p.pend = { t: now, cc, xe: p.xe, bust: last };
         else { countReentry(state, e, k, p, now, cc); res.reentries++; }
         p.st = 's'; delete p.pre;
@@ -328,7 +340,7 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
     // Returns waiting for the entry count: a re-entry once it rises, a correction if it hasn't after PEND_WAIT
     for (const [n, p] of Object.entries(e.p)) {
       if (!p.pend) continue;
-      const grew = e.entries != null && p.pend.xe != null && e.entries > p.pend.xe;
+      const grew = spareRebuy(e, p, p.pend.xe);
       if (grew) { countReentry(state, e, n, p, p.pend.t, p.pend.cc); res.reentries++; state.feed.sort((a, b) => a.t - b.t); delete p.pend; }
       else if (p.st !== 's' || now - p.pend.t >= PEND_WAIT) { undoBust(state, kid, personOf(state, n), p, p.pend.bust); res.busts--; delete p.pend; }
     }
@@ -512,7 +524,9 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
   function watchedFromStart(state, num, now) {
     now = now || nowSec();
     const kids = kidsOf(state, num);
-    return kids.length > 0 && kids.some((k) => k.polls > 0) && kids.every((k) => fromStart(k) || (!k.polls && (!k.start || k.start > now)));
+    // Watched from the start, or every official rebuy is attached to a player (so no bullet is unknown)
+    const allSeen = (k) => k.polls > 0 && k.rebuys != null && eventCounts(k).missed === 0;
+    return kids.length > 0 && kids.some((k) => k.polls > 0) && kids.every((k) => fromStart(k) || allSeen(k) || (!k.polls && (!k.start || k.start > now)));
   }
 
   function maxBuyin(state, num) { return Math.max(0, ...kidsOf(state, num).map((e) => e.buyin || 0)); }
@@ -575,7 +589,7 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       const cashedNums = new Set(r.cashes.map((c) => c.num));
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
-        buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: entered ? cashedNums.size / entered : 0,
+        buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
         seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.partial,
         cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
     }

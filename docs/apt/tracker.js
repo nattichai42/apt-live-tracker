@@ -108,8 +108,17 @@
   const baseName = (name) => clean(name).split(/ - (?=(?:Turbo )?Flight\b|Day \d|Final Day|Final Table)/)[0];
   const isLaterDay = (name) => /\b(Day [2-9]|Final Day|Final Table)\b/i.test(name || '');
 
+  // Most bullets one player may fire, from the event name: Freezeout = 1, "1 Re-Entry" = 2, "2 Re-Entry" = 3
+  function maxBulletsOf(name) {
+    if (/freeze-?out/i.test(name) && !/satellite to/i.test(name)) return 1;
+    const m = String(name).match(/\b(\d+)\s*re-?entr/i); if (m) return Number(m[1]) + 1;
+    if (/single re-?entry/i.test(name)) return 2;
+    return null;
+  }
+
   function eventMeta(e) {
     return {
+      maxBullets: maxBulletsOf(clean(e.name)),
       kid: e.kholdemId, num: e.number, name: clean(e.name), phase: e.phase,
       start: toSec(e.startTimeUTC), regClose: toSec(e.regCloseUTC),
       buyin: Math.round(Number(e.buyin || 0) + Number(e.fee || 0)), currency: e.currency || 'TWD',
@@ -207,7 +216,9 @@
           const regOpen = !e.regClose || now <= e.regClose + REG_GRACE;
           const entriesGrew = p.xe == null || e.entries == null || e.entries > p.xe;
           // The seat itself decides nothing: rebuys can land back in the same seat, depending on table balance.
-          if (!regOpen) {
+          // A return past the event's bullet limit (any return in a freezeout) was a seat move or a glitch
+          const capped = e.maxBullets && (p.b || 1) >= e.maxBullets;
+          if (!regOpen || capped) {
             undoBust(state, kid, n, p, last); res.busts--;
           } else if (!entriesGrew) {
             // The entry count often updates after the seating list: wait up to PEND_WAIT for it before deciding
@@ -227,11 +238,13 @@
       const grew = e.entries != null && p.pend.xe != null && e.entries > p.pend.xe;
       if (p.st !== 's') {
         // Busted again before we decided: the return was real play if the count went up, otherwise a glitch
-        if (grew) { p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(p.pend.t); pushFeed(state, { t: p.pend.t, kid, num: e.num, n, k: 'reentry', b: p.b, cc: p.pend.cc || p.cc }); state.feed.sort((a, b) => a.t - b.t); }
+        if (grew && !(e.maxBullets && (p.b || 1) >= e.maxBullets)) { p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(p.pend.t); pushFeed(state, { t: p.pend.t, kid, num: e.num, n, k: 'reentry', b: p.b, cc: p.pend.cc || p.cc }); state.feed.sort((a, b) => a.t - b.t); }
         else { undoBust(state, kid, n, p, p.pend.bust); res.busts--; }
         delete p.pend; continue;
       }
-      if (grew) {
+      if (grew && e.maxBullets && (p.b || 1) >= e.maxBullets) {
+        undoBust(state, kid, n, p, p.pend.bust); res.busts--; delete p.pend;
+      } else if (grew) {
         p.b = (p.b || 0) + 1; res.reentries++; (p.r || (p.r = [])).push(p.pend.t);
         pushFeed(state, { t: p.pend.t, kid, num: e.num, n, k: 'reentry', b: p.b, cc: p.pend.cc || p.cc });
         state.feed.sort((a, b) => a.t - b.t);
@@ -340,7 +353,9 @@
       const f = state.feed[i];
       if (f.k !== 'reentry') continue;
       const e = state.events[f.kid];
-      if (!e || !e.regClose || f.t <= e.regClose + REG_GRACE) continue;
+      if (!e) continue;
+      const overCap = e.maxBullets && f.b > e.maxBullets;
+      if (!overCap && (!e.regClose || f.t <= e.regClose + REG_GRACE)) continue;
       const p = e.p && e.p[f.n];
       state.feed.splice(i, 1); fixed++;
       if (!p) continue;
@@ -356,6 +371,23 @@
       }
       // Later feed items for this player in this event carry a bullet number that is now one too high
       for (const g of state.feed) if (g.kid === f.kid && g.n === f.n && g.t > f.t && g.b > 1) g.b--;
+    }
+    // Anyone still above the event's bullet limit (their feed items may be gone): drop the extra returns and the busts before them
+    for (const e of Object.values(state.events || {})) {
+      if (!e.maxBullets || !e.p) continue;
+      for (const [n, p] of Object.entries(e.p)) {
+        if ((p.b || 1) <= e.maxBullets) continue;
+        const extra = p.b - e.maxBullets;
+        const rs = (p.r || []).slice().sort((a, b) => a - b);
+        const drop = rs.slice(rs.length - Math.min(extra, rs.length));
+        for (const t of drop) {
+          const bt = (p.x || []).filter((x) => x < t).pop();
+          if (bt != null) undoBust(state, e.kid, n, p, bt);
+          for (let j = state.feed.length - 1; j >= 0; j--) { const f = state.feed[j]; if (f.kid === e.kid && f.n === n && f.k === 'reentry' && f.t === t) { state.feed.splice(j, 1); break; } }
+        }
+        p.r = rs.slice(0, rs.length - drop.length);
+        p.b = e.maxBullets; fixed++;
+      }
     }
     return fixed;
   }
@@ -432,7 +464,9 @@
     now = now || nowSec();
     const kids = Object.values(state.events).filter((e) => e.num === Number(num));
     return kids.length > 0 && kids.some((k) => k.polls > 0) &&
-      kids.every((k) => (k.firstPoll && k.start && k.firstPoll - k.start < 900) || (!k.polls && (!k.start || k.start > now)));
+      kids.every((k) => (k.firstPoll && k.start && k.firstPoll - k.start < 900) || (!k.polls && (!k.start || k.start > now)) ||
+        // or the bullets seen already reach the official count (e.g. a freezeout where every entrant was seen)
+        (!isLaterDay(k.name) && k.polls > 0 && k.entries > 0 && Object.values(k.p || {}).reduce((a, p) => a + (p.b || 0), 0) >= k.entries));
   }
 
   function resultsByName(state, keep) {
@@ -505,7 +539,7 @@
       const cashedNums = new Set(r.cashes.map((c) => c.num));
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
-        buyins, prizes, net: prizes - buyins, cashes: r.cashes.length, itm: entered ? cashedNums.size / entered : 0,
+        buyins, prizes, net: prizes - buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
         seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0,
         cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
     }

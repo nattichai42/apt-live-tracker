@@ -51,7 +51,8 @@ const FESTIVALS = `query ($type: FestivalType, $size: Int!) { series { name fest
     const paid = Object.values(out.results).reduce((a, x) => a + x.rows.reduce((b, row) => b + row[3], 0), 0);
     fs.writeFileSync(file, JSON.stringify(out));
     byId.set(f.uuid, { id: f.uuid, name: f.name, place: T.festTag(f.name, f.startDate).replace(/ '\d\d$/, ''), tag: T.festTag(f.name, f.startDate),
-      series: f.series, one: /Triton One/i.test(f.series), start: f.startDate, end: f.endDate, tz: f.timeZone,
+      series: f.series, one: /Triton One/i.test(f.series), start: f.startDate, end: f.endDate, tz: out.festival.timeZone,
+      currency: out.festival.currency, usd: T.usdRate(out.festival.currency, f.startDate),
       events: ev.length, entries, players: players.size, paid, bullets: missing === 0 ? 'all' : missing < reentries ? 'some' : 'none',
       bytes: fs.statSync(file).size });
     console.log(`${f.name}: ${ev.length} events, ${entries} entries, ${players.size} players, paid $${Math.round(paid / 1e6)}M, re-entries unattributed ${missing}, ${Math.round(fs.statSync(file).size / 1024)} KB, ${s.requests} requests`);

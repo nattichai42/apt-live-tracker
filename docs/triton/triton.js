@@ -118,7 +118,7 @@
 
   function mergeFestival(state, f, now) {
     if (!f) return;
-    state.festival = { name: f.name, shortName: f.shortName, startDate: f.startDate, endDate: f.endDate, timeZone: f.timeZone || 'UTC', currency: f.currency || 'USD' };
+    state.festival = { name: f.name, shortName: f.shortName, startDate: f.startDate, endDate: f.endDate, timeZone: venueZone(f.name) || f.timeZone || 'UTC', currency: f.currency || 'USD' };
     const tz = state.festival.timeZone;
     for (const t of f.tournaments || []) {
       const e = state.events[t.uuid] || (state.events[t.uuid] = { kid: t.uuid, p: {}, ids: {}, polls: 0 });
@@ -126,8 +126,11 @@
       e.base = clean(t.name) + (t.flight ? ' ' + clean(t.flight) : '');
       e.buyinListed = Math.round((Number(t.buyIn) || 0) + (Number(t.registrationFee) || 0));
       e.buyin = pickBuyin(t.name, e.buyinListed);
-      e.days = (t.days || []).map((d) => ({ name: clean(d.name), date: d.date, t: zoned(d.date, d.startTime || '12:00', tz) }));
-      e.start = (e.days[0] && e.days[0].t) || zoned(t.startDate, '12:00', tz);
+      e.days = (t.days || []).map((d) => ({ name: clean(d.name), date: d.date, t: zoned(d.date, d.startTime || '12:00', tz) })).sort((a, b) => (a.date < b.date ? -1 : 1));
+      // Day 1 is the event's start date; the day list sometimes holds only Day 2 (or nothing)
+      e.startDate = t.startDate || (e.days[0] && e.days[0].date);
+      const d1 = e.days.find((d) => d.date === e.startDate);
+      e.start = d1 ? d1.t : zoned(e.startDate, '12:00', tz);
       e.status = t.tournamentStatus; e.reg = t.registrationStatus; e.clock = t.clockStatus; e.note = clean(t.statusNote);
       e.ongoing = !!t.isOngoing; e.sat = !!t.isSatellite; e.stack = t.startingChips;
       if (t.noOfEntries != null) e.entries = t.noOfEntries;
@@ -138,6 +141,14 @@
       if (e.status === 'COMPLETED' && !e.doneAt && e.polls) e.doneAt = now;
     }
     state.listAt = now;
+  }
+
+  // Some older festivals have no time zone on record: use the venue's
+  function venueZone(name) {
+    const z = [[/jeju/i, 'Asia/Seoul'], [/vietnam/i, 'Asia/Ho_Chi_Minh'], [/cyprus/i, 'Asia/Nicosia'], [/london/i, 'Europe/London'],
+      [/montenegro/i, 'Europe/Podgorica'], [/monte-?carlo/i, 'Europe/Monaco'], [/madrid/i, 'Europe/Madrid'], [/paradise|bahamas/i, 'America/Nassau'],
+      [/sochi/i, 'Europe/Moscow'], [/manila/i, 'Asia/Manila'], [/macau/i, 'Asia/Macau']].find(([re]) => re.test(name || ''));
+    return z ? z[1] : null; // known venue first: the site has e.g. Africa/Asmera for Northern Cyprus
   }
 
   function dayPart(e, now, tz) {
@@ -187,7 +198,9 @@
       const tx = (r.transactions || []).map((x) => Number(x.amount) || 0);
       txAll += tx.length;
       const bullets = Math.max(1, tx.length);
-      const bust = r.bustedAt ? Math.floor(Number(r.bustedAt) / 1000) : null;
+      let bust = r.bustedAt ? Math.floor(Number(r.bustedAt) / 1000) : null;
+      // Pre-2020 festivals carry a placeholder (every bust on 21 Apr 2021, the import date): keep only times within the event
+      if (bust && e.start && (bust < e.start - 86400 || bust > e.start + 10 * 86400)) bust = null;
       let p = e.p[k];
       if (!p) {
         p = e.p[k] = { uid, b: bullets, st: r.alive ? 's' : 'x', f: now, x: [], cc, paid: tx.reduce((a, v) => a + v, 0) };
@@ -325,6 +338,8 @@
     for (const r of rs) if (r && r.error) note(r);
     const tz = (state.festival && state.festival.timeZone) || 'UTC';
     for (const e of Object.values(state.events)) {
+      const firstBust = Math.min(Infinity, ...Object.values(e.p || {}).flatMap((p) => p.x || []));
+      if (firstBust < Infinity && e.start && firstBust < e.start) e.start = firstBust - 1800; // schedule was off: it began before this
       settle(state, e, now);
       e.phase = computePhase(e);
       e.partShown = e.phase === 'Completed' ? '' : dayPart(e, now, tz);
@@ -459,7 +474,7 @@
       const cashedNums = new Set(r.cashes.map((c) => c.num));
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
-        buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: entered ? cashedNums.size / entered : 0,
+        buyins: r.buyins, prizes, net: prizes - r.buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
         seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: !!r.partial, cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));

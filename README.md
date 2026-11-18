@@ -101,3 +101,14 @@ Every tracker has a currency menu at the top (remembered across the trackers). `
 rate of its own date — a buy-in at the event's start, a prize at its finish — using ECB rates via Frankfurter (history back
 to 1999) and, for TWD and VND, daily rates on jsDelivr (from March 2024; earlier dates use the first available day).
 Rates are cached in the browser. The all-time Triton view always picks one currency (USD by default).
+
+## Data checks (rules added after an audit)
+
+- APT: re-entries are capped by the event's limit from its name (Freezeout = 1 bullet, "1 Re-Entry" = 2, "2 Re-Entry" = 3);
+  a return past the limit is a seat move or glitch. Saved history is repaired the same way. "All bullets known" also counts
+  an event whose bullets seen reach the official entries (e.g. a freezeout where every entrant was seen).
+- GLPC: a return is a re-entry only if the entry count rose since that player's bust and an official rebuy is still unclaimed.
+  "All bullets known" also counts events where every official rebuy is attached to a player.
+- Triton: event start = the event's own start date (the day list sometimes holds only Day 2), the venue's time zone when
+  Triton's is missing or wrong, never after the first bust. Pre-2020 bust times are a placeholder (21 Apr 2021) and are ignored.
+- ITM % on players is per bullet (cashes / bullets); the panel also shows it per event.
