@@ -54,10 +54,13 @@ button, input, select { font: inherit; color: inherit; }
 /* Header */
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--head-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--bg); }
-.top-row { display: flex; align-items: center; gap: 10px; padding-block: 12px 4px; }
+.top-row { display: flex; align-items: center; gap: 8px; padding-block: 12px 4px; }
+.home { flex: none; display: grid; place-items: center; width: 34px; height: 34px; margin-left: -6px; border-radius: 8px; color: var(--fg); }
+.home:hover { background: var(--card); } .home svg { width: 22px; height: 22px; }
 .brand { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .brand h1 { font: 700 22px/1 var(--head); letter-spacing: .02em; color: var(--gold); text-transform: uppercase; margin: 0; white-space: nowrap; }
-.brand span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.brand { overflow: hidden; }
+.brand span { font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .brand a { color: inherit; text-decoration: none; } .brand a:hover { text-decoration: underline; }
 .ctl { display: flex; gap: 6px; align-items: center; }
 .sel, .btn { border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
@@ -243,6 +246,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 <header class="top">
   <div class="wrap">
     <div class="top-row">
+      <a class="home" href="../" aria-label="Back to all series"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
       <div class="brand"><h1><a href="../" title="All series">GLPC VI</a></h1><span><a href="https://grandloyal.vn/series/121" target="_blank" rel="noopener">Grand Loyal</a></span></div>
       <div class="ctl">
         <button id="theme" class="btn" type="button"></button>
