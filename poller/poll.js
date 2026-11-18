@@ -9,8 +9,8 @@ const { execFileSync } = require('child_process');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const flag = (k) => args.includes('--' + k);
-// Which tracker: docs/tracker.js (APT, default) or docs/glpc/glpc.js (GLPC), and the branch its record goes to
-const T = require(path.resolve(opt('engine', path.join(__dirname, '../docs/tracker.js'))));
+// Which tracker: docs/apt/tracker.js (APT, default) or docs/glpc/glpc.js (GLPC), and the branch its record goes to
+const T = require(path.resolve(opt('engine', path.join(__dirname, '../docs/apt/tracker.js'))));
 const branch = opt('branch', 'data');
 const statePath = opt('state', 'state/state.json');
 const minutes = Number(opt('minutes', 55));

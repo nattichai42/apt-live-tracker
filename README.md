@@ -32,13 +32,13 @@ began and bust + re-entry faster than one poll. Chip counts on the site are not 
    After that it runs on its own: each job polls every 60 s for ~5 h 45 min and, when it starts, queues the
    next run, which takes over the moment it ends. The cron schedule is only a backup. Queueing stops once
    every event in the series is completed.
-5. Open `https://<owner>.github.io/<repo>/`.
+5. Open `https://<owner>.github.io/<repo>/` (home) or `/apt/` for this tracker.
 
 To stop after the series, disable the workflow in the Actions tab.
 
 ## Changing the engine
 
-After editing `docs/tracker.js`, `docs/glpc/glpc.js` or `docs/triton/triton.js`, run `tools/stamp.sh`. It points each page at its engine by content hash (`tracker.js?v=<hash>`),
+After editing `docs/apt/tracker.js`, `docs/glpc/glpc.js` or `docs/triton/triton.js`, run `tools/stamp.sh`. It points each page at its engine by content hash (`tracker.js?v=<hash>`),
 so phones never combine a new page with a cached old engine.
 
 ## Local run
@@ -75,3 +75,10 @@ Triton Poker+ app loads (`prod-public-serverless.triton-poker.com/graphql`, no l
   it asks GitHub's API for the branch's latest commit (an unchanged answer costs nothing against the rate limit) and
   fetches `state.json` at that commit, which avoids the raw host's 5-minute cache.
 - Buy-ins use the amount in each event's name (the schedule's `buyIn` field is stale for some upcoming events).
+
+## Home page and layout
+
+`docs/index.html` is the home page: one banner per tracked series under *Running now*, *Coming up* or *Past*
+(by the series dates in its venue's time zone), with live counts from each tracker's `meta.json` (events running and
+finished, players, bullets, prizes paid). Trackers live at `docs/apt/`, `docs/glpc/` and `docs/triton/`; each page's title
+links home. To add a series, add its tracker and one entry to `SERIES` in `docs/index.html`.

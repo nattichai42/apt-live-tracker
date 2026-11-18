@@ -4,1048 +4,212 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c0c0f">
-<title>APT Taipei Live Tracker</title>
+<title>Poker Live Trackers</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap">
 <style>
-/* Styled after the APT site: zinc-950 page, zinc-900 cards, Inter text, Oswald headings, teal status, gold prizes.
-   One deliberate dark look, like the site itself. */
+/* Home: one banner per tracked series, running first, then past. Dark, like the trackers. */
 :root {
-  --bg: #0c0c0f; --card: #18181b; --card2: #1f1f23; --hover: #232328; --line: #27272a; --line2: #3f3f46;
-  --fg: #fafafa; --fg2: #d4d4d8; --muted: #a1a1aa; --dim: #71717a;
-  --teal: #14b8a6; --teal2: #2dd4bf; --teal-soft: rgba(20, 184, 166, .14);
-  --gold: #cea45b; --gold-soft: rgba(206, 164, 91, .14);
-  --rose: #f43f5e; --rose-soft: rgba(244, 63, 94, .14);
-  --amber: #fbbf24; --amber-soft: rgba(251, 191, 36, .14);
-  --sky: #38bdf8; --sky-soft: rgba(56, 189, 248, .14);
-  /* names used by the chart code */
-  --ok: var(--teal2); --bust: var(--rose); --panel: var(--card); --accent: var(--teal);
+  --bg: #0c0c0f; --card: #141418; --line: #26262c; --fg: #fafafa; --fg2: #d4d4d8; --muted: #a1a1aa; --dim: #7c7c86;
+  --gold: #e3b45f; --live: #2dd4bf; --live-soft: rgba(45, 212, 191, .16);
   --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --head: 'Oswald', 'Arial Narrow', 'Inter', sans-serif;
-  --r: 8px; color-scheme: dark;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
-body { padding-bottom: env(safe-area-inset-bottom, 0px); font-variant-numeric: tabular-nums; }
-button, input, select { font: inherit; color: inherit; }
-.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
+body { padding: env(safe-area-inset-top, 0px) 0 calc(32px + env(safe-area-inset-bottom, 0px)); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1000px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+header { padding: 22px 0 6px; }
+header h1 { margin: 0; font: 700 34px/1.05 var(--head); letter-spacing: .01em; }
+header p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; }
+h2 { font: 600 24px/1.1 var(--head); margin: 28px 0 14px; letter-spacing: .01em; }
+.empty { color: var(--dim); font-size: 14px; background: var(--card); border-radius: 14px; padding: 22px 16px; text-align: center; }
 
-/* Header */
-header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(12, 12, 15, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--bg); }
-.top-row { display: flex; align-items: center; gap: 10px; padding-block: 12px 4px; }
-.brand { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
-.brand h1 { font: 600 20px/1 var(--head); letter-spacing: .02em; text-transform: uppercase; margin: 0; white-space: nowrap; }
-.brand span { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.brand a { color: inherit; text-decoration: none; } .brand a:hover { text-decoration: underline; }
-.ctl { display: flex; gap: 6px; align-items: center; }
-.sel, .btn { border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
-.sel { appearance: none; padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 13px) 52%, calc(100% - 9px) 52%; background-size: 4px 4px; background-repeat: no-repeat; max-width: 100%; }
-.btn:hover, .sel:hover { border-color: var(--dim); }
-.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-bottom: 6px; min-width: 0; }
-.status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
-.dot.live { background: var(--teal); animation: pulse 2s infinite; }
-.dot.err { background: var(--rose); }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, .6); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
-@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
-.tabs { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
-.tab { border: 0; background: none; padding: 8px 0 10px; cursor: pointer; color: var(--muted); font: 600 15px/1 var(--head); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; border-bottom: 2px solid transparent; }
-.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--teal); }
-.tab .n { font: 500 11px var(--sans); color: var(--dim); margin-left: 5px; letter-spacing: 0; }
+/* Banner card */
+.banners { display: grid; gap: 18px; }
+.past { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.banner { position: relative; display: block; border-radius: 16px; overflow: hidden; background: var(--card); isolation: isolate;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35); transition: transform .2s ease; }
+.banner:hover { transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) { .banner { transition: none; } .banner:hover { transform: none; } .badge .dot { animation: none !important; } }
+.art { position: relative; aspect-ratio: 16 / 8; overflow: hidden; }
+.past .art { aspect-ratio: 16 / 9; }
+@media (min-width: 760px) { .banners .art { aspect-ratio: 16 / 5.5; } }
+.past .empty { grid-column: 1 / -1; }
+.art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, .55) 75%, #000 100%); }
+.mark { position: absolute; z-index: 1; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; line-height: .9; }
+.mark b { display: block; font: 700 clamp(30px, 9vw, 74px)/.9 var(--head); letter-spacing: .02em; text-transform: uppercase; }
+.mark i { display: block; font: 600 clamp(11px, 2.4vw, 16px)/1 var(--head); font-style: normal; letter-spacing: .32em; text-transform: uppercase; margin-top: 8px; opacity: .85; }
+.watermark { position: absolute; right: -2%; bottom: -8%; font: 700 clamp(80px, 26vw, 220px)/1 var(--head); opacity: .08; letter-spacing: -.02em; pointer-events: none; }
+.info { position: relative; z-index: 2; margin-top: -30px; padding: 0 18px 18px; background: linear-gradient(180deg, transparent, #000 30px); }
+.past .info { margin-top: -24px; padding: 0 14px 14px; background: linear-gradient(180deg, transparent, #000 24px); }
+.title { font: 700 clamp(24px, 6.4vw, 38px)/1.05 var(--head); margin: 0; letter-spacing: .005em; }
+.past .title { font-size: 22px; }
+.dates { color: var(--gold); font-size: clamp(16px, 4.2vw, 21px); margin-top: 6px; }
+.past .dates { font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #3a3a42; border-radius: 9px; padding: 6px 11px; font-size: 13px; color: var(--fg2); background: rgba(255, 255, 255, .03); }
+.chip b { font-weight: 600; color: var(--fg); font-size: 14.5px; }
+.chip small { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.chip svg { width: 16px; height: 16px; flex: none; color: var(--gold); }
+.badge { position: absolute; z-index: 2; top: 14px; left: 14px; display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 11px;
+  font: 600 12px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; background: rgba(0, 0, 0, .55); backdrop-filter: blur(6px); color: var(--fg); }
+.badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: pulse 2s infinite; }
+.badge.done .dot { background: var(--dim); animation: none; }
+.badge.soon .dot { background: var(--gold); animation: none; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, .6); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--fg); font-weight: 600; }
+.stats .gold { color: var(--gold); }
+.go { position: absolute; z-index: 2; top: 14px; right: 14px; font: 600 12.5px var(--sans); color: var(--fg); background: rgba(0, 0, 0, .55); backdrop-filter: blur(6px); border-radius: 999px; padding: 5px 11px; }
 
-/* Layout */
-main { padding-block: 16px 48px; }
-.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 980px) {
-  .grid.two { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
-  .tabs .tab[data-tab="events"] { display: none; }
-  .grid.two #view-events { display: block !important; grid-column: 2; grid-row: 1; }
-  #view-feed, #view-players { grid-column: 1; grid-row: 1; }
-}
-.section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 22px 0 10px; }
-.section-h:first-child { margin-top: 0; }
-.section-h h2 { font: 600 16px/1.1 var(--head); letter-spacing: .05em; text-transform: uppercase; margin: 0; color: var(--fg); }
-.section-h .t { font-size: 12px; color: var(--dim); }
-.empty { padding: 22px 12px; color: var(--dim); text-align: center; font-size: 13px; }
-.more { display: block; width: 100%; margin-top: 10px; text-align: center; }
-
-/* Filters */
-.filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
-.chip { border: 1px solid var(--line2); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
-.chip[aria-pressed="true"].bust { background: var(--rose-soft); border-color: var(--rose); color: var(--rose); }
-.chip[aria-pressed="true"].re { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
-.chip[aria-pressed="true"].entry { background: var(--sky-soft); border-color: var(--sky); color: var(--sky); }
-.chip.toggle input { accent-color: var(--teal); margin: 0; }
-.chip.toggle:has(input:checked) { border-color: var(--teal); color: var(--teal2); background: var(--teal-soft); }
-.search { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 7px 10px; font-size: 16px; }
-.search::placeholder { color: var(--dim); }
-@media (min-width: 700px) { .search { font-size: 13px; } }
-.sel.small { font-size: 12.5px; padding-block: 5px; }
-
-/* Event cards (APT style) */
-.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
-@media (min-width: 980px) { #view-events .cards { grid-template-columns: minmax(0, 1fr); } }
-.card { display: grid; gap: 10px; border: 0; border-radius: var(--r); background: var(--card); padding: 14px 16px; cursor: pointer; text-align: left; width: 100%; transition: background .15s; }
-.card:hover { background: var(--hover); }
-.card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
-.card-top .when { color: var(--muted); font-weight: 600; }
-.phase { font-weight: 700; font-size: 12.5px; color: var(--teal); white-space: nowrap; }
-.phase.itm { color: var(--gold); } .phase.done { color: var(--dim); }
-.card h3 { margin: 0; font-size: 14.5px; font-weight: 500; line-height: 1.3; color: var(--fg); text-wrap: pretty; }
-.num-tag { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 4px; }
-.part { display: inline-block; font-size: 11px; font-weight: 600; color: var(--fg2); background: var(--card2); border: 1px solid var(--line2); border-radius: 4px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
-.stats4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; text-align: center; }
-.stats4 .k, .kv .k { font-size: 11px; color: var(--dim); }
-.stats4 .v { font-size: 14px; font-weight: 600; color: var(--fg2); }
-.mix { display: grid; gap: 6px; }
-.mix-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); }
-.mix-bar i { display: block; height: 100%; }
-.mix-bar .p { background: var(--teal); } .mix-bar .r { background: var(--amber); } .mix-bar .m { background: var(--line2); } .mix-bar .w { background: var(--sky); } .mix-bar .c { background: #0f766e; }
-.mix-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
-.mix-legend b { color: var(--fg2); font-weight: 600; }
-.mix-legend .sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
-.sw.p { background: var(--teal); } .sw.r { background: var(--amber); } .sw.m { background: var(--line2); } .sw.o { background: var(--rose); } .sw.w { background: var(--sky); } .sw.c { background: #0f766e; }
-
-/* Lists (starting soon, completed) */
-.list { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
-.list li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); align-items: center; }
-.list li:first-child { border-top: 0; }
-.list .when { font-size: 12px; font-weight: 600; color: var(--muted); }
-.list .nm { font-size: 13.5px; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
-.list .sub { font-size: 12px; color: var(--dim); margin-top: 2px; overflow-wrap: anywhere; }
-.list .sub b { color: var(--gold); font-weight: 600; }
-.list .sub b.bag { color: var(--teal2); }
-.list .right { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.list .right b { display: block; color: var(--fg2); font-weight: 600; }
-.list.click li { cursor: pointer; } .list.click li:hover { background: var(--hover); }
-.list .empty { display: block; }
-
-/* Bust feed */
-.feed { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
-.feed li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); }
-.feed li.day { display: block; padding: 7px 14px; font: 600 12px var(--head); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--card2); }
-.feed li.fresh { animation: flash 2.5s ease-out; }
-@keyframes flash { from { background: var(--teal-soft); } to { background: transparent; } }
-@media (prefers-reduced-motion: reduce) { .feed li.fresh { animation: none; } }
-.feed .t { font-size: 12px; color: var(--dim); font-weight: 500; }
-.who { min-width: 0; }
-.who .nm { font-weight: 500; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.who .nm:hover { text-decoration: underline; }
-.who .ev { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.badge { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap; text-align: center; }
-.badge.bust { background: var(--rose-soft); color: var(--rose); }
-.badge.reentry { background: var(--amber-soft); color: var(--amber); }
-.badge.entry { background: var(--sky-soft); color: var(--sky); }
-.badge.cash { background: var(--gold-soft); color: var(--gold); }
-.badge.seat, .badge.end { background: var(--teal-soft); color: var(--teal2); }
-
-/* Players */
-.summary { display: grid; gap: 8px; margin-bottom: 8px; }
-.sum-group { background: var(--card); border-radius: var(--r); padding: 10px 14px 12px; }
-.sum-group h3 { margin: 0 0 8px; font: 600 12px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.sum-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
-.sum-grid .k { font-size: 11px; color: var(--dim); }
-.sum-grid .v { font-size: 16px; font-weight: 600; color: var(--fg); line-height: 1.25; overflow-wrap: anywhere; }
-.sum-grid .s { font-size: 11px; color: var(--dim); }
-.pos { color: var(--teal2) !important; } .neg { color: var(--rose) !important; } .gold { color: var(--gold) !important; }
-.note { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
-.note.warn { color: var(--amber); }
-.plist { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
-.plist li { border-top: 1px solid var(--line); } .plist li:first-child { border-top: 0; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; cursor: pointer; width: 100%; border: 0; background: transparent; text-align: left; align-items: center; }
-.row:hover { background: var(--hover); }
-.row .nm { font-weight: 500; overflow-wrap: anywhere; }
-.row .meta { color: var(--dim); font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; margin-top: 1px; }
-.row .num { text-align: right; white-space: nowrap; }
-.row .num .big { font-size: 14px; font-weight: 600; color: var(--gold); }
-.row .num .small { font-size: 12px; color: var(--dim); }
-.tag { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; }
-.tag.seat { background: var(--teal-soft); color: var(--teal2); }
-.tag.out { background: var(--card2); color: var(--muted); }
-
-/* Notes */
-.others { margin-top: 24px; font-size: 13px; color: var(--dim); } .others a { color: var(--muted); }
-details.notes { margin-top: 24px; color: var(--muted); font-size: 13px; background: var(--card); border-radius: var(--r); padding: 12px 16px; }
-details.notes summary { cursor: pointer; color: var(--fg); font: 600 14px var(--head); letter-spacing: .05em; text-transform: uppercase; }
-details.notes h4 { margin: 14px 0 4px; color: var(--fg2); font-size: 13px; }
-details.notes p, details.notes li { margin: 4px 0; max-width: 72ch; }
-details.notes ul { padding-left: 18px; margin: 4px 0; }
-
-/* Sheet */
-.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 40; }
-.sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow: auto; background: var(--bg); border-radius: 14px 14px 0 0; border-top: 1px solid var(--line2);
-  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
-@media (min-width: 760px) { .sheet { left: auto; top: 0; bottom: 0; width: 460px; max-height: none; border-radius: 0; border-top: 0; border-left: 1px solid var(--line2); } }
-.sheet-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-.sheet-head .spacer { flex: 1; }
-.sheet h2 { margin: 0; font: 600 22px/1.15 var(--head); letter-spacing: .02em; overflow-wrap: anywhere; }
-.sheet .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
-.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; background: var(--card); border-radius: var(--r); padding: 12px 14px; }
-.kv .v { font-size: 16px; font-weight: 600; color: var(--fg); }
-.hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
-.chart-h { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
-.chart-h h3, .tl-h { margin: 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.chart-h span { font-size: 11px; color: var(--dim); }
-.chart { position: relative; margin: 6px 0 16px; background: var(--card); border-radius: var(--r); padding: 10px 6px 4px; }
-.chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
-.chart .lbl { fill: var(--dim); font: 10.5px var(--sans); }
-.chart .grid { stroke: var(--line); }
-.chart .zero { stroke: var(--line2); stroke-dasharray: 3 3; }
-.chart .day { stroke: var(--line); stroke-dasharray: 2 3; }
-.chart .ln { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
-.chart .ln.up { stroke: var(--teal2); } .chart .ln.down { stroke: var(--rose); }
-.chart .pt-in, .chart .pt-out { stroke: var(--card); stroke-width: 1.5; }
-.chart .pt-in { fill: var(--rose); } .chart .pt-out { fill: var(--gold); }
-.chart .end { font: 600 11.5px var(--sans); }
-.chart .tip { position: absolute; pointer-events: none; background: var(--card2); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 9px; font-size: 12px; line-height: 1.4; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); max-width: 230px; z-index: 2; }
-.chart .tip .m { color: var(--muted); font-size: 11px; }
-.seg { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 4px 0 10px; }
-.seg button { border: 1px solid var(--line2); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.seg button .n { font-size: 11px; opacity: .7; margin-left: 4px; }
-.sheet .plist .row { padding: 9px 14px; }
-.tl { list-style: none; margin: 8px 0 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
-.tl li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); align-items: start; }
-.tl li:first-child { border-top: 0; }
-.tl .mk { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--dim); }
-.tl li.bust .mk { background: var(--rose); } .tl li.reentry .mk { background: var(--amber); } .tl li.cash .mk { background: var(--gold); }
-.tl li.buyin .mk { background: transparent; border: 1.5px solid var(--rose); } .tl li.end .mk, .tl li.seen .mk, .tl li.carry .mk { background: var(--teal); }
-.tl .when { font-size: 11.5px; color: var(--dim); }
-.tl .what { font-size: 13px; color: var(--fg2); overflow-wrap: anywhere; }
-.tl .amt { text-align: right; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
-.tl .amt small { display: block; font-weight: 400; font-size: 11px; color: var(--dim); }
-.tl .amt.minus { color: var(--rose); } .tl .amt.plus { color: var(--gold); }
+/* Series art: drawn here, in each organiser's colours */
+.art.apt { background:
+    radial-gradient(60% 70% at 72% 18%, rgba(255, 196, 120, .45), transparent 60%),
+    radial-gradient(70% 80% at 20% 90%, rgba(220, 38, 38, .55), transparent 60%),
+    linear-gradient(160deg, #1b2440 0%, #2a1f3a 45%, #4a1c1c 100%); }
+.art.apt .mark b { color: #f3c77a; text-shadow: 0 2px 0 #7a3a10, 0 8px 24px rgba(0, 0, 0, .6); }
+.art.apt .skyline { position: absolute; inset: auto 0 0 0; height: 62%; opacity: .55; }
+.art.glpc { background:
+    radial-gradient(70% 90% at 50% 0%, rgba(242, 200, 120, .55), transparent 60%),
+    radial-gradient(60% 60% at 85% 85%, rgba(156, 111, 30, .6), transparent 60%),
+    linear-gradient(180deg, #3b2a12 0%, #1c140a 100%); }
+.art.glpc .mark b { color: #ffe3a8; text-shadow: 0 2px 0 #6b4a14, 0 10px 26px rgba(0, 0, 0, .55); }
+.art.glpc .rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg at 50% 30%, rgba(255, 227, 168, .07) 0 6deg, transparent 6deg 18deg); }
+.art.triton { background:
+    radial-gradient(55% 80% at 50% 40%, rgba(214, 178, 106, .28), transparent 65%),
+    linear-gradient(180deg, #0d1018 0%, #05060a 100%); }
+.art.triton .mark b { color: #e7cf98; letter-spacing: .14em; text-shadow: 0 8px 24px rgba(0, 0, 0, .7); }
+.art.triton .lines { position: absolute; inset: 0; background:
+    linear-gradient(90deg, transparent 49.6%, rgba(214, 178, 106, .35) 50%, transparent 50.4%),
+    repeating-linear-gradient(115deg, rgba(214, 178, 106, .08) 0 1px, transparent 1px 28px); mask-image: radial-gradient(60% 80% at 50% 45%, #000, transparent); -webkit-mask-image: radial-gradient(60% 80% at 50% 45%, #000, transparent); }
+footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="wrap">
-    <div class="top-row">
-      <div class="brand"><h1>APT Taipei 2026</h1><span>Live tracker</span></div>
-      <div class="ctl">
-        <select id="interval" class="sel" aria-label="How often this page polls">
-          <option value="15">15s</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2m</option><option value="0">Off</option>
-        </select>
-        <button id="refresh" class="btn" type="button" aria-label="Poll now">↻</button>
-      </div>
-    </div>
-    <div class="status" aria-live="polite"><span id="dot" class="dot"></span><span id="status-text">Starting…</span></div>
-    <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" data-tab="events" aria-selected="false">Events<span class="n" id="n-events"></span></button>
-      <button class="tab" role="tab" data-tab="feed" aria-selected="true">Bust feed<span class="n" id="n-feed"></span></button>
-      <button class="tab" role="tab" data-tab="players" aria-selected="false">Players<span class="n" id="n-players"></span></button>
-    </nav>
-  </div>
-</header>
+<div class="wrap">
+  <header>
+    <h1>Series</h1>
+    <p>Live bust and re-entry trackers. Tap a series to follow it.</p>
+  </header>
+  <section aria-labelledby="h-live"><h2 id="h-live">Running now</h2><div class="banners" id="live"></div></section>
+  <section aria-labelledby="h-soon" id="soon-wrap" hidden><h2 id="h-soon">Coming up</h2><div class="banners" id="soon"></div></section>
+  <section aria-labelledby="h-past"><h2 id="h-past">Past</h2><div class="past" id="past"></div></section>
+  <footer>Data from each organiser's public live pages, saved by pollers on GitHub. Not affiliated with the organisers.</footer>
+</div>
 
-<main class="wrap">
-  <div class="grid two" id="grid">
-    <section id="view-feed" role="tabpanel" aria-label="Bust feed">
-      <div class="section-h"><h2>Bust feed</h2><span class="t" id="feed-count"></span></div>
-      <div class="filters">
-        <button class="chip bust" data-kind="bust" aria-pressed="true">Busts</button>
-        <button class="chip re" data-kind="reentry" aria-pressed="true">Re-entries</button>
-        <button class="chip entry" data-kind="entry" aria-pressed="false">New entries</button>
-        <select id="feed-event" class="sel small" aria-label="Event"><option value="">All events</option></select>
-        <select id="feed-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
-        <input id="feed-q" class="search" type="search" placeholder="Search player" aria-label="Search player" autocomplete="off">
-      </div>
-      <ul class="feed" id="feed"></ul>
-      <button class="btn more" id="feed-more" type="button" hidden>Show more</button>
-    </section>
-
-    <section id="view-events" role="tabpanel" aria-label="Events" hidden>
-      <div class="section-h"><h2>Running now</h2><span class="t">tap for players</span></div>
-      <div class="cards" id="events"></div>
-      <div class="section-h"><h2>Starting soon</h2></div>
-      <ul class="list" id="soon"></ul>
-      <div class="section-h"><h2>Completed</h2><span class="t" id="done-count"></span></div>
-      <ul class="list click" id="done"></ul>
-      <button class="btn more" id="done-more" type="button" hidden>Show all completed</button>
-    </section>
-
-    <section id="view-players" role="tabpanel" aria-label="Players" hidden>
-      <div class="section-h"><h2>Players</h2><span class="t" id="players-count"></span></div>
-      <div class="filters">
-        <input id="players-q" class="search" type="search" placeholder="Search player" aria-label="Search players" autocomplete="off">
-        <select id="players-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
-        <select id="players-sort" class="sel small" aria-label="Sort players">
-          <option value="prizes">Prizes</option><option value="net">Net</option><option value="bullets">Bullets</option>
-          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM %</option>
-          <option value="lastBust">Latest bust</option><option value="seated">Seated now</option><option value="name">Name</option>
-        </select>
-        <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
-        <label class="chip toggle"><input type="checkbox" id="players-finished"> Finished events only</label>
-        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> Watched from start only</label>
-      </div>
-      <p class="note" id="summary-h"></p>
-      <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
-      <ul class="plist" id="players"></ul>
-      <button class="btn more" id="players-more" type="button" hidden>Show more</button>
-    </section>
-  </div>
-
-  <nav class="others" aria-label="Other trackers">Other trackers: <a href="glpc/">GLPC VI</a> · <a href="triton/">Triton N. Cyprus</a></nav>
-  <details class="notes">
-    <summary>How the numbers work</summary>
-    <h4>Where the data comes from</h4>
-    <ul>
-      <li>This page reads the APT site's live seating for every running event, from your browser (every 60 s by default). A player whose seat disappears is logged as busted; a busted player who sits down again while registration is open is a re-entry.</li>
-      <li>A poller on GitHub does the same around the clock and saves its record every few minutes. This page loads that record on open, then continues live.</li>
-      <li>Payouts (places and prizes) come from the site's payout pages, checked every minute while an event is in the money. Chip counts on the site are not live, so they are not shown.</li>
-      <li>Times are Taipei time. A bust is stamped at the poll that first saw the seat empty.</li>
-    </ul>
-    <h4>Event cards</h4>
-    <ul>
-      <li>Entries (official) = players seen + re-entries + waiting for a seat + missed. The coloured bar shows that split.</li>
-      <li>Waiting for a seat: registered (counted in entries and players left) but not in the seating list yet.</li>
-      <li>Missed bullets were never seen: busted before tracking began, a re-entry bought at the table without leaving the seat (the seating list doesn't change and the site has no live chip counts), or a bust and re-entry between two polls.</li>
-      <li>A return counts as a re-entry only while registration is open and the official entry count goes up since the bust. The count often updates after the seating list, so the tracker waits up to 3 minutes for it; if it doesn't rise, the bust is undone as a data glitch. The seat doesn't matter: a rebuy can land back in the same seat.</li>
-      <li>A later day (Day 2, Final Day) shows players carried over from the flights, plus new entries if registration is open.</li>
-      <li>"Over" means we counted more bullets than the official entries: registrations cancelled after seating.</li>
-      <li>For a later day (Day 2, Final Day) the entries cover every flight, so missed is only known when all flights were watched from their start.</li>
-    </ul>
-    <h4>Players</h4>
-    <ul>
-      <li>Buy-in = bullets seen × buy-in. A ≥ means some of that player's events were not watched from the start; there one bullet is counted.</li>
-      <li>"Finished events only" counts an event once every flight and day has ended, so prizes still to be won (and buy-ins of events still running) are left out.</li>
-      <li>Events played before tracking began only show their cashers, so ITM and net look far better than reality. Tick "Watched from start only" for honest totals.</li>
-      <li>Players are matched by name; name edits by the floor (e.g. reordered names) are merged.</li>
-    </ul>
-  </details>
-</main>
-
-<div id="sheet-bg" class="sheet-bg" hidden></div>
-<aside id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-name" hidden>
-  <div class="sheet-head">
-    <button class="btn" id="sheet-back" type="button" hidden>← Event</button>
-    <span class="spacer"></span>
-    <button class="btn" id="sheet-close" type="button" aria-label="Close">✕</button>
-  </div>
-  <h2 id="sheet-name"></h2>
-  <div class="sub" id="sheet-sub"></div>
-  <div class="kv" id="sheet-stats"></div>
-  <div id="sheet-chart-wrap" hidden>
-    <div class="chart-h"><h3>Bankroll</h3><span><span style="color:var(--rose)">●</span> buy-in &nbsp;<span style="color:var(--gold)">●</span> cash</span></div>
-    <div class="chart" id="sheet-chart"></div>
-  </div>
-  <div class="hint" id="sheet-hint"></div>
-  <div id="sheet-event" hidden>
-    <div class="seg" id="sheet-seg" role="group" aria-label="Player status">
-      <button type="button" data-seg="seated" aria-pressed="true">Seated<span class="n"></span></button>
-      <button type="button" data-seg="busted" aria-pressed="false">Busted<span class="n"></span></button>
-      <button type="button" data-seg="reentered" aria-pressed="false">Re-entered<span class="n"></span></button>
-      <button type="button" data-seg="bagged" aria-pressed="false">Bagged<span class="n"></span></button>
-      <button type="button" data-seg="cashed" aria-pressed="false">Cashed<span class="n"></span></button>
-      <button type="button" data-seg="all" aria-pressed="false">All<span class="n"></span></button>
-    </div>
-    <div class="filters">
-      <input id="sheet-q" class="search" type="search" placeholder="Search this event" aria-label="Search players in this event" autocomplete="off">
-      <select id="sheet-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
-      <button class="btn" id="sheet-feed" type="button">Busts in feed →</button>
-    </div>
-    <ul class="plist" id="sheet-list"></ul>
-  </div>
-  <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
-</aside>
-
-<script src="tracker.js?v=a687870440"></script>
 <script>
 (function () {
   'use strict';
-  const T = window.APTTracker;
-  const $ = (s) => document.querySelector(s);
-  const LS_STATE = 'apt-live-state-v1', LS_PREFS = 'apt-live-prefs-v1';
-  const store = {
-    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
-  };
+  // One entry per tracker. start/end: series dates in the venue's time zone (inclusive).
+  const SERIES = [
+    { id: 'apt', path: 'apt/', branch: 'data', title: 'APT Championship, Taipei 2026', mark: 'APT Championship', sub: 'Taipei · 2026', art: 'apt', watermark: '2026',
+      start: '2026-11-12', end: '2026-11-29', tz: 'Asia/Taipei', currency: 'TWD' },
+    { id: 'triton', path: 'triton/', branch: 'triton-data', title: 'Triton, Northern Cyprus 2026', mark: 'Triton', sub: 'Northern Cyprus · 2026', art: 'triton', watermark: 'TRITON',
+      start: '2026-11-15', end: '2026-11-30', tz: 'Europe/Athens', currency: 'USD' },
+    { id: 'glpc', path: 'glpc/', branch: 'glpc-data', title: 'Grand Loyal Poker Championships VI', mark: 'GLPC VI', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'VI',
+      start: '2026-11-18', end: '2026-11-29', tz: 'Asia/Ho_Chi_Minh', currency: 'VND' },
+  ];
 
-  // Where the GitHub history lives: ?repo=owner/name, else derived from <owner>.github.io/<repo>/
+  // Where the trackers' saved summaries live: ?repo=owner/name, else derived from <owner>.github.io/<repo>/
   function repoSlug() {
     const q = new URLSearchParams(location.search).get('repo');
     if (q && /^[\w.-]+\/[\w.-]+$/.test(q)) return q;
     const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
     const seg = location.pathname.split('/').filter(Boolean)[0];
-    if (m && seg) return `${m[1]}/${seg}`;
-    return null;
+    return m && seg ? `${m[1]}/${seg}` : null;
   }
   const REPO = repoSlug();
-  const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/data/state.json` : null;
 
-  let state = T.emptyState();
-  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); state = s; } } catch {}
-  const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
-  const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
-
-  let ghAt = 0, ghAdopted = 0, lastErr = null, polling = false, nextAt = 0, timer = null, freshSince = 0, backoff = 0;
-  let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null, openEvent = null, eventSeg = 'seated', backToEvent = null;
-
-  /* ---------- formatting ---------- */
-  const tz = 'Asia/Taipei';
-  const fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
-  const fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
-  const fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short' });
-  const fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const dayKey = (t) => fDay.format(new Date(t * 1000));
-  const nf = new Intl.NumberFormat('en-US');
-  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(v) : '—');
-  const money = (v) => 'TWD ' + nf.format(Math.round(v || 0));
-  // 3,500 -> 3.5K, 16,500 -> 16.5K, 165,000 -> 165K, 1,555,940 -> 1.56M (never round a buy-in to a different number)
-  const short = (v) => {
-    const a = Math.abs(v), s = v < 0 ? '−' : '';
-    if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
-    if (a >= 1e5) return s + Math.round(a / 1e3) + 'K';
-    if (a >= 1e3) return s + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-    return s + Math.round(a);
-  };
-  const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + short(Math.abs(v));
-  const ord = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-  const flag = (cc) => (cc && /^[A-Z]{2}$/.test(cc)) ? String.fromCodePoint(...[...cc].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65)) : '';
-  const withFlag = (cc, name) => (flag(cc) ? flag(cc) + ' ' : '') + name;
-  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : Math.round(s / 3600) + 'h ago'; };
+  const $ = (s) => document.querySelector(s);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  const PART = /\s*-\s*\b((?:Turbo )?Flight \w+|Day \d+|Final Day|Final Table)\b/i;
-  // Short event name for lists: no "[Event 1]", guarantee, sponsor or long game notes in brackets
-  const cleanName = (name) => String(name || '').replace(/^\[Event \d+\]\s*/, '').replace(/\s*-\s*(?:TWD|USD) [\d,]+ GTD.*$/i, '').replace(/\s*-\s*Sponsored by .*$/i, '').replace(/\s*\([^)]{12,}\)/g, '').trim();
-  const partOf = (name) => { const m = String(name || '').match(PART); return m ? m[1] : ''; };
-  const baseOf = (name) => cleanName(String(name || '').replace(/\s*-\s*\b((?:Turbo )?Flight \w+|Day \d+|Final Day|Final Table)\b.*$/i, ''));
-  const evShort = (e) => e ? `#${e.num} ${baseOf(e.name)}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
-  const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
-  const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
+  const nf = new Intl.NumberFormat('en-US');
+  const short = (v) => { const a = Math.abs(v); if (a >= 1e9) return (a / 1e9).toFixed(a >= 1e10 ? 1 : 2).replace(/\.?0+$/, '') + 'B'; if (a >= 1e6) return (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M'; if (a >= 1e3) return Math.round(a / 1e3) + 'K'; return String(Math.round(a)); };
+  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; };
+  const fMon = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const ymd = (tz) => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch { return new Date().toISOString().slice(0, 10); } };
+  const asDate = (s) => new Date(s + 'T00:00:00Z');
+  const days = (a, b) => Math.round((asDate(b) - asDate(a)) / 86400000) + 1;
+  const status = (s) => { const today = ymd(s.tz); return today < s.start ? 'soon' : today > s.end ? 'past' : 'live'; };
+  const calIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/></svg>';
 
-  /* ---------- data plumbing ---------- */
-  function persist() {
-    if (!store.set(LS_STATE, JSON.stringify(state))) {
-      const slim = { ...state, feed: state.feed.slice(-1500) };
-      store.set(LS_STATE, JSON.stringify(slim));
-    }
-  }
-  async function loadGitHub() {
-    if (!STATE_URL) return;
-    try {
-      const r = await fetch(STATE_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const s = await r.json();
-      ghAt = s.updatedAt || 0;
-      // The GitHub poller watches around the clock, so its record is the complete one: take every new save,
-      // even when this page polled more recently (it may have been closed or in the background meanwhile).
-      // The page's own polling then continues from it.
-      if (s && s.v === 1 && (s.updatedAt || 0) > ghAdopted) {
-        T.repair(s);
-        freshSince = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
-        state = s; ghAdopted = s.updatedAt; persist(); render();
-      }
-    } catch (e) { console.warn('GitHub history unavailable', e); }
-  }
-  async function poll() {
-    if (polling) return;
-    polling = true; setStatus();
-    const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
-    try {
-      const s = await T.pollOnce(state, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 60, finalEvery: 300, concurrency: 4 });
-      lastErr = s.errors.length && !s.events ? s.errors[0] : null;
-      // If the site refuses requests, wait longer (2 min, doubling to 10 min) until it accepts them again
-      backoff = s.throttled ? Math.min(600, Math.max(120, backoff * 2, s.retryAfter || 0)) : 0;
-      if (s.throttled) lastErr = 'site is limiting requests, slowing down';
-      freshSince = before;
-      persist();
-    } catch (e) { lastErr = String(e.message || e); }
-    polling = false;
-    render();
-    schedule();
-  }
-  function schedule() {
-    clearTimeout(timer);
-    const iv = Number(prefs.interval);
-    if (!iv) { nextAt = 0; setStatus(); return; }
-    const wait = Math.max(iv, backoff);
-    nextAt = Date.now() + wait * 1000;
-    timer = setTimeout(poll, wait * 1000);
-    setStatus();
-  }
-  function setStatus() {
-    const dot = $('#dot'), txt = $('#status-text');
-    const iv = Number(prefs.interval);
-    dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
-    const parts = [];
-    if (polling) parts.push('Updating…');
-    else if (lastErr) parts.push(lastErr);
-    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + fTime.format(new Date(state.updatedAt * 1000)) + ' Taipei');
-    if (iv && nextAt && !polling) parts.push('next ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
-    parts.push(STATE_URL ? (ghAt ? 'history ' + ago(ghAt) : 'loading history') : 'no history (?repo=owner/name)');
-    txt.textContent = parts.join(' · ');
-  }
-  setInterval(setStatus, 1000);
-
-  /* ---------- shared bits ---------- */
-  function resultIndex() {
-    const m = new Map();
-    for (const [n0, r] of Object.entries(state.results || {})) for (const [pos, n, , prize] of r.rows) m.set(n0 + '|' + n, { pos, prize });
-    return m;
-  }
-  const regionName = (() => { try { const d = new Intl.DisplayNames(['en'], { type: 'region' }); return (cc) => { try { return d.of(cc) || cc; } catch { return cc; } }; } catch { return (cc) => cc; } })();
-  // Country menus: flag, name and player count, most common first; rebuilt only when the list changes
-  function fillCountries(sel, ccs) {
-    const counts = new Map();
-    for (const cc of ccs) if (cc && /^[A-Z]{2}$/.test(cc)) counts.set(cc, (counts.get(cc) || 0) + 1);
-    if (prefs.country && !counts.has(prefs.country)) counts.set(prefs.country, 0);
-    const list = [...counts].sort((a, b) => b[1] - a[1] || regionName(a[0]).localeCompare(regionName(b[0])));
-    const sig = list.map(([c, n]) => c + n).join(',');
-    if (sel.dataset.sig !== sig) {
-      sel.replaceChildren(new Option('All countries', ''), ...list.map(([cc, n]) => new Option(`${flag(cc)} ${regionName(cc)} (${n})`, cc)));
-      sel.dataset.sig = sig;
-    }
-    sel.value = prefs.country || '';
-  }
-  // Small label/value tile
-  const tile = (parent, k, v, sub, cls) => {
-    const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
-    if (sub) d.appendChild(el('div', 's', sub)); parent.appendChild(d); return d;
-  };
-  // Entries split into players seen / re-entries / waiting for a seat / missed, as a bar plus the numbers.
-  // A later day (Final Day) shows players carried over from the flights instead.
-  function entriesMix(e) {
-    const box = el('div', 'mix');
-    if (e.entries == null) return box;
-    const p = e.unique || 0, r = e.reentriesSeen || 0, w = e.waiting || 0, c = e.carried || 0, m = e.untracked;
-    const parts = e.laterDay
-      ? [['c', c, 'carried over'], ['p', p, 'new'], ['r', r, r === 1 ? 're-entry' : 're-entries']]
-      : [['p', p, p === 1 ? 'player' : 'players'], ['r', r, r === 1 ? 're-entry' : 're-entries'], ['w', w, 'waiting for a seat']];
-    const field = parts.reduce((a, x) => a + x[1], 0);
-    // A later day's entry count covers every flight, so its bar is scaled to today's field instead
-    const total = (e.laterDay && m == null ? field : Math.max(e.entries, field)) || 1;
-    const bar = el('div', 'mix-bar'); bar.setAttribute('role', 'img');
-    bar.setAttribute('aria-label', `${e.entries} entries: ` + parts.map((x) => `${x[1]} ${x[2]}`).join(', ') + `, ${m == null ? 'unknown' : m} missed`);
-    for (const [cls, n] of parts) if (n > 0) { const i = el('i', cls); i.style.width = (n / total * 100) + '%'; bar.appendChild(i); }
-    if (m) { const i = el('i', 'm'); i.style.width = (m / total * 100) + '%'; bar.appendChild(i); }
-    box.appendChild(bar);
-    const lg = el('div', 'mix-legend');
-    const item = (sw, n, label) => { const s = el('span'); s.appendChild(el('span', 'sw ' + sw)); s.appendChild(el('b', '', n)); s.append(' ' + label); lg.appendChild(s); };
-    for (const [cls, n, label] of parts) if (n > 0 || cls === 'p' || cls === 'r') item(cls, nf.format(n), label);
-    if (e.over) item('o', '+' + nf.format(e.over), 'over (cancelled)');
-    else if (!(e.laterDay && m == null)) item('m', m == null ? '?' : nf.format(m), 'missed');
-    box.appendChild(lg);
-    return box;
+  function art(s) {
+    const a = el('div', 'art ' + s.art);
+    if (s.art === 'apt') a.insertAdjacentHTML('beforeend', '<svg class="skyline" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true"><path fill="#0b0d16" d="M0 120V70h18v-22h14v30h12V40h16v38h10V58h20v62h8V30l8-8 8 8v90h10V64h14V20h6V6l3-6 3 6v14h6v100h10V52h18v68h12V36h20v84h10V62h16v58h14V44h12v76h18V58h22v62h20V74h12v46z"/></svg>');
+    if (s.art === 'glpc') a.appendChild(el('div', 'rays'));
+    if (s.art === 'triton') a.appendChild(el('div', 'lines'));
+    a.appendChild(el('div', 'watermark', s.watermark));
+    const m = el('div', 'mark'); m.appendChild(el('b', '', s.mark)); m.appendChild(el('i', '', s.sub)); a.appendChild(m);
+    return a;
   }
 
-  /* ---------- bust feed ---------- */
-  function renderFeed() {
-    const ul = $('#feed');
-    { const seen = new Set(), ccs = []; for (const f of state.feed) if (!seen.has(f.n)) { seen.add(f.n); ccs.push(f.cc); } fillCountries($('#feed-country'), ccs); }
-    const q = $('#feed-q').value.trim().toLowerCase();
-    const res = resultIndex();
-    const items = [];
-    for (let i = state.feed.length - 1; i >= 0 && items.length < feedLimit + 1; i--) {
-      const f = state.feed[i];
-      if (!prefs.kinds[f.k]) continue;
-      if (eventFilter && String(f.num) !== eventFilter) continue;
-      if (q && !f.n.toLowerCase().includes(q)) continue;
-      if (prefs.country && f.cc !== prefs.country) continue;
-      items.push(f);
+  function banner(s, meta) {
+    const st = status(s);
+    const card = el('a', 'banner'); card.href = s.path;
+    card.setAttribute('aria-label', `${s.title}, ${fMon.format(asDate(s.start))} to ${fMon.format(asDate(s.end))}`);
+    card.appendChild(art(s));
+    const running = meta && meta.running;
+    const b = el('span', 'badge ' + (st === 'live' ? '' : st === 'soon' ? 'soon' : 'done'));
+    b.appendChild(el('span', 'dot'));
+    b.append(st === 'past' ? 'Finished' : st === 'soon' ? 'Coming up' : running ? `Live · ${running} running` : 'Live');
+    card.appendChild(b);
+    card.appendChild(el('span', 'go', 'Open tracker →'));
+    const info = el('div', 'info');
+    info.appendChild(el('h3', 'title', s.title));
+    info.appendChild(el('div', 'dates', `${fMon.format(asDate(s.start))} to ${fMon.format(asDate(s.end))}`));
+    const chips = el('div', 'chips');
+    const c = el('span', 'chip'); c.innerHTML = calIcon; c.appendChild(el('b', '', String(days(s.start, s.end)))); c.appendChild(el('small', '', 'days')); chips.appendChild(c);
+    info.appendChild(chips);
+    if (meta) {
+      const stats = el('div', 'stats');
+      const add = (v, label, cls) => { const sp = el('span'); sp.appendChild(el('b', cls || '', v)); sp.append(' ' + label); stats.appendChild(sp); };
+      if (meta.finished) add(nf.format(meta.finished), meta.finished === 1 ? 'event finished' : 'events finished');
+      if (meta.players) add(nf.format(meta.players), 'players');
+      if (meta.bullets) add(nf.format(meta.bullets), 'bullets');
+      if (meta.paid) add(`${s.currency} ${short(meta.paid)}`, 'paid out', 'gold');
+      if (meta.updatedAt && st === 'live') { const sp = el('span'); sp.append('updated '); sp.appendChild(el('b', '', ago(meta.updatedAt))); stats.appendChild(sp); }
+      if (stats.childNodes.length) info.appendChild(stats);
     }
-    const more = items.length > feedLimit; if (more) items.pop();
-    ul.replaceChildren();
-    if (!items.length) ul.appendChild(el('li', 'empty', state.feed.length ? 'Nothing matches these filters.' : 'Waiting for the first busts.'));
-    let lastDay = '';
-    for (const f of items) {
-      const d = dayKey(f.t);
-      if (d !== lastDay) { ul.appendChild(el('li', 'day', d)); lastDay = d; }
-      const li = el('li', f.t > freshSince && freshSince ? 'fresh' : '');
-      li.appendChild(el('span', 't', fTime.format(new Date(f.t * 1000))));
-      const who = el('div', 'who');
-      const nm = el('div', 'nm', withFlag(f.cc, f.n));
-      nm.tabIndex = 0; nm.setAttribute('role', 'button');
-      nm.addEventListener('click', () => openSheet(f.n));
-      nm.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') openSheet(f.n); });
-      who.appendChild(nm);
-      who.appendChild(el('div', 'ev', evShort(state.events[f.kid])));
-      li.appendChild(who);
-      const r = f.k === 'bust' ? res.get(f.num + '|' + f.n) : null;
-      const [cls, label] = r ? ['cash', `${ord(r.pos)} · ${short(r.prize)}`]
-        : f.k === 'bust' ? ['bust', f.b > 1 ? `Busted · B${f.b}` : 'Busted']
-        : f.k === 'reentry' ? ['reentry', `Bullet ${f.b}`] : ['entry', 'New'];
-      li.appendChild(el('span', 'badge ' + cls, label));
-      ul.appendChild(li);
-    }
-    $('#feed-more').hidden = !more;
-    const busts = state.feed.filter((f) => f.k === 'bust').length;
-    $('#feed-count').textContent = plural(busts, 'bust', 'busts');
-    $('#n-feed').textContent = busts ? nf.format(busts) : '';
+    card.appendChild(info);
+    return card;
   }
 
-  /* ---------- events ---------- */
-  function renderEvents() {
-    const now = Math.floor(Date.now() / 1000);
-    const evs = T.liveEvents(state, now);
-    const box = $('#events');
-    box.replaceChildren();
-    $('#n-events').textContent = evs.filter((e) => e.phase !== 'Completed').length || '';
-    const sel = $('#feed-event'); const cur = sel.value;
-    const nums = [...new Map(evs.map((e) => [e.num, e])).values()];
-    sel.replaceChildren(new Option('All events', ''), ...nums.map((e) => new Option(`#${e.num} ${baseOf(e.name)}`.slice(0, 40), String(e.num))));
-    sel.value = nums.some((e) => String(e.num) === cur) ? cur : '';
-    if (!evs.length) { box.appendChild(el('div', 'empty', 'No event is running right now.')); return; }
-    for (const e of evs) {
-      const c = el('button', 'card'); c.type = 'button';
-      const top = el('div', 'card-top');
-      let when;
-      if (e.phase === 'Completed') when = 'Finished';
-      else if (e.regClose && e.regClose > now) when = `Reg closes ${fTime.format(new Date(e.regClose * 1000))} · ${dur(e.regClose - now)}`;
-      else when = 'Reg closed';
-      if (!e.trackedFromStart && e.firstPoll) when += ` · watched since ${fTime.format(new Date(e.firstPoll * 1000))}`;
-      top.appendChild(el('span', 'when', when));
-      top.appendChild(el('span', 'phase' + (e.phase === 'In The Money' || e.phase === 'Final Table' ? ' itm' : e.phase === 'Completed' ? ' done' : ''), e.phase));
-      c.appendChild(top);
-      const h = el('h3'); h.appendChild(el('span', 'num-tag', '#' + e.num)); h.append(baseOf(e.name));
-      if (partOf(e.name)) h.appendChild(el('span', 'part', partOf(e.name)));
-      c.appendChild(h);
-      const st = el('div', 'stats4');
-      tile(st, 'Buy-in', short(e.buyin)); tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Busts', num(e.busts));
-      c.appendChild(st);
-      c.appendChild(entriesMix(e));
-      c.addEventListener('click', () => showEvent(e.kid));
-      box.appendChild(c);
-    }
-  }
-
-  function renderSoon() {
-    const ul = $('#soon'); ul.replaceChildren();
-    const list = T.upcoming(state, Math.floor(Date.now() / 1000), 12);
-    if (!list.length) { ul.appendChild(el('li', 'empty', 'Nothing else starts in the next 12 hours.')); return; }
-    for (const e of list.slice(0, 15)) {
-      const li = el('li');
-      li.appendChild(el('span', 'when', fTime.format(new Date(e.start * 1000))));
-      const mid = el('div');
-      const nm = el('div', 'nm'); nm.appendChild(el('span', 'num-tag', '#' + e.num)); nm.append(baseOf(e.name));
-      if (partOf(e.name)) nm.appendChild(el('span', 'part', partOf(e.name)));
-      mid.appendChild(nm); li.appendChild(mid);
-      const right = el('div', 'right'); right.appendChild(el('b', '', short(e.buyin))); right.append('buy-in');
-      li.appendChild(right);
-      ul.appendChild(li);
-    }
-  }
-
-  let doneLimit = 15;
-  function renderDone() {
-    const ul = $('#done'); ul.replaceChildren();
-    const list = T.completedEvents(state);
-    $('#done-count').textContent = list.length ? plural(list.length, 'event', 'events') : '';
-    if (!list.length) { ul.appendChild(el('li', 'empty', 'No event has finished yet.')); $('#done-more').hidden = true; return; }
-    for (const e of list.slice(0, doneLimit)) {
-      const li = el('li'); li.tabIndex = 0; li.setAttribute('role', 'button');
-      li.appendChild(el('span', 'when', e.finished ? fDate.format(new Date(e.finished * 1000)) : ''));
-      const mid = el('div');
-      const nm = el('div', 'nm'); nm.appendChild(el('span', 'num-tag', '#' + e.num)); nm.append(baseOf(e.name));
-      if (e.part) nm.appendChild(el('span', 'part', e.part));
-      mid.appendChild(nm);
-      const sub = el('div', 'sub');
-      if (e.kind === 'flight') {
-        sub.appendChild(el('b', 'bag', `${nf.format(e.bagged)} bagged`));
-        if (e.next) sub.append(` → ${e.next.part}${e.next.start ? ' ' + fFull.format(new Date(e.next.start * 1000)) : ''}`);
-      } else if (e.winner) { sub.append('🏆 '); sub.appendChild(el('b', '', withFlag(e.winner.cc, e.winner.name))); sub.append(` · ${short(e.winner.prize)}`); }
-      else sub.textContent = e.final ? '' : 'Payouts being posted';
-      mid.appendChild(sub);
-      li.appendChild(mid);
-      const right = el('div', 'right'); right.appendChild(el('b', '', nf.format(e.entries))); right.append('entries · ' + short(e.buyin));
-      li.appendChild(right);
-      const open = () => showEvent(e.kid);
-      li.addEventListener('click', open);
-      li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') open(); });
-      ul.appendChild(li);
-    }
-    $('#done-more').hidden = list.length <= doneLimit;
-  }
-
-  /* ---------- event panel ---------- */
-  function showEvent(kid) {
-    const ev = state.events[kid];
-    if (ev && ev.phase === 'Completed') {
-      const r = state.results[ev.num];
-      const allDone = Object.values(state.events).filter((x) => x.num === ev.num).every((x) => x.phase === 'Completed');
-      eventSeg = allDone && r && r.rows.length ? 'cashed' : 'bagged';
-    } else if (eventSeg === 'cashed' || eventSeg === 'bagged') eventSeg = 'seated';
-    openEvent = kid; openPlayer = null; backToEvent = null;
-    $('#sheet-q').value = '';
-    renderEventSheet();
-    $('#sheet').hidden = false; $('#sheet-bg').hidden = false; $('#sheet').scrollTop = 0;
-    $('#sheet-close').focus();
-  }
-
-  function renderEventSheet() {
-    const e = state.events[openEvent]; if (!e) return closeSheet();
-    const now = Math.floor(Date.now() / 1000);
-    const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
-    $('#sheet-back').hidden = true;
-    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true;
-    $('#sheet-name').textContent = '#' + e.num + ' ' + String(e.name).replace(/^\[Event \d+\]\s*/, '');
-    $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.regClose ? (e.regClose > now ? 'reg closes ' + fTime.format(new Date(e.regClose * 1000)) : 'reg closed') : '',
-      e.firstPoll ? (info.trackedFromStart ? 'watched from the start' : 'watched since ' + fTime.format(new Date(e.firstPoll * 1000))) : ''].filter(Boolean).join(' · ');
-    const st = $('#sheet-stats'); st.replaceChildren();
-    const psAll = T.eventPlayers(state, e.kid);
-    fillCountries($('#sheet-country'), psAll.map((p) => p.cc));
-    // The country filter narrows the lists and their counts; the totals above stay for the whole field
-    const ps = prefs.country ? psAll.filter((p) => p.cc === prefs.country) : psAll;
-    tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Seated', num(psAll.filter((p) => p.status === 'seated').length));
-    tile(st, 'Busts', num(psAll.reduce((a, p) => a + p.busts.length, 0))); tile(st, 'Re-entries', num(info.reentriesSeen || 0)); tile(st, 'Missed', num(info.untracked), '', info.untracked ? 'gold' : '');
-    const hint = $('#sheet-hint'); hint.replaceChildren();
-    if (info.entries != null) hint.appendChild(entriesMix(info));
-    const groups = {
-      seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),
-      busted: ps.filter((p) => p.status === 'busted').sort((a, b) => (b.lastBust || 0) - (a.lastBust || 0)),
-      reentered: ps.filter((p) => p.bullets > 1).sort((a, b) => b.bullets - a.bullets || (b.lastBust || 0) - (a.lastBust || 0)),
-      bagged: ps.filter((p) => p.status === 'end').sort((a, b) => a.name.localeCompare(b.name)),
-      cashed: ps.filter((p) => p.pos != null).sort((a, b) => a.pos - b.pos),
-      all: ps.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    };
-    document.querySelectorAll('#sheet-seg button').forEach((b) => {
-      const n = groups[b.dataset.seg].length;
-      b.setAttribute('aria-pressed', String(b.dataset.seg === eventSeg));
-      b.querySelector('.n').textContent = nf.format(n);
-      b.hidden = !n && b.dataset.seg !== eventSeg && b.dataset.seg !== 'all';
-    });
-    const q = $('#sheet-q').value.trim().toLowerCase();
-    let rows = groups[eventSeg] || [];
-    if (q) rows = rows.filter((p) => p.name.toLowerCase().includes(q));
-    const ul = $('#sheet-list'); ul.replaceChildren();
-    if (!rows.length) ul.appendChild(el('li', 'empty', q || prefs.country ? 'No player matches.' : 'Nobody here yet.'));
-    for (const p of rows.slice(0, 600)) {
-      const li = el('li'); const b = el('button', 'row'); b.type = 'button';
-      const left = el('div');
-      left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
-      const meta = el('div', 'meta');
-      if (p.status === 'seated') meta.appendChild(el('span', '', p.table ? `Table ${p.table} · Seat ${p.seat}` : 'Waiting for a seat'));
-      if (p.lastBust) meta.appendChild(el('span', '', (p.status === 'seated' ? 'last bust ' : 'out ') + fTime.format(new Date(p.lastBust * 1000))));
-      if (p.bullets > 1) meta.appendChild(el('span', '', `bullet ${p.bullets}`));
-      if (p.status === 'cashed') meta.appendChild(el('span', '', 'paid before tracking'));
-      left.appendChild(meta);
-      const right = el('div', 'num');
-      if (p.pos != null) { right.appendChild(el('div', 'big', ord(p.pos))); right.appendChild(el('div', 'small', short(p.prize))); }
-      else right.appendChild(el('span', 'badge ' + (p.status === 'seated' ? 'seat' : p.status === 'end' ? 'end' : 'bust'),
-        p.status === 'seated' ? (p.bullets > 1 ? 'Re-entered' : 'Seated') : p.status === 'end' ? 'Bagged' : 'Busted'));
-      b.append(left, right);
-      b.addEventListener('click', () => { const ev = openEvent; openSheet(p.name); backToEvent = ev; $('#sheet-back').hidden = false; });
-      li.appendChild(b); ul.appendChild(li);
-    }
-  }
-
-  /* ---------- players ---------- */
-  // Totals for exactly the players listed (after country, search and sort filters), in three groups
-  function renderSummary(rows, q) {
-    const sum = (f) => rows.reduce((a, p) => a + (f(p) || 0), 0);
-    const n = rows.length;
-    const bullets = sum((p) => p.bullets), entered = sum((p) => p.events);
-    const buyins = sum((p) => p.buyins), prizes = sum((p) => p.prizes), net = prizes - buyins;
-    const itmPlayers = rows.filter((p) => p.cashes > 0).length, cashes = sum((p) => p.cashes), cashedEvents = sum((p) => p.cashedEvents);
-    const winners = rows.filter((p) => p.net > 0).length, losers = rows.filter((p) => p.net < 0).length, wins = sum((p) => p.wins);
-    const partial = rows.some((p) => p.partial);
-    const pct = (a, b) => (b ? (a / b * 100).toFixed(1) + '%' : '—');
-    const groups = [
-      ['Field', [['Players', nf.format(n), ''], ['Bullets', nf.format(bullets), n ? (bullets / n).toFixed(2) + ' each' : ''], ['Re-entries', nf.format(Math.max(0, bullets - entered)), pct(bullets - entered, entered)]]],
-      ['Money', [['Buy-in', (partial ? '≥' : '') + short(buyins), n ? short(buyins / n) + ' each' : ''], ['Prizes', short(prizes), cashes ? short(prizes / cashes) + ' per cash' : '', 'gold'],
-        ['Net', signed(net), buyins ? 'ROI ' + pct(net, buyins) : '', net > 0 ? 'pos' : net < 0 ? 'neg' : '']]],
-      ['Results', [['Cashes', nf.format(cashes), wins ? plural(wins, 'win', 'wins') : ''], ['Players ITM', pct(itmPlayers, n), nf.format(itmPlayers) + ' players'],
-        ['ITM per event', pct(cashedEvents, entered), `${nf.format(cashedEvents)}/${nf.format(entered)}`], ['ITM per bullet', pct(cashedEvents, bullets), `${nf.format(cashedEvents)}/${nf.format(bullets)}`],
-        ['Winning', pct(winners, n), nf.format(winners) + ' players', 'pos'], ['Losing', pct(losers, n), nf.format(losers) + ' players', 'neg']]],
-    ];
-    const box = $('#players-summary'); box.replaceChildren();
-    for (const [title, tiles] of groups) {
-      const g = el('div', 'sum-group'); g.appendChild(el('h3', '', title));
-      const grid = el('div', 'sum-grid');
-      for (const [k, v, sub, cls] of tiles) tile(grid, k, v, sub, cls);
-      g.appendChild(grid); box.appendChild(g);
-    }
-    const scope = [prefs.finished ? 'Finished events' : '', prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : '', q ? `“${q}”` : '',
-      prefs.sort === 'seated' ? 'seated now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
-    const h = $('#summary-h');
-    h.className = 'note' + (prefs.fromStart ? '' : ' warn');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events watched from their start' : '⚠ Includes events played before tracking (only cashers known): ITM and net look better than reality');
-  }
-
-  function renderPlayers() {
-    const all = T.players(state, { fromStart: !!prefs.fromStart, finished: !!prefs.finished });
-    $('#n-players').textContent = all.length ? nf.format(all.length) : '';
-    const q = $('#players-q').value.trim().toLowerCase();
-    fillCountries($('#players-country'), all.map((p) => p.cc));
-    let rows = q ? all.filter((p) => p.name.toLowerCase().includes(q)) : all;
-    if (prefs.country) rows = rows.filter((p) => p.cc === prefs.country);
-    const k = prefs.sort;
-    const dir = prefs.sortDir === 'asc' ? 1 : -1; // -1 = high to low (A to Z for names)
-    const val = (p) => k === 'seated' ? (p.seatedIn.length ? 1 : 0) : k === 'lastBust' ? (p.lastBust || 0) : p[k];
-    rows = rows.slice().sort(k === 'name'
-      ? (a, b) => a.name.localeCompare(b.name) * -dir
-      : (a, b) => ((val(a) - val(b)) * dir) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));
-    if (k === 'seated') rows = rows.filter((p) => p.seatedIn.length);
-    if (k === 'lastBust') rows = rows.filter((p) => p.lastBust);
-    $('#players-count').textContent = plural(rows.length, 'player', 'players');
-    renderSummary(rows, q);
-    const ul = $('#players'); ul.replaceChildren();
-    if (!rows.length) ul.appendChild(el('li', 'empty', all.length ? 'No players match.' : 'Loading players…'));
-    for (const p of rows.slice(0, playersLimit)) {
-      const li = el('li'); const b = el('button', 'row'); b.type = 'button';
-      const left = el('div');
-      left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
-      const meta = el('div', 'meta');
-      meta.appendChild(el('span', '', `${plural(p.bullets, 'bullet', 'bullets')} · ${plural(p.events, 'event', 'events')}`));
-      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${Math.round(p.itm * 100)}% ITM` : 'no cash'));
-      if (p.seatedIn.length) meta.appendChild(el('span', 'tag seat', 'Seated #' + p.seatedIn.join(', #')));
-      else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + fTime.format(new Date(p.lastBust * 1000))));
-      left.appendChild(meta);
-      const right = el('div', 'num');
-      right.appendChild(el('div', 'big', p.prizes ? short(p.prizes) : '—'));
-      right.appendChild(el('div', 'small ' + (p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : ''), signed(p.net)));
-      right.appendChild(el('div', 'small', 'in ' + (p.partial ? '≥' : '') + short(p.buyins)));
-      b.append(left, right);
-      b.addEventListener('click', () => openSheet(p.name));
-      li.appendChild(b); ul.appendChild(li);
-    }
-    $('#players-more').hidden = rows.length <= playersLimit;
-  }
-
-  /* ---------- player panel ---------- */
-  function whenText(it) {
-    if (!it.t) return '';
-    const d = new Date((it.before ? it.t + 1 : it.t) * 1000);
-    if (it.approx) return fDay.format(d);
-    if (it.before) return fDay.format(d) + ', before ' + fTime.format(d) + ' (before tracking)';
-    return fFull.format(d);
-  }
-  function describe(it) {
-    const ev = '#' + it.num + ' ' + baseOf(it.ev || '') + (partOf(it.ev) ? ' · ' + partOf(it.ev) : '');
-    switch (it.k) {
-      case 'bust': return `Busted · ${ev}`;
-      case 'reentry': return `Re-entered (bullet ${it.b}) · ${ev}`;
-      case 'cash': return `${ord(it.pos)} place · ${ev}`;
-      case 'end': return `In at the end · ${ev}`;
-      case 'carry': return `Carried over · ${ev}`;
-      case 'buyin': return `Bought in (not watched) · ${ev}`;
-      default: return it.first ? `Seated when tracking began · ${ev}` : `Entered · ${ev}`;
-    }
-  }
-
-  // Monotone cubic interpolation (same idea as d3.curveMonotoneX) as an SVG path
-  function smoothPath(p) {
-    if (p.length < 2) return '';
-    const n = p.length, d = [], m = new Array(n);
-    for (let i = 0; i < n - 1; i++) d.push((p[i + 1][1] - p[i][1]) / ((p[i + 1][0] - p[i][0]) || 1));
-    m[0] = d[0]; m[n - 1] = d[n - 2];
-    for (let i = 1; i < n - 1; i++) {
-      if (d[i - 1] * d[i] <= 0) { m[i] = 0; continue; }
-      const h0 = p[i][0] - p[i - 1][0], h1 = p[i + 1][0] - p[i][0];
-      const s = (d[i - 1] * h1 + d[i] * h0) / (h0 + h1);
-      m[i] = (Math.sign(d[i - 1]) + Math.sign(d[i])) * Math.min(Math.abs(d[i - 1]), Math.abs(d[i]), 0.5 * Math.abs(s));
-    }
-    let out = `M${p[0][0]},${p[0][1]}`;
-    for (let i = 0; i < n - 1; i++) {
-      const h = (p[i + 1][0] - p[i][0]) / 3;
-      out += `C${p[i][0] + h},${p[i][1] + m[i] * h} ${p[i + 1][0] - h},${p[i + 1][1] - m[i + 1] * h} ${p[i + 1][0]},${p[i + 1][1]}`;
-    }
-    return out;
-  }
-
-  // Smooth chart of the running bankroll: one point per buy-in or cash, in time order
-  function drawBankroll(box, items) {
-    box.replaceChildren();
-    const pts = [{ i: 0, bank: 0, it: null }];
-    items.filter((it) => it.amt).forEach((it, k) => pts.push({ i: k + 1, bank: it.bank, it }));
-    if (pts.length < 2) return;
-    const NS = 'http://www.w3.org/2000/svg';
-    const W = Math.max(260, box.clientWidth || 360), H = 170;
-    const lo = Math.min(0, ...pts.map((p) => p.bank)), hi = Math.max(0, ...pts.map((p) => p.bank));
-    const span = hi - lo || 1;
-    const mag = Math.pow(10, Math.floor(Math.log10(span / 3)));
-    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => span / x <= 4) || mag * 10;
-    const y0 = Math.floor(lo / step) * step, y1 = Math.ceil(hi / step) * step;
-    const ticks = []; for (let v = y0; v <= y1 + step / 2; v += step) ticks.push(v);
-    const labW = Math.max(...ticks.map((v) => short(v).length)) * 6.6 + 8;
-    const m = { l: labW, r: 52, t: 10, b: 22 };
-    const n = pts.length - 1;
-    const x = (i) => m.l + (W - m.l - m.r) * (i / n);
-    const y = (v) => m.t + (H - m.t - m.b) * (1 - (v - y0) / (y1 - y0 || 1));
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svg.setAttribute('role', 'img');
-    const last = pts[pts.length - 1].bank;
-    svg.setAttribute('aria-label', `Bankroll over ${n} buy-ins and cashes, now ${last >= 0 ? 'up' : 'down'} ${money(Math.abs(last))}`);
-    const add = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
-    for (const v of ticks) {
-      add('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 0 ? 'zero' : 'grid' });
-      add('text', { x: m.l - 6, y: y(v) + 3.5, 'text-anchor': 'end', class: 'lbl' }, short(v));
-    }
-    let prevDay = '', lastLabelX = -99;
-    pts.slice(1).forEach((p) => {
-      const d = p.it.t ? fDate.format(new Date(p.it.t * 1000)) : '';
-      if (d && d !== prevDay) {
-        const xx = x(p.i - 1) + (x(p.i) - x(p.i - 1)) / 2;
-        if (prevDay) add('line', { x1: xx, x2: xx, y1: m.t, y2: H - m.b, class: 'day' });
-        const w = d.length * 6.2;
-        const left = Math.min(Math.max(m.l, xx - w / 2), W - m.r - w);
-        if (left > lastLabelX + 8) { add('text', { x: left, y: H - 6, class: 'lbl', 'text-anchor': 'start' }, d); lastLabelX = left + w; }
-        prevDay = d;
-      }
-    });
-    const xy = pts.map((p) => [x(p.i), y(p.bank)]);
-    const dPath = smoothPath(xy);
-    const z = y(0);
-    const uid = 'bk' + Math.random().toString(36).slice(2, 8);
-    const defs = add('defs', {});
-    const grad = (id, color, from, to) => {
-      const g = document.createElementNS(NS, 'linearGradient');
-      g.setAttribute('id', id); g.setAttribute('gradientUnits', 'userSpaceOnUse');
-      g.setAttribute('x1', 0); g.setAttribute('x2', 0); g.setAttribute('y1', from); g.setAttribute('y2', to);
-      [[0, 0.35], [1, 0.02]].forEach(([o, a]) => { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', color); st.setAttribute('stop-opacity', a); g.appendChild(st); });
-      defs.appendChild(g);
-    };
-    const clip = (id, y0c, h) => {
-      const c = document.createElementNS(NS, 'clipPath'); c.setAttribute('id', id);
-      const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', 0); r.setAttribute('width', W); r.setAttribute('y', y0c); r.setAttribute('height', Math.max(0, h));
-      c.appendChild(r); defs.appendChild(c);
-    };
-    grad(uid + 'gu', '#2dd4bf', m.t, z); grad(uid + 'gd', '#f43f5e', H - m.b, z);
-    clip(uid + 'cu', 0, z); clip(uid + 'cd', z, H - z);
-    const area = dPath + `L${xy[xy.length - 1][0]},${z}L${xy[0][0]},${z}Z`;
-    add('path', { d: area, fill: `url(#${uid}gu)`, 'clip-path': `url(#${uid}cu)` });
-    add('path', { d: area, fill: `url(#${uid}gd)`, 'clip-path': `url(#${uid}cd)` });
-    add('path', { d: dPath, class: 'ln up', 'clip-path': `url(#${uid}cu)` });
-    add('path', { d: dPath, class: 'ln down', 'clip-path': `url(#${uid}cd)` });
-    for (const p of pts.slice(1)) add('circle', { cx: x(p.i), cy: y(p.bank), r: p.it.amt > 0 ? 4 : 2.75, class: p.it.amt > 0 ? 'pt-out' : 'pt-in' });
-    const endTxt = add('text', { x: x(n) + 6, y: y(last) + 4, class: 'end' }, (last > 0 ? '+' : last < 0 ? '−' : '') + short(Math.abs(last)));
-    endTxt.style.fill = last > 0 ? 'var(--teal2)' : last < 0 ? 'var(--rose)' : 'var(--fg)';
-    const hl = add('circle', { r: 6, fill: 'none', stroke: 'var(--fg)', 'stroke-width': 1.5, opacity: 0 });
-    box.appendChild(svg);
-    const tip = el('div', 'tip'); tip.hidden = true; box.appendChild(tip);
-    const show = (ev) => {
-      const r = svg.getBoundingClientRect(), k = W / r.width;
-      const mx = (ev.clientX - r.left) * k;
-      const i = Math.max(1, Math.min(n, Math.round((mx - m.l) / ((W - m.l - m.r) / n))));
-      const p = pts[i];
-      hl.setAttribute('cx', x(p.i)); hl.setAttribute('cy', y(p.bank)); hl.setAttribute('opacity', 1);
-      tip.replaceChildren(el('div', 'm', whenText(p.it)), el('div', '', describe(p.it)),
-        el('div', 'm', (p.it.amt < 0 ? '−' : '+') + nf.format(Math.abs(p.it.amt)) + ' → ' + (p.bank > 0 ? '+' : p.bank < 0 ? '−' : '') + nf.format(Math.abs(p.bank))));
-      tip.hidden = false;
-      const px = x(p.i) / k + 6, py = y(p.bank) / k + 10;
-      tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, px - tip.offsetWidth / 2)) + 'px';
-      tip.style.top = Math.max(0, py - tip.offsetHeight - 12) + 'px';
-    };
-    svg.addEventListener('pointermove', show);
-    svg.addEventListener('pointerdown', show);
-    svg.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') { tip.hidden = true; hl.setAttribute('opacity', 0); } });
-  }
-
-  function openSheet(name) {
-    name = T.canon(state, name);
-    openPlayer = name; openEvent = null; backToEvent = null;
-    $('#sheet-event').hidden = true; $('#sheet-tl-wrap').hidden = false; $('#sheet-back').hidden = true;
-    const p = T.players(state).find((x) => x.name === name);
-    $('#sheet-name').textContent = withFlag(p && p.cc, name);
-    $('#sheet-sub').textContent = p ? [p.cc ? regionName(p.cc) : '', p.seatedIn.length ? 'seated now in #' + p.seatedIn.join(', #') : p.lastBust ? 'last bust ' + fFull.format(new Date(p.lastBust * 1000)) : ''].filter(Boolean).join(' · ') : '';
-    const st = $('#sheet-stats'); st.replaceChildren();
-    if (p) {
-      tile(st, 'Buy-in', (p.partial ? '≥' : '') + short(p.buyins)); tile(st, 'Prizes', short(p.prizes), '', 'gold'); tile(st, 'Net', signed(p.net), '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '');
-      tile(st, 'Events', String(p.events)); tile(st, 'Bullets', String(p.bullets)); tile(st, 'ITM', Math.round(p.itm * 100) + '%');
-    }
-    $('#sheet-hint').textContent = p && p.partial ? '≥ Some events were not watched from the start; one bullet is counted there.' : '';
-    const tl = $('#sheet-tl'); tl.replaceChildren();
-    const items = T.playerTimeline(state, name);
-    $('#sheet-chart-wrap').hidden = !items.some((i) => i.amt);
-    if (!items.length) tl.appendChild(el('li', 'empty', 'No tracked activity yet.'));
-    for (const it of items.slice().reverse()) {
-      const li = el('li', it.k);
-      li.appendChild(el('span', 'mk'));
-      const mid = el('div');
-      mid.appendChild(el('div', 'when', whenText(it)));
-      mid.appendChild(el('div', 'what', describe(it)));
-      li.appendChild(mid);
-      const a = el('div', 'amt' + (it.amt < 0 ? ' minus' : it.amt > 0 ? ' plus' : ''));
-      if (it.amt) { a.append((it.amt < 0 ? '−' : '+') + short(Math.abs(it.amt))); a.appendChild(el('small', '', 'bank ' + signed(it.bank))); }
-      li.appendChild(a);
-      tl.appendChild(li);
-    }
-    const wasHidden = $('#sheet').hidden;
-    $('#sheet').hidden = false; $('#sheet-bg').hidden = false;
-    drawBankroll($('#sheet-chart'), items); // measure now that the sheet is visible
-    if (wasHidden) $('#sheet-close').focus();
-  }
-  function closeSheet() { openPlayer = null; openEvent = null; backToEvent = null; $('#sheet').hidden = true; $('#sheet-bg').hidden = true; }
-  $('#sheet-back').addEventListener('click', () => { if (backToEvent) { const k = backToEvent; showEvent(k); } });
-  $('#sheet-feed').addEventListener('click', () => {
-    const e = state.events[openEvent]; if (!e) return;
-    eventFilter = String(e.num); closeSheet(); selectTab('feed'); render();
-  });
-  document.querySelectorAll('#sheet-seg button').forEach((b) => b.addEventListener('click', () => { eventSeg = b.dataset.seg; renderEventSheet(); }));
-  $('#sheet-q').addEventListener('input', () => renderEventSheet());
-  $('#sheet-close').addEventListener('click', closeSheet);
-  $('#sheet-bg').addEventListener('click', closeSheet);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (openPlayer || openEvent)) closeSheet(); });
-
+  const metas = {};
   function render() {
-    renderEvents(); renderFeed();
-    if (!$('#view-players').hidden) renderPlayers(); else $('#n-players').textContent = '';
-    renderSoon(); renderDone();
-    if (openEvent) renderEventSheet();
-    else if (openPlayer) { const back = backToEvent; openSheet(openPlayer); if (back) { backToEvent = back; $('#sheet-back').hidden = false; } }
-    setStatus();
+    const groups = { live: [], soon: [], past: [] };
+    for (const s of SERIES) groups[status(s)].push(s);
+    groups.live.sort((a, b) => (b.start < a.start ? -1 : 1));
+    groups.soon.sort((a, b) => (a.start < b.start ? -1 : 1));
+    groups.past.sort((a, b) => (b.end < a.end ? -1 : 1));
+    const fill = (id, list, empty) => {
+      const box = $('#' + id); box.replaceChildren();
+      if (!list.length && empty) { box.appendChild(el('div', 'empty', empty)); return; }
+      for (const s of list) box.appendChild(banner(s, metas[s.id]));
+    };
+    fill('live', groups.live, 'No series is running right now.');
+    $('#soon-wrap').hidden = !groups.soon.length; fill('soon', groups.soon);
+    fill('past', groups.past, 'Series appear here once they end.');
   }
 
-  /* ---------- controls ---------- */
-  function selectTab(tab) {
-    prefs.tab = tab; savePrefs();
-    document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-    for (const t of ['feed', 'events', 'players']) $('#view-' + t).hidden = t !== tab;
-    if (tab === 'players') renderPlayers();
-    if (window.innerWidth >= 980 && tab === 'events') selectTab('feed');
+  async function load() {
+    if (!REPO) return;
+    await Promise.all(SERIES.map(async (s) => {
+      try {
+        const r = await fetch(`https://raw.githubusercontent.com/${REPO}/${s.branch}/meta.json`, { cache: 'no-cache' });
+        if (r.ok) metas[s.id] = await r.json();
+      } catch {}
+    }));
+    render();
   }
-  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
-  document.querySelectorAll('.chip[data-kind]').forEach((c) => {
-    c.setAttribute('aria-pressed', String(!!prefs.kinds[c.dataset.kind]));
-    c.addEventListener('click', () => { prefs.kinds[c.dataset.kind] = !prefs.kinds[c.dataset.kind]; c.setAttribute('aria-pressed', String(prefs.kinds[c.dataset.kind])); savePrefs(); feedLimit = 150; renderFeed(); });
-  });
-  $('#feed-event').addEventListener('change', (e) => { eventFilter = e.target.value; feedLimit = 150; renderFeed(); });
-  $('#feed-q').addEventListener('input', () => { feedLimit = 150; renderFeed(); });
-  document.querySelectorAll('.country-sel').forEach((sel) => sel.addEventListener('change', (e) => {
-    prefs.country = e.target.value; savePrefs(); feedLimit = 150; playersLimit = 60;
-    renderFeed(); if (!$('#view-players').hidden) renderPlayers(); if (openEvent) renderEventSheet();
-  }));
-  $('#feed-more').addEventListener('click', () => { feedLimit += 150; renderFeed(); });
-  $('#players-q').addEventListener('input', () => { playersLimit = 60; renderPlayers(); });
-  $('#players-sort').value = prefs.sort;
-  const setDirBtn = () => {
-    const asc = prefs.sortDir === 'asc', b = $('#players-dir');
-    b.textContent = prefs.sort === 'name' ? (asc ? 'Z→A' : 'A→Z') : (asc ? '↑ Low' : '↓ High');
-    b.setAttribute('aria-label', prefs.sort === 'name' ? (asc ? 'Sorted Z to A' : 'Sorted A to Z') : (asc ? 'Sorted lowest first' : 'Sorted highest first'));
-  };
-  setDirBtn();
-  $('#players-dir').addEventListener('click', () => { prefs.sortDir = prefs.sortDir === 'asc' ? 'desc' : 'asc'; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
-  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
-  $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
-  $('#players-finished').checked = !!prefs.finished;
-  $('#players-finished').addEventListener('change', (e) => { prefs.finished = e.target.checked; savePrefs(); playersLimit = 60; renderPlayers(); });
-  $('#players-fromstart').checked = !!prefs.fromStart;
-  $('#players-fromstart').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; savePrefs(); playersLimit = 60; renderPlayers(); });
-  $('#done-more').addEventListener('click', () => { doneLimit = 1e9; renderDone(); });
-  $('#interval').value = String(prefs.interval);
-  $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
-  $('#refresh').addEventListener('click', () => { clearTimeout(timer); poll(); });
-  // Back from the background: load the GitHub record first (it kept watching), then poll live
-  document.addEventListener('visibilitychange', async () => {
-    if (document.hidden) return;
-    await loadGitHub();
-    if (Number(prefs.interval) && Date.now() > nextAt) { clearTimeout(timer); poll(); }
-  });
-
-  /* ---------- boot ---------- */
-  selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
   render();
-  (async () => {
-    await loadGitHub();
-    setInterval(loadGitHub, 5 * 60 * 1000);
-    if (Number(prefs.interval)) poll(); else setStatus();
-  })();
+  load();
+  setInterval(load, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 })();
 </script>
 </body>
