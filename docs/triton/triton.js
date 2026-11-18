@@ -447,7 +447,9 @@
   const bulletsKnown = (e) => {
     if (!e.polls || !(e.entries > 0)) return false;
     const seen = Object.values(e.p || {}).reduce((a, p) => a + (p.b || 1), 0);
-    const slack = e.entryCounts ? Math.max(2, Math.round(e.entries * 0.01)) : 0;
+    // Triton's own per-player figures (entry counts, or buy-in records for every player) leave a small gap as bookkeeping
+    const ownFigures = e.entryCounts || Object.values(e.p || {}).every((p) => p.paid > 0);
+    const slack = ownFigures ? Math.max(2, Math.round(e.entries * 0.01)) : 0;
     return seen >= e.entries - slack;
   };
   function watchedFromStart(state, num) { const k = kidsOf(state, num); return k.length > 0 && k.every(bulletsKnown); }
