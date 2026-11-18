@@ -1,0 +1,112 @@
+#!/usr/bin/env node
+// Save every finished APT series as a static file for the past-series pages (apt/?f=<slug>) and the all-series page.
+// Past series don't change, so this runs by hand (again only to add a series that has since ended):
+//   node tools/apt-archive.js [--only <series slug>] [--force]
+//   node tools/apt-archive.js --from-state <state.json> --only <slug>   (a series we watched live: keep its richer record)
+//   node tools/apt-archive.js --repack   (rewrite the saved files in the current compact form, no requests)
+// Writes docs/apt/archive/<slug>.json and docs/apt/archive/index.json.
+//
+// What a finished series still serves: every event's entries, buy-in and times, its payouts, and its registration
+// list (everyone who registered, once each). Re-entries are only known for series we watched live, so elsewhere a
+// player's bullets are a minimum, except in events whose registrations add up to the entries.
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const A = require('../docs/apt/tracker.js');
+const Series = require('../docs/series.js');
+
+const args = process.argv.slice(2);
+const arg = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : null);
+const only = arg('--only'), fromState = arg('--from-state');
+const force = args.includes('--force');
+const repack = args.includes('--repack');
+const DIR = path.join(__dirname, '../docs/apt/archive');
+fs.mkdirSync(DIR, { recursive: true });
+
+const fetchFn = (url) => fetch(url, { headers: { 'User-Agent': 'apt-live-tracker (archive)', Accept: 'application/json' }, signal: AbortSignal.timeout(60000) });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const tzOf = (name) => Series.tzOf(name, 'Asia/Taipei'); // the venue's time zone from the series name
+// "APT Jeju Classic, South Korea 2026" -> place "Jeju Classic", tag "Jeju Classic '26"
+function placeOf(name) {
+  const yr = (name.match(/\b(20\d\d)\b/) || [])[1] || '';
+  let p = name.replace(/^APT\s+/i, '').replace(/\b20\d\d\b/, '').replace(/,.*$/, '').replace(/\s+/g, ' ').trim();
+  if (/^championship$/i.test(p)) p = 'Championship ' + (name.match(/,\s*([^,\d]+)/) || [, ''])[1].trim();
+  return { place: p, tag: `${p} '${yr.slice(2)}`, year: yr };
+}
+
+// A finished series as a small file: what only live polling needs is dropped, and its payouts are final
+function slim(state) {
+  const out = { v: 1, series: state.series, archive: true, updatedAt: state.updatedAt, events: {}, results: {}, feed: [] };
+  for (const e of Object.values(state.events)) {
+    const { seats, regAt, evAt, lastPoll, ...keep } = e;
+    out.events[e.kid] = keep;
+  }
+  for (const [k, r] of Object.entries(state.results || {})) { const { at, ...rest } = r; out.results[k] = { ...rest, final: true }; }
+  return A.pack(out);
+}
+
+async function archive(league) {
+  let state;
+  if (fromState) {
+    state = JSON.parse(fs.readFileSync(fromState, 'utf8'));
+    A.repair(state);
+  } else {
+    A.configure({ series: league.slug });
+    state = A.emptyState();
+    // Round 1 lists the events and reads every registration list and payout table; later rounds retry what failed
+    for (let round = 1; round <= 5; round++) {
+      const s = await A.pollOnce(state, { fetchFn, concurrency: 3, regBatch: 2000, listEvery: 1e9, finalEvery: 1e9 });
+      const pending = Object.values(state.events).filter((e) => !e.regDone && e.phase === 'Completed').length;
+      if (s.errors.length) console.warn(`  round ${round}: ${s.errors.length} errors (${s.errors.slice(0, 2).join(' | ')})`);
+      if (!pending && !s.errors.length) break;
+      await sleep(3000);
+    }
+  }
+  const packed = slim(state);
+  const file = path.join(DIR, league.slug + '.json');
+  fs.writeFileSync(file, JSON.stringify(packed));
+  const out = A.unpack(JSON.parse(JSON.stringify(packed)));
+  const ev = Object.values(out.events);
+  const nums = [...new Set(ev.map((e) => e.num))];
+  const flights = ev.filter((e) => !A.isLaterDay(e.name));
+  const paid = Object.values(out.results).reduce((a, r) => a + r.rows.reduce((b, row) => b + row[3], 0), 0);
+  const { place, tag } = placeOf(league.name);
+  const info = { id: league.slug, name: league.name.replace(/\s+/g, ' ').trim(), place, tag, start: league.startDate, end: league.endDate, tz: tzOf(league.name),
+    currency: league.currency, events: nums.filter((n) => out.results[n] && out.results[n].rows.length).length,
+    entries: flights.reduce((a, e) => a + (e.entries || 0), 0), players: A.players(out).length, paid,
+    known: nums.filter((n) => A.watchedFromStart(out, n)).length, watched: ev.some((e) => e.polls > 0), bytes: fs.statSync(file).size };
+  console.log(`${league.name}: ${info.events} events paid, ${info.entries} entries, ${info.players} players, every bullet known in ${info.known}, ${Math.round(info.bytes / 1024)} KB`);
+  return info;
+}
+
+(async () => {
+  if (repack) {
+    for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json') && x !== 'index.json')) {
+      const file = path.join(DIR, f), before = fs.statSync(file).size;
+      fs.writeFileSync(file, JSON.stringify(A.pack(A.unpack(JSON.parse(fs.readFileSync(file, 'utf8'))))));
+      console.log(`${f}: ${Math.round(before / 1024)} -> ${Math.round(fs.statSync(file).size / 1024)} KB`);
+    }
+    const ip = path.join(DIR, 'index.json');
+    if (fs.existsSync(ip)) { const ix = JSON.parse(fs.readFileSync(ip, 'utf8')); for (const s of ix.series) { try { s.bytes = fs.statSync(path.join(DIR, s.id + '.json')).size; } catch {} } fs.writeFileSync(ip, JSON.stringify(ix, null, 1)); }
+    return;
+  }
+  const d = await (await fetchFn(`${A.SITE}/series/__data.json`)).json();
+  const node = d.nodes.map((n) => (n && n.data ? A.unflatten(n.data) : null)).find((x) => x && x.pastLeagues);
+  // Series still polled live (docs/series.js) keep their own tracker until they are archived with --from-state
+  const live = new Set(Series.ofOrg('apt').filter(Series.pollable).map((s) => s.source.series));
+  const past = node.pastLeagues.filter((l) => !live.has(l.slug) || (fromState && l.slug === only));
+  const indexPath = path.join(DIR, 'index.json');
+  const index = fs.existsSync(indexPath) ? JSON.parse(fs.readFileSync(indexPath, 'utf8')) : { series: [] };
+  const byId = new Map(index.series.map((s) => [s.id, s]));
+  for (const l of past) {
+    if (only && l.slug !== only) continue;
+    if (fs.existsSync(path.join(DIR, l.slug + '.json')) && !force && !fromState) { console.log('have', l.name); continue; }
+    try { byId.set(l.slug, await archive(l)); } catch (e) { console.error(`${l.name}: ${e.message}`); }
+    await sleep(1000);
+  }
+  index.series = [...byId.values()].sort((a, b) => (a.start < b.start ? 1 : -1));
+  index.updatedAt = Math.floor(Date.now() / 1000);
+  fs.writeFileSync(indexPath, JSON.stringify(index, null, 1));
+  console.log(`index: ${index.series.length} series`);
+})();

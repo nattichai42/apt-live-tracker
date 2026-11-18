@@ -394,13 +394,18 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=913361b8f8"></script>
-<script src="../series.js?v=618a7af897"></script>
-<script src="tracker.js?v=141e5f6c44"></script>
+<script src="../series.js?v=e540f28cb6"></script>
+<script src="tracker.js?v=915d1d95b6"></script>
 <script>
 (function () {
   'use strict';
-  // Which series this page shows (docs/series.js): ?s=<id>, else the organiser's running one
-  const SER = Series.pick('apt', new URLSearchParams(location.search).get('s'));
+  // Which series this page shows: a past one saved by tools/apt-archive.js (?f=<series slug>), or one in
+  // docs/series.js (?s=<id>, else APT's running one)
+  const params = new URLSearchParams(location.search);
+  const FEST = /^[a-z0-9-]{3,80}$/.test(params.get('f') || '') ? params.get('f') : null;
+  const MODE = FEST ? 'archive' : 'live';
+  const SER = FEST ? { id: FEST, org: 'apt', tz: Series.tzOf(FEST, 'Asia/Taipei'), place: '', name: 'APT', mark: 'APT', sub: '', source: { series: FEST },
+    link: `https://www.theasianpokertour.com/series/${FEST}` } : Series.pick('apt', params.get('s'));
   const T = window.APTTracker.configure(SER.source);
   const $ = (s) => document.querySelector(s);
   const LS_STATE = Series.storageKey(SER), LS_PREFS = Series.ORGANISERS.apt.prefs;
@@ -419,10 +424,10 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     return null;
   }
   const REPO = repoSlug();
-  const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/${SER.branch}/state.json` : null;
+  const STATE_URL = REPO && MODE === 'live' ? `https://raw.githubusercontent.com/${REPO}/${SER.branch}/state.json` : null;
 
   let raw = T.emptyState(), state = raw; // raw: as polled and saved; state: what's shown (maybe converted)
-  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
+  if (MODE === 'live') try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
   const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
   const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
 
@@ -442,6 +447,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   // 3,500 -> 3.5K, 16,500 -> 16.5K, 165,000 -> 165K, 1,555,940 -> 1.56M (never round a buy-in to a different number)
   const plainShort = (v) => {
     const a = Math.abs(v), s = v < 0 ? '−' : '';
+    if (a >= 1e9) return s + (a / 1e9).toFixed(a >= 1e10 ? 1 : 2).replace(/\.?0+$/, '') + 'B';
     if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
     if (a >= 1e5) return s + Math.round(a / 1e3) + 'K';
     if (a >= 1e3) return s + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -465,7 +471,9 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const evShort = (e) => e ? `#${e.num} ${baseOf(e.name)}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
   const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
   const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
-  const NATIVE_OF = (e) => e.currency || 'TWD', NATIVE_LABEL = () => 'TWD', FIXED_FX = false, FX_FALLBACK = null;
+  // The series' own currency (KRW in Korea, PHP in Manila...): from its entry, else its events
+  const NATIVE_LABEL = () => SER.currency || (Object.values(raw.events || {}).find((e) => e.currency) || {}).currency || 'TWD';
+  const NATIVE_OF = (e) => e.currency || NATIVE_LABEL(), FIXED_FX = false, FX_FALLBACK = null;
 
   /* ---------- currency ---------- */
   // Amounts in each event's own currency, or in one picked at the top (shared by all the trackers):
@@ -531,6 +539,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
   /* ---------- data plumbing ---------- */
   function persist() {
+    if (MODE !== 'live') return; // a past series comes from the site's own files
     if (!store.set(LS_STATE, JSON.stringify(raw))) {
       const slim = { ...raw, feed: raw.feed.slice(-1500) };
       store.set(LS_STATE, JSON.stringify(slim));
@@ -553,7 +562,27 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       }
     } catch (e) { console.warn('GitHub history unavailable', e); }
   }
+  // A past series: its saved file, and its name and dates from the archive's index
+  let archLoaded = false;
+  async function loadArchive() {
+    try {
+      const [r, idx] = await Promise.all([fetch(`archive/${FEST}.json`), fetch('archive/index.json').then((x) => x.json()).catch(() => ({ series: [] }))]);
+      if (!r.ok) throw new Error(r.status === 404 ? 'No saved series with this id' : 'HTTP ' + r.status);
+      const s = T.unpack(await r.json()); T.repair(s);
+      raw = state = s; archLoaded = true; lastErr = null;
+      const info = (idx.series || []).find((x) => x.id === FEST);
+      if (info) {
+        const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        Object.assign(SER, { name: info.name, mark: 'APT ' + info.place, sub: `${fmt(info.start)} – ${fmt(info.end)}`, place: info.place, currency: info.currency });
+        Series.fillBrand(SER); document.title = info.name;
+      }
+      if (!raw.feed.length) { document.querySelector('.tab[data-tab="feed"]').hidden = true; if (prefs.tab === 'feed') selectTab('players'); }
+      fillFx(); // the currency menu offers the series' own currency first
+    } catch (e) { lastErr = String(e.message || e); }
+    refresh();
+  }
   async function poll() {
+    if (MODE !== 'live') return;
     if (polling) return;
     polling = true; setStatus();
     const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
@@ -572,6 +601,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   }
   function schedule() {
     clearTimeout(timer);
+    if (MODE !== 'live') return;
     const iv = Number(prefs.interval);
     if (!iv) { nextAt = 0; setStatus(); return; }
     const wait = Math.max(iv, backoff);
@@ -581,6 +611,11 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   }
   function setStatus() {
     const dot = $('#dot'), txt = $('#status-text');
+    if (MODE !== 'live') {
+      dot.className = 'dot' + (lastErr ? ' err' : '');
+      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : 'Past series · entries, registrations and payouts as published by APT' + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
+      return;
+    }
     const iv = Number(prefs.interval);
     dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
     const parts = [];
@@ -1199,7 +1234,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
   /* ---------- controls ---------- */
   function selectTab(tab) {
-    prefs.tab = tab; savePrefs();
+    if (MODE === 'live') { prefs.tab = tab; savePrefs(); } // a past series doesn't change the live view's tab
     document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     for (const t of ['feed', 'events', 'players']) $('#view-' + t).hidden = t !== tab;
     if (tab === 'players') renderPlayers();
@@ -1255,9 +1290,15 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#refresh').addEventListener('click', () => setMenu(false));
 
   /* ---------- boot ---------- */
-  Series.fillBrand(SER); Series.fillNav($('nav.others'), SER, '../');
+  Series.fillBrand(SER); Series.fillNav($('nav.others'), MODE === 'live' ? SER : null, '../');
   fillFx();
   if (fxCur) setTimeout(refresh, 0);
+  if (MODE === 'archive') {
+    // Nothing runs or polls in a past series
+    $('#row-interval').hidden = true; $('#refresh').hidden = true;
+    for (const id of ['#events', '#soon']) { const box = $(id); box.hidden = true; box.previousElementSibling.hidden = true; }
+    selectTab('players'); render(); loadArchive(); return;
+  }
   selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
   render();
   (async () => {

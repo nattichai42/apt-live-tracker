@@ -173,3 +173,21 @@ Every player and event the trackers hold, across every series in `docs/series.js
   ("Chen Kuan-Han" = "Kuan Han Chen"), and only when the countries agree or one is missing. About 150 players appear in more
   than one series. Same-name players from the same country are merged, and different spellings stay apart.
 - Tracker pages open a player or event from a link: `?player=<name>`, `?event=<event id>`.
+
+## Past APT series
+
+`node tools/apt-archive.js` saves every finished series listed on theasianpokertour.com/series (22 from Manila 2022 on)
+to `docs/apt/archive/<series slug>.json` plus `index.json`. The APT page shows one with `apt/?f=<slug>`. The home page
+lists them under Past, and the all-series page includes them. Run it again to add a series that has since ended (`--only <slug>`,
+`--force` to refetch, `--repack` to rewrite the files without requests). For a series we watched live, archive its own record
+instead, which has bust times and re-entries: `--from-state <state.json> --only <slug>`.
+
+- A finished series still serves every event's entries, buy-in and times, its payouts, and its registration list (everyone
+  who registered, once each, with country). Each registered player counts one bullet per flight.
+- Re-entries aren't published, so for series we didn't watch live a player's bullets and buy-ins are a minimum (≥).
+  The exception is events whose registrations add up to the entries (freezeouts and other small fields), which count under
+  "All bullets known". Prizes and places are exact.
+- Players known only from a registration list are stored as `name|country` (`pack()` / `unpack()` in the engine), which keeps
+  a series to roughly 30–100 KB gzipped.
+- TWD and VND rates before March 2024 use the first day available (2 March 2024), so conversions of older Taipei and Vietnam
+  series are approximate.

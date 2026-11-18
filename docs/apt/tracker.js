@@ -804,7 +804,30 @@
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat }));
   }
 
-  const api = { SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  // A finished series as a compact file (tools/apt-archive.js): a player known only from the registration list
+  // (one bullet, never seen at a table) is stored as "name|country" in e.rg instead of a full record; unpack() restores it
+  const regOnly = (p, e) => p.reg && p.b === 1 && p.st === 'x' && !(p.x || []).length && p.f === e.start && Object.keys(p).every((k) => ['b', 'st', 'f', 'x', 'cc', 'reg'].includes(k));
+  function pack(state) {
+    const out = { ...state, packed: 1, events: {} };
+    for (const [kid, e] of Object.entries(state.events || {})) {
+      const p = {}, rg = [];
+      for (const [k, q] of Object.entries(e.p || {})) { if (regOnly(q, e)) rg.push(q.cc ? `${k}|${q.cc}` : k); else p[k] = q; }
+      out.events[kid] = rg.length ? { ...e, p, rg } : { ...e, p };
+    }
+    return out;
+  }
+  function unpack(state) {
+    if (!state || !state.packed) return state;
+    for (const e of Object.values(state.events || {})) {
+      e.p = e.p || {};
+      for (const r of e.rg || []) { const i = r.lastIndexOf('|'), k = i > 0 ? r.slice(0, i) : r; e.p[k] = { b: 1, st: 'x', f: e.start, x: [], cc: i > 0 ? r.slice(i + 1) : '', reg: 1 }; }
+      delete e.rg;
+    }
+    delete state.packed;
+    return state;
+  }
+
+  const api = { pack, unpack, SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
   // source: the series' entry in docs/series.js ({ series: '<slug in the APT site's /series/ URLs>' })
   api.configure = (source) => {
     if (source && source.series) { SERIES = source.series; BASE = `${SITE}/series/${SERIES}/events`; }

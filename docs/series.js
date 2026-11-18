@@ -40,6 +40,26 @@
       link: 'https://www.theasianpokertour.com/series/apt-championship-taipei-2026',
       title: 'APT Championship, Taipei 2026', mark: 'APT Taipei', sub: 'Championship · 2026', art: 'apt', watermark: '2026',
       source: { series: 'apt-championship-taipei-2026' } },
+    { id: 'apt-jeju-classic-2027', org: 'apt', branch: 'apt-jeju-classic-2027-data',
+      name: 'APT Jeju Classic 2027', tag: "Jeju Classic '27", place: 'Jeju', tz: 'Asia/Seoul', currency: 'KRW', start: '2027-01-22', end: '2027-01-31',
+      link: 'https://www.theasianpokertour.com/series/apt-jeju-classic-south-korea-2027',
+      title: 'APT Jeju Classic, South Korea 2027', mark: 'APT Jeju Classic', sub: 'South Korea · 2027', art: 'apt', watermark: '2027',
+      source: { series: 'apt-jeju-classic-south-korea-2027' } },
+    { id: 'apt-taipei-2027', org: 'apt', branch: 'apt-taipei-2027-data',
+      name: 'APT Taipei 2027', tag: "Taipei '27", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2027-04-21', end: '2027-05-03',
+      link: 'https://www.theasianpokertour.com/series/apt-taipei-taiwan-2027',
+      title: 'APT Taipei, Taiwan 2027', mark: 'APT Taipei', sub: 'Taiwan · 2027', art: 'apt', watermark: '2027',
+      source: { series: 'apt-taipei-taiwan-2027' } },
+    { id: 'apt-jeju-2027', org: 'apt', branch: 'apt-jeju-2027-data',
+      name: 'APT Jeju 2027', tag: "Jeju '27", place: 'Jeju', tz: 'Asia/Seoul', currency: 'KRW', start: '2027-10-01', end: '2027-10-10',
+      link: 'https://www.theasianpokertour.com/series/apt-jeju-south-korea-2027',
+      title: 'APT Jeju, South Korea 2027', mark: 'APT Jeju', sub: 'South Korea · 2027', art: 'apt', watermark: '2027',
+      source: { series: 'apt-jeju-south-korea-2027' } },
+    { id: 'apt-championship-taipei-2027', org: 'apt', branch: 'apt-championship-taipei-2027-data',
+      name: 'APT Championship Taipei 2027', tag: "Championship '27", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2027-11-12', end: '2027-11-28',
+      link: 'https://www.theasianpokertour.com/series/apt-championship-taiwan-2027',
+      title: 'APT Championship, Taipei 2027', mark: 'APT Championship', sub: 'Taipei · 2027', art: 'apt', watermark: '2027',
+      source: { series: 'apt-championship-taiwan-2027' } },
     { id: 'triton-n-cyprus-2026', org: 'triton', branch: 'triton-data', storage: 'triton-live-state-v1',
       name: 'Triton N. Cyprus 2026', tag: "N. Cyprus '26", place: 'Cyprus', tz: 'Europe/Athens', currency: 'USD', start: '2026-11-15', end: '2026-11-30',
       link: 'https://tritonpoker.plus/festival/daca20f2-506a-4377-9c73-2651390b6782',
@@ -73,6 +93,11 @@
   const pollable = (s) => { const t = today(s.tz); return t >= shift(s.start, -1) && t <= shift(s.end, 2); };
 
   const pollOpts = (s) => ({ ...ORGANISERS[s.org].poll, ...(s.poll || {}) });
+  // A venue's time zone from a series' name or slug (for past series, which have no entry here)
+  const TZ = [[/korea|jeju|incheon|seoul/i, 'Asia/Seoul'], [/taipei|taiwan/i, 'Asia/Taipei'], [/manila|philippines/i, 'Asia/Manila'],
+    [/vietnam|hanoi|da[ -]?nang|phu[ -]?quoc|ho[ -]?chi[ -]?minh|saigon/i, 'Asia/Ho_Chi_Minh'], [/macau/i, 'Asia/Macau'], [/japan|tokyo|osaka/i, 'Asia/Tokyo'],
+    [/cambodia|phnom penh/i, 'Asia/Phnom_Penh'], [/thailand|bangkok|pattaya/i, 'Asia/Bangkok'], [/cyprus/i, 'Asia/Nicosia']];
+  const tzOf = (name, fallback) => (TZ.find(([re]) => re.test(name)) || [, fallback || 'UTC'])[1];
   // Over: two days past its last day, or every event it listed has finished
   function over(s, state) {
     const t = today(s.tz); if (t > shift(s.end, 2)) return true;
@@ -99,5 +124,5 @@
     document.title = `${s.name} Tracker`;
   }
 
-  return { ORGANISERS, LIST, status, byId, ofOrg, pick, pageUrl, storageKey, pollable, pollOpts, over, fillNav, fillBrand };
+  return { ORGANISERS, LIST, status, byId, ofOrg, pick, pageUrl, storageKey, pollable, pollOpts, over, fillNav, fillBrand, tzOf };
 });

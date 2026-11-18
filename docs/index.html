@@ -120,7 +120,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
   <footer>Data from each organiser's public live pages, saved by pollers on GitHub. Not affiliated with the organisers.</footer>
 </div>
 
-<script src="series.js?v=618a7af897"></script>
+<script src="series.js?v=e540f28cb6"></script>
 <script>
 (function () {
   'use strict';
@@ -195,7 +195,21 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
 
   const metas = {};
   // Past Triton festivals, saved by tools/triton-archive.js (newest first), shown under Past
-  let tritonPast = [], allTime = null, allSeries = null;
+  let tritonPast = [], allTime = null, allSeries = null, aptPast = [];
+  // Past APT series, saved by tools/apt-archive.js (newest first), shown under Past
+  async function loadApt() {
+    try {
+      const idx = await (await fetch('apt/archive/index.json', { cache: 'no-cache' })).json();
+      aptPast = (idx.series || []).map((f) => {
+        const yr = f.start.slice(0, 4), country = (f.name.match(/,\s*([^,\d]+?)\s*\d{4}/) || [, ''])[1];
+        const s = { id: 'apt-' + f.id, path: `apt/?f=${f.id}`, title: f.name, mark: 'APT ' + f.place, sub: [country, yr].filter(Boolean).join(' · '),
+          art: 'apt', watermark: yr, start: f.start, end: f.end, tz: f.tz || 'UTC', currency: f.currency, fixed: 'past', archived: true };
+        metas[s.id] = { finished: f.events, players: f.players, paid: f.paid };
+        return s;
+      });
+    } catch {}
+    render();
+  }
   async function loadTriton() {
     try {
       const idx = await (await fetch('triton/archive/index.json', { cache: 'no-cache' })).json();
@@ -224,7 +238,10 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
     const groups = { live: [], soon: [], past: [] };
     const archived = new Set(tritonPast.map((t) => t.id.slice(3)));
     for (const s of SERIES) if (!(s.source && archived.has(s.source.festival))) groups[status(s)].push(s);
-    groups.past.push(...tritonPast);
+    // A series in docs/series.js that has since been archived shows once, as its archive banner
+    const aptArchived = new Set(aptPast.map((a) => a.id.slice(4)));
+    for (const k of ['live', 'soon', 'past']) groups[k] = groups[k].filter((x) => !(x.org === 'apt' && aptArchived.has(x.source.series)));
+    groups.past.push(...tritonPast, ...aptPast);
     groups.live.sort((a, b) => (b.start < a.start ? -1 : 1));
     groups.soon.sort((a, b) => (a.start < b.start ? -1 : 1));
     groups.past.sort((a, b) => (b.end < a.end ? -1 : 1));
@@ -252,6 +269,7 @@ footer { margin-top: 30px; color: var(--dim); font-size: 12.5px; }
   render();
   load();
   loadTriton();
+  loadApt();
   setInterval(load, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 })();

@@ -41,7 +41,7 @@
   // key: source id; page: its tracker (Triton: the all-time view, which holds every festival)
   const SRC = [];
   for (const x of Series.LIST) {
-    if (x.org === 'triton') continue;
+    if (x.org === 'triton' || Series.status(x) === 'soon') continue; // nothing saved before it starts
     const E = window[ORG[x.org].global];
     if (!E) { console.warn(`${x.id}: add a <script> for ${ORG[x.org].engine} to this page`); continue; }
     SRC.push({ id: x.id, org: x.org, entry: x, E, branch: x.branch, name: x.name, short: ORG[x.org].name, tag: x.tag || '', page: Series.pageUrl(x, '../') });
@@ -49,7 +49,7 @@
   SRC.push({ id: 'triton', org: 'triton', entry: {}, E: T, name: 'Triton', short: 'Triton', tag: '', page: '../triton/?view=all', all: true });
   for (const s of SRC) { s.ad = adapt(s.org); s.nat = (e) => s.ad.nat(e, s.entry); }
   const SRC_BY = Object.fromEntries(SRC.map((s) => [s.id, s]));
-  const ORGS = [...new Set(SRC.map((s) => s.org))];
+  let ORGS = [...new Set(SRC.map((s) => s.org))];
   const prefs = prefs0;
   for (const o of ORGS) if (prefs.on[o] == null) prefs.on[o] = true;
 
@@ -151,6 +151,12 @@
         }
         raws.triton = T.mergeStates(parts);
         savedAt.triton = at;
+      } else if (s.file) {
+        // A past series saved by its organiser's archive tool: loaded once
+        if (raws[s.id]) return false;
+        const r = await fetch(s.file);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const st = await r.json(); if (s.E.unpack) s.E.unpack(st); s.E.repair(st); raws[s.id] = st;
       } else {
         if (!REPO) return false;
         const st = await fetchBranch(s.branch);
@@ -162,11 +168,34 @@
       return true;
     } catch (e) { errors[s.id] = String(e.message || e); return false; }
   }
+  // Past APT series (tools/apt-archive.js) join as sources of their own, unless still a live entry in docs/series.js
+  let archivesAdded = false;
+  async function addArchives() {
+    if (archivesAdded) return []; archivesAdded = true;
+    const added = [];
+    try {
+      const idx = await (await fetch('../apt/archive/index.json')).json();
+      for (const f of idx.series || []) {
+        const dup = SRC.find((x) => x.org === 'apt' && x.entry.source && x.entry.source.series === f.id);
+        if (dup) SRC.splice(SRC.indexOf(dup), 1); // archived since: the saved file replaces the live record
+        const s = { id: 'apt:' + f.id, org: 'apt', entry: { currency: f.currency }, E: window[ORG.apt.global], name: f.name, short: ORG.apt.name, tag: f.tag,
+          page: `../apt/?f=${encodeURIComponent(f.id)}`, file: `../apt/archive/${f.id}.json`, archived: true };
+        s.ad = adapt(s.org); s.nat = (e) => s.ad.nat(e, s.entry);
+        SRC.push(s); SRC_BY[s.id] = s; added.push(s);
+      }
+      ORGS = [...new Set(SRC.map((s) => s.org))];
+      for (const o of ORGS) if (prefs.on[o] == null) prefs.on[o] = true;
+      fillSrcChips();
+    } catch (e) { console.warn('APT archive unavailable', e); }
+    return added;
+  }
   let loading = false;
   async function loadAll() {
     if (loading) return; loading = true; setStatus();
-    // Each series shows as soon as it arrives
-    await Promise.all(SRC.map((s) => loadSrc(s).then((changed) => { if (changed) recompute(); })));
+    // Live series show as soon as each arrives; the past APT series all at once
+    const live = Promise.all(SRC.map((s) => loadSrc(s).then((changed) => { if (changed) recompute(); })));
+    const past = addArchives().then((added) => Promise.all(added.map(loadSrc))).then((ch) => { if (ch.some(Boolean)) recompute(); });
+    await Promise.all([live, past]);
     loading = false; setStatus();
   }
 
@@ -638,8 +667,8 @@
     else if (fxBusy) parts.push('Loading exchange rates…');
     const at = Math.max(0, ...SRC.filter((s) => prefs.on[s.org] && Series.byId(s.id) && Series.status(s.entry) === 'live').map((s) => savedAt[s.id] || 0),
       ...Series.ofOrg('triton').filter((x) => Series.status(x) === 'live' && tritonLive[x.id]).map((x) => tritonLive[x.id].updatedAt || 0));
-    const nSeries = SRC.filter((s) => !s.all).length + Series.ofOrg('triton').length;
-    if (views) parts.push(plural(nSeries, 'series', 'series') + ' + Triton history');
+    const nSeries = SRC.filter((s) => !s.all).length + (tritonAll ? (tritonAll.index || []).length : 0) + Object.keys(tritonLive).length;
+    if (views) parts.push(plural(nSeries, 'series', 'series'));
     if (at) parts.push('live data saved ' + ago(at));
     if (fxShown) parts.push(`in ${fxShown} at each date's rate`);
     for (const [id, e] of errs) parts.push(`${SRC_BY[id].name}: ${e}`);
