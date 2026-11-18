@@ -19,8 +19,10 @@
   // poll: the GitHub poller's pace (seconds between rounds at least, requests per second on average, minutes between
   // saves); a series can override it with its own poll: {...}.
   const ORGANISERS = {
+    // APT seating is only seen by polling (busts and re-entries happen between looks), so it is polled hardest:
+    // 3 requests/s is half of what the site took without refusing in a test; the poller backs off if it ever refuses
     apt: { name: 'APT', engine: 'apt/tracker.js', global: 'APTTracker', page: 'apt/', prefs: 'apt-live-prefs-v1',
-      poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 } },
+      poll: { minInterval: 5, maxInterval: 30, budget: 3, publishEvery: 1 } },
     glpc: { name: 'GLPC', engine: 'glpc/glpc.js', global: 'GLPCTracker', page: 'glpc/', prefs: 'glpc-live-prefs-v1',
       poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 } },
     triton: { name: 'Triton', engine: 'triton/triton.js', global: 'TritonTracker', page: 'triton/', prefs: 'triton-live-prefs-v1',
