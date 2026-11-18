@@ -376,14 +376,14 @@
       const early = p.f === e.firstPoll && !fromStart(e); // registered before tracking began
       const t0 = early ? (e.start || p.f) : p.f;
       items.push({ ...base, t: t0, k: 'seen', first: early, approx: early, b: 1, amt: -(e.buyin || 0) });
-      const rt = (p.r || []).slice();
+      const rt = (p.r || []).slice().sort((a, b) => a - b);
       const extra = Math.max(0, (p.b || 1) - 1);
-      const known = rt.length, unknown = extra - known;
-      // Re-entries whose time we didn't see: just after the bust before them, else the event start
-      const xs = (p.x || []).slice();
-      for (let i = 0; i < unknown; i++) items.push({ ...base, t: (xs[i] != null ? xs[i] + 1 : t0), k: 'reentry', b: i + 2, amt: -(e.buyin || 0), approxTime: true });
+      const unknown = Math.max(0, extra - rt.length);
+      // Re-entries bought before tracking began: the site gives the count but no times, and its bust time is the
+      // player's latest bust (after all of them). Keep them in bullet order on the event's first day, time unknown.
+      for (let i = 0; i < unknown; i++) items.push({ ...base, t: t0 + i + 1, k: 'reentry', b: i + 2, amt: -(e.buyin || 0), approx: true, unknownTime: true });
       rt.forEach((t, i) => items.push({ ...base, t, k: 'reentry', b: unknown + i + 2, amt: -(e.buyin || 0) }));
-      xs.forEach((t) => items.push({ ...base, t, k: 'bust' }));
+      (p.x || []).forEach((t) => items.push({ ...base, t, k: 'bust' }));
       if (p.st === 'end') items.push({ ...base, t: e.doneAt || e.lastPoll, k: 'end' });
     }
     for (const [num, r] of Object.entries(state.results)) for (const [pos, n, , prize] of r.rows) if (canon(state, n) === name) {
