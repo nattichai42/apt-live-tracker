@@ -435,7 +435,9 @@
       for (const [k, p] of Object.entries(e.p)) {
         const r = get(personOf(state, k)); if (p.cc) r.cc = p.cc;
         r.nums.add(e.num); r.bullets += p.b || 1;
-        if (!(p.paid > 0) && !bulletsKnown(e)) r.partial = true; // re-entries here are not on record: at least this many
+        // The event's buy-ins on record don't add up to its entries (no records before Sep 2026, or flights whose early
+        // days Triton doesn't list): anyone's count there may be short, so totals are a minimum
+        if (!bulletsKnown(e)) r.partial = true;
         // Bullets x buy-in from the name (the site's transaction amounts leave out the fee)
         r.buyins += (p.b || 1) * (e.buyin || 0);
         r.busts += Math.max((p.x || []).length, p.st === 'x' ? (p.b || 1) : Math.max(0, (p.b || 1) - 1));
