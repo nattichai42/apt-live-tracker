@@ -96,7 +96,8 @@
   // Organiser label, coloured per organiser, with the series or festival ("APT Taipei '26", "Triton ×9")
   const stag = (key, extra) => { const s = SRC_BY[key], x = extra == null ? s.tag : extra; return el('span', 'stag ' + s.org, s.short + (x ? ' ' + x : '')); };
   // Short event name: no "[Event 1]", guarantee or sponsor notes
-  const cleanName = (n) => String(n || '').replace(/^\s*\[[^\]]*\]\s*/, '').replace(/\s*[-–]\s*[\d.,]+\s*(M|K)?\s*GTD\b.*$/i, '')
+  const cleanName = (n) => String(n || '').replace(/^\s*\[[^\]]*\]\s*/, '').replace(/\s*[-–]\s*Sponsored by\b.*$/i, '')
+    .replace(/\s*[-–]\s*(?:[A-Z]{3}\s*)?[\d.,]+\s*(M|K)?\s*GTD\b.*$/i, '')
     .replace(/\s*\([^)]{18,}\)\s*$/, '').replace(/\s+/g, ' ').trim(); // and no long rule notes in brackets at the end
   const tile = (parent, k, v, sub, cls) => {
     const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
@@ -397,25 +398,43 @@
       ['Results', [['Cashes', nf.format(cashes), wins ? plural(wins, 'win', 'wins') : ''], ['ITM', (partial ? '≤' : '') + pct(cashedEvents, bullets), `${nf.format(cashedEvents)}/${nf.format(bullets)} bullets`],
         ['Cashing players', nf.format(rows.filter((p) => p.cashes > 0).length), ''], ['Winning', pct(winners, n), nf.format(winners) + ' players', 'pos'], ['Losing', pct(losers, n), nf.format(losers) + ' players', 'neg']]],
     ]);
-    // The same players split by series
+    // The same players split by organiser (each opens to its series)
     const g = el('div', 'sum-group'); g.appendChild(el('h3', '', 'By series'));
     const t = el('table', 'gtable flat');
-    t.innerHTML = '<thead><tr><th>Series</th><th>Players</th><th>Events</th><th>Bullets</th><th>Buy-in</th><th>Prizes</th></tr></thead>';
+    t.innerHTML = '<thead><tr><th>Series</th><th>Players</th><th>Bullets</th><th>Buy-in</th><th>Prizes</th></tr></thead>';
     const tb = el('tbody');
-    for (const s of SRC) {
-      const rs = rows.map((p) => p.rows[s.id]).filter(Boolean); if (!rs.length) continue;
-      const evs = new Set(rs.flatMap((r) => r.ev.map((d) => String(d.num)))).size;
-      const tr = el('tr'); const td0 = el('td'); td0.appendChild(stag(s.id)); tr.appendChild(td0);
+    const used = SRC.filter((s) => rows.some((p) => p.rows[s.id]));
+    fillGrouped(tb, used, (s, under) => (under ? Object.assign(el('span', 'stag ' + s.org, s.tag || s.name), { title: s.name }) : stag(s.id, s.all ? '' : null)), (list, label) => {
+      const ps = rows.filter((p) => list.some((s) => p.rows[s.id]));
+      const rs = ps.flatMap((p) => list.map((s) => p.rows[s.id]).filter(Boolean));
       const part = rs.some((r) => r.partial) ? '≥' : '';
-      for (const v of [nf.format(rs.length), nf.format(evs), part + nf.format(rs.reduce((a, r) => a + r.bullets, 0)), part + short(rs.reduce((a, r) => a + r.buyins, 0)), short(rs.reduce((a, r) => a + r.prizes, 0))]) tr.appendChild(el('td', '', v));
-      tb.appendChild(tr);
-    }
-    t.appendChild(tb); g.appendChild(t); box.appendChild(g);
+      const tr = el('tr'), td0 = el('td'); td0.appendChild(label); tr.appendChild(td0);
+      for (const v of [nf.format(ps.length), part + plainShort(rs.reduce((a, r) => a + r.bullets, 0)), part + short(rs.reduce((a, r) => a + r.buyins, 0)), short(rs.reduce((a, r) => a + r.prizes, 0))]) tr.appendChild(el('td', '', v));
+      return tr;
+    }, renderPlayers);
+    t.appendChild(tb); const wrap = el('div', 'tscroll'); wrap.appendChild(t); g.appendChild(wrap); box.appendChild(g);
     const scopeTxt = [prefs.year, prefs.finished ? 'Finished events' : '', prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : '', q ? `“${q}”` : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
     h.className = 'note' + (!prefs.known && partial ? ' warn' : '');
     h.textContent = (scopeTxt ? scopeTxt + ' · ' : '') + (prefs.known ? 'Events where every bullet is credited to a player' : partial ? '≥ Some events have bullets no player is credited with (see each series): counts there are a minimum' : 'All events');
   }
+  // A by-series table's rows: one per organiser; an organiser with several series has a button that opens one row each.
+  // label(s, under): a single series' first cell (under: listed beneath its organiser, so without its name); row(series list, first cell) builds a row; redraw re-renders after a toggle
+  const openOrgs = new Set();
+  function fillGrouped(tb, srcs, label, row, redraw) {
+    for (const o of ORGS) {
+      const mine = srcs.filter((s) => s.org === o); if (!mine.length) continue;
+      if (mine.length === 1) { tb.appendChild(row(mine, label(mine[0]))); continue; }
+      const open = openOrgs.has(o);
+      const b = el('button', 'grp'); b.type = 'button'; b.setAttribute('aria-expanded', String(open));
+      b.title = open ? 'Hide each series' : 'Show each series';
+      b.appendChild(stag(mine[0].id, '×' + mine.length)); b.append(open ? ' ▾' : ' ▸');
+      b.addEventListener('click', () => { if (open) openOrgs.delete(o); else openOrgs.add(o); redraw(); });
+      tb.appendChild(row(mine, b));
+      if (open) for (const s of mine) { const tr = row([s], label(s, true)); tr.className = 'sub'; tb.appendChild(tr); }
+    }
+  }
+
   function renderPlayers() {
     const all = getModel();
     $('#n-players').textContent = all.length ? nf.format(all.length) : '';
@@ -551,19 +570,22 @@
     const t = $('#sheet-series'); t.replaceChildren();
     $('#sheet-series-wrap').hidden = !p;
     if (p) {
-      t.innerHTML = '<thead><tr><th>Series</th><th>Events</th><th>Bullets</th><th>ITM</th><th>Buy-in</th><th>Net</th></tr></thead>';
+      t.innerHTML = '<thead><tr><th>Series</th><th>Events</th><th>Bullets</th><th>ITM</th><th>Net</th></tr></thead>';
       const tb = el('tbody');
-      for (const s of SRC) {
-        const r = p.rows[s.id]; if (!r) continue;
-        const tr = el('tr'), td0 = el('td'), a = el('a', 'slink'); a.href = playerHref(s.id, r.name); a.title = `${r.name} in the ${s.name} tracker`;
-        a.appendChild(stag(s.id, s.all ? (p.fests > 1 ? '×' + p.fests : '') : null)); a.append(' →'); td0.appendChild(a); tr.appendChild(td0);
-        tr.appendChild(el('td', '', nf.format(r.events)));
-        tr.appendChild(el('td', '', (r.partial ? '≥' : '') + nf.format(r.bullets)));
-        tr.appendChild(el('td', '', (r.partial ? '≤' : '') + Math.round(r.itm * 100) + '%'));
-        tr.appendChild(el('td', '', (r.partial ? '≥' : '') + short(r.buyins)));
-        tr.appendChild(el('td', r.net > 0 ? 'pos' : r.net < 0 ? 'neg' : '', signed(r.net)));
-        tb.appendChild(tr);
-      }
+      const link = (s, under) => {
+        const r = p.rows[s.id], a = el('a', 'slink'); a.href = playerHref(s.id, r.name); a.title = `${r.name} in the ${s.name} tracker`;
+        a.appendChild(under ? Object.assign(el('span', 'stag ' + s.org, s.tag || s.name), { title: s.name }) : stag(s.id, s.all ? (p.fests > 1 ? '×' + p.fests : '') : null)); a.append(' →'); return a;
+      };
+      fillGrouped(tb, SRC.filter((s) => p.rows[s.id]), link, (list, label) => {
+        const rs = list.map((s) => p.rows[s.id]), part = rs.some((r) => r.partial);
+        const sum = (f) => rs.reduce((a, r) => a + (r[f] || 0), 0), bullets = sum('bullets'), net = sum('net');
+        const tr = el('tr'), td0 = el('td'); td0.appendChild(label); tr.appendChild(td0);
+        tr.appendChild(el('td', '', nf.format(sum('events'))));
+        tr.appendChild(el('td', '', (part ? '≥' : '') + nf.format(bullets)));
+        tr.appendChild(el('td', '', (part ? '≤' : '') + (bullets ? Math.round(sum('cashedEvents') / bullets * 100) : 0) + '%'));
+        tr.appendChild(el('td', net > 0 ? 'pos' : net < 0 ? 'neg' : '', signed(net)));
+        return tr;
+      }, () => openPerson(openRef));
       t.appendChild(tb);
     }
     // Every event, newest first

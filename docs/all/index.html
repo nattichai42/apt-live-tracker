@@ -282,6 +282,25 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 .gtable.flat th:first-child, .gtable.flat td:first-child { padding-left: 0; } .gtable.flat th:last-child, .gtable.flat td:last-child { padding-right: 0; }
 .gtable .slink { color: inherit; text-decoration: none; white-space: nowrap; } .gtable .slink:hover { text-decoration: underline; }
 .sheet .summary { margin-top: 12px; }
+/* By-series tables: never wider than the screen (they scroll inside if they must); series names shorten */
+.summary { grid-template-columns: minmax(0, 1fr); } .summary > * { min-width: 0; }
+.tscroll { overflow-x: auto; max-width: 100%; }
+.tscroll .gtable td:first-child { max-width: 38vw; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 440px) {
+  .tscroll .gtable { font-size: 11.5px; }
+  .tscroll .gtable th, .tscroll .gtable td { padding-left: 4px; padding-right: 4px; }
+  .tscroll .gtable td:first-child { max-width: 31vw; }
+  .tscroll .gtable .stag { font-size: 10px; padding: 0 4px; }
+}
+@media (max-width: 400px) {
+  .tscroll .gtable td:first-child { max-width: 25vw; }
+  .sum-group:has(.tscroll) { padding-left: 10px; padding-right: 10px; }
+}
+.tscroll .gtable .stag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.gtable tr.sub td:first-child { padding-left: 14px; }
+.gtable.flat tr.sub td:first-child { padding-left: 12px; }
+.gtable button.grp { border: 0; background: none; padding: 0; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.gtable button.grp .stag { cursor: pointer; }
 #sheet-events { margin-top: 8px; }
 </style>
 </head>
@@ -378,7 +397,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   </div>
   <div class="summary" id="sheet-stats"></div>
   <div class="hint" id="sheet-hint"></div>
-  <div id="sheet-series-wrap"><h3 class="more-h">By series</h3><table class="gtable" id="sheet-series"></table></div>
+  <div id="sheet-series-wrap"><h3 class="more-h">By series</h3><div class="tscroll"><table class="gtable" id="sheet-series"></table></div></div>
   <div id="sheet-chart-wrap" hidden>
     <div class="chart-h"><h3>Bankroll</h3><span>net after each event</span></div>
     <div class="chart" id="sheet-chart"></div>
@@ -392,6 +411,6 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 <script src="../apt/tracker.js?v=bce8511306"></script>
 <script src="../glpc/glpc.js?v=c0e2dc44dc"></script>
 <script src="../triton/triton.js?v=421b8f312a"></script>
-<script src="all.js?v=f7a41bc1ea"></script>
+<script src="all.js?v=d68431cd1a"></script>
 </body>
 </html>
