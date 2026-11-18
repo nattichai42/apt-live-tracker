@@ -115,3 +115,13 @@ Rates are cached in the browser. The all-time Triton view always picks one curre
 - Triton: event start = the event's own start date (the day list sometimes holds only Day 2), the venue's time zone when
   Triton's is missing or wrong, never after the first bust. Pre-2020 bust times are a placeholder (21 Apr 2021) and are ignored.
 - ITM % on players is per bullet (cashes / bullets); the panel also shows it per event.
+
+## APT registration lists
+
+Each APT event has an unlinked page, `/series/<series>/events/<id>/players`, listing everyone registered (name and
+country, no entry counts). The poller reads it every 2 minutes while an event runs and once when it finishes (including
+events that finished before tracking began), and adds every registered player never seen at a table with one bullet.
+Later days list that day's players, so a Final Day player found in an earlier flight counts as carried over.
+"All bullets known" on APT means the bullets counted (seen, re-entries seen, registered) add up to the official entries
+within 2 or 1%; elsewhere unattributed re-entries make players' bullets a minimum. A finished multi-flight event's panel
+shows every flight's players with bullets summed.

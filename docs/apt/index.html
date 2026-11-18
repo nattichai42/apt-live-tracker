@@ -332,6 +332,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <h4>Event cards</h4>
     <ul>
       <li>Entries (official) = players seen + re-entries + waiting for a seat + missed. The coloured bar shows that split.</li>
+      <li>When an event finishes, its full registration list (an unlinked page of the APT site) adds every player we never saw at a table, with one bullet. The list has no entry counts, so re-entries we didn't see stay unattributed.</li>
       <li>Waiting for a seat: registered (counted in entries and players left) but not in the seating list yet.</li>
       <li>Missed bullets were never seen: busted before tracking began, a re-entry bought at the table without leaving the seat (the seating list doesn't change and the site has no live chip counts), or a bust and re-entry between two polls.</li>
       <li>A return counts as a re-entry only while registration is open and the official entry count goes up since the bust. The count often updates after the seating list, so the tracker waits up to 3 minutes for it; if it doesn't rise, the bust is undone as a data glitch. The seat doesn't matter: a rebuy can land back in the same seat.</li>
@@ -343,7 +344,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     <ul>
       <li>Buy-in = bullets seen × buy-in. A ≥ means some of that player's events were not watched from the start; there one bullet is counted.</li>
       <li>"Finished events only" counts an event once every flight and day has ended, so prizes still to be won (and buy-ins of events still running) are left out.</li>
-      <li>Events played before tracking began only show their cashers, so ITM and net look far better than reality. Tick "All bullets known" for honest totals: only events watched from their first minute, where every player and re-entry was seen.</li>
+      <li>"All bullets known" keeps events whose bullets counted (seen at the tables, re-entries seen, and registered players) add up to the official entries, allowing 2 entries or 1% for cancelled registrations. Elsewhere some re-entries can't be credited to anyone, so players' bullets and buy-ins there are a minimum (≥).</li>
       <li>Players are matched by name; name edits by the floor (e.g. reordered names) are merged.</li>
     </ul>
   </details>
@@ -393,7 +394,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=f81f1587bd"></script>
-<script src="tracker.js?v=c8729a92b3"></script>
+<script src="tracker.js?v=200699f108"></script>
 <script>
 (function () {
   'use strict';
@@ -797,8 +798,17 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     fillCountries($('#sheet-country'), psAll.map((p) => p.cc));
     // The country filter narrows the lists and their counts; the totals above stay for the whole field
     const ps = prefs.country ? psAll.filter((p) => p.cc === prefs.country) : psAll;
+    // A finished event over several flights: the numbers cover every flight (bullets counted from registration lists)
+    const allFlights = e.phase === 'Completed' && T.isLaterDay(e.name) && Object.values(state.events).filter((x) => x.num === e.num).length > 1;
+    if (allFlights) {
+      const players = psAll.filter((p) => p.bullets > 0).length, counted = psAll.reduce((a, p) => a + (p.bullets || 0), 0);
+      tile(st, 'Entries', num(e.entries)); tile(st, 'Players', num(players)); tile(st, 'Cashed', num(psAll.filter((p) => p.pos != null).length));
+      tile(st, 'Bullets counted', num(counted)); tile(st, 'Re-entries', num(Math.max(0, counted - players)));
+      tile(st, 'Missed', num(Math.max(0, (e.entries || 0) - counted)), 're-entries no one is credited with', counted < e.entries ? 'gold' : '');
+    } else {
     tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Seated', num(psAll.filter((p) => p.status === 'seated').length));
     tile(st, 'Busts', num(psAll.reduce((a, p) => a + p.busts.length, 0))); tile(st, 'Re-entries', num(info.reentriesSeen || 0)); tile(st, 'Missed', num(info.untracked), '', info.untracked ? 'gold' : '');
+    }
     const hint = $('#sheet-hint'); hint.replaceChildren();
     if (info.entries != null) hint.appendChild(entriesMix(info));
     const groups = {
@@ -827,6 +837,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       const meta = el('div', 'meta');
       if (p.status === 'seated') meta.appendChild(el('span', '', p.table ? `Table ${p.table} · Seat ${p.seat}` : 'Waiting for a seat'));
       if (p.lastBust) meta.appendChild(el('span', '', (p.status === 'seated' ? 'last bust ' : 'out ') + fTime.format(new Date(p.lastBust * 1000))));
+      if (p.regOnly) meta.appendChild(el('span', '', 'registered, not seen at a table'));
       if (p.bullets > 1) meta.appendChild(el('span', '', `bullet ${p.bullets}`));
       if (p.status === 'cashed') meta.appendChild(el('span', '', 'paid before tracking'));
       left.appendChild(meta);
@@ -868,8 +879,9 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const scope = [prefs.finished ? 'Finished events' : '', prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : '', q ? `“${q}”` : '',
       prefs.sort === 'seated' ? 'seated now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
     const h = $('#summary-h');
-    h.className = 'note' + (prefs.fromStart ? '' : ' warn');
-    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is known (watched from their start)' : '⚠ Includes events played before tracking (only cashers known): ITM and net look better than reality');
+    const someMin = rows.some((p) => p.partial);
+    h.className = 'note' + (!prefs.fromStart && someMin ? ' warn' : '');
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is known (bullets counted add up to the entries)' : someMin ? '≥ Some events have re-entries no player is credited with: bullets and buy-ins there are a minimum' : 'All events');
   }
 
   function renderPlayers() {

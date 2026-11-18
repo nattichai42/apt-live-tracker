@@ -97,9 +97,11 @@
   // name not already present in this event), or null
   function findCarrySource(state, e, n) {
     const sibs = Object.values(state.events).filter((x) => x.num === e.num && x.kid !== e.kid && (x.start || 0) < (e.start || Infinity));
-    if (sibs.some((x) => x.p && x.p[n] && x.p[n].st === 'end')) return n;
+    // Bagged in a watched flight, or registered in a flight we only know from its registration list
+    const fromFlight = (p) => p && (p.st === 'end' || p.reg);
+    if (sibs.some((x) => x.p && fromFlight(x.p[n]))) return n;
     for (const x of sibs) for (const [k, p] of Object.entries(x.p || {})) {
-      if (p.st === 'end' && k !== n && !(e.p && e.p[k]) && similarNames(k, n)) return k;
+      if (fromFlight(p) && k !== n && !(e.p && e.p[k]) && similarNames(k, n)) return k;
     }
     return null;
   }
@@ -322,9 +324,9 @@
     for (const e of Object.values(state.events || {})) {
       if (!isLaterDay(e.name) || !e.p || !e.firstPoll) continue;
       for (const [n, p] of Object.entries(e.p)) {
-        if (p.carry || p.f !== e.firstPoll || (p.b || 0) > 1) continue;
+        if (p.carry || (p.b || 0) > 1 || (p.r && p.r.length)) continue;
         const src = findCarrySource(state, e, n);
-        if (src && src !== n) { p.carry = 1; p.b = 0; (state.aliases || (state.aliases = {}))[src] = n; fixed++; }
+        if (src) { p.carry = 1; p.b = 0; if (src !== n) (state.aliases || (state.aliases = {}))[src] = n; fixed++; }
       }
     }
     // Payouts saved as final while the site was still filling them in
@@ -392,6 +394,34 @@
     return fixed;
   }
 
+  // Everyone registered for an event, once each (an unlinked page of the site: /events/<id>/players). It has no entry
+  // counts, but it completes the field: players who busted before we watched, or between two polls.
+  async function fetchRegistered(fetchFn, kid) {
+    const d = await getData(fetchFn, `${BASE}/${kid}/players/__data.json`);
+    return (d.players || []).filter((p) => p && p.name).map((p) => [clean(p.name), p.countryCode || '']);
+  }
+  // Once a flight / single-day event has finished, add every registered player we never saw (one bullet, bust time
+  // unknown). Later days list who is playing that day, not entrants, so they only give the count.
+  function mergeRegistered(state, e, list, now) {
+    e.regN = list.length; e.regAt = now;
+    if (e.phase !== 'Completed') return 0; // while it runs, a registered player may still sit down
+    e.regDone = 1;
+    if (isLaterDay(e.name)) return 0;
+    e.p = e.p || {};
+    const onList = new Set(list.map(([n]) => n));
+    const have = new Set(Object.keys(e.p).map((k) => canon(state, k)));
+    let added = 0;
+    for (const [n0, cc] of list) {
+      const n = canon(state, n0);
+      if (have.has(n)) { const p = e.p[n] || e.p[n0]; if (p && !p.cc && cc) p.cc = cc; continue; }
+      // Seen at a table under another spelling of the same name: same player
+      if (Object.keys(e.p).some((k) => !onList.has(k) && similarNames(k, n))) continue;
+      e.p[n] = { b: 1, st: 'x', f: e.start || now, x: [], cc, reg: 1 };
+      have.add(n); added++;
+    }
+    return added;
+  }
+
   /**
    * One polling round. opts: {fetchFn, interval (s), listEvery (s), resultsEvery (s, events in the money),
    *   finalEvery (s, finished events whose payouts are still settling), evEvery (s), concurrency}
@@ -440,6 +470,19 @@
       const r = applySnapshot(state, g.kid, g.players, now, interval);
       summary.events++; summary.busts += r.busts; summary.reentries += r.reentries; summary.entries += r.entries;
     }
+    // Registration lists: running events every regEvery (for the count), each finished event once (to complete its field)
+    const regWant = Object.values(state.events).filter((e) => {
+      if (e.regDone) return false;
+      if (e.phase === 'Completed') return !e.start || e.start < now;
+      return kids.includes(e.kid) && (!e.regAt || now - e.regAt >= (opts.regEvery || 120));
+    }).sort((a, b) => (b.phase === 'Completed') - (a.phase === 'Completed') || (a.start || 0) - (b.start || 0)).slice(0, opts.regBatch || 8);
+    const regs = await pool(regWant, opts.concurrency || 4, async (e) => ({ e, list: await fetchRegistered(fetchFn, e.kid) }));
+    for (const g of regs) {
+      if (!g || g.error) { note(g || { error: 'unknown' }); continue; }
+      summary.registered = (summary.registered || 0) + mergeRegistered(state, g.e, g.list, now);
+    }
+    // Later-day players who turn out to be from a flight we only knew by its registration list are carried over
+    if (regs.some((g) => g && g.e && g.e.regDone)) repair(state);
     // Payouts: in-the-money events every resultsEvery, finished ones every finalEvery until complete
     const nums = [...new Set(Object.values(state.events).map((e) => e.num))];
     const want = nums.filter((num) => {
@@ -459,14 +502,20 @@
 
   /* ---------- Derived views ---------- */
 
-  // Was every flight/day of this event watched from its first minute (or not started yet)?
+  // Every bullet known: in each flight (or single-day event) the bullets counted - seen at the tables, re-entries
+  // seen, and registered players never seen - add up to the official entries, allowing 2 entries or 1% for
+  // cancelled registrations. Later days add no unknown bullets of their own. Name kept for the page's filter.
+  function bulletsKnownIn(e) {
+    if (!(e.entries > 0)) return false;
+    const counted = Object.values(e.p || {}).reduce((a, p) => a + (p.b || 0), 0);
+    return counted >= e.entries - Math.max(2, Math.round(e.entries * 0.01));
+  }
   function watchedFromStart(state, num, now) {
     now = now || nowSec();
     const kids = Object.values(state.events).filter((e) => e.num === Number(num));
-    return kids.length > 0 && kids.some((k) => k.polls > 0) &&
-      kids.every((k) => (k.firstPoll && k.start && k.firstPoll - k.start < 900) || (!k.polls && (!k.start || k.start > now)) ||
-        // or the bullets seen already reach the official count (e.g. a freezeout where every entrant was seen)
-        (!isLaterDay(k.name) && k.polls > 0 && k.entries > 0 && Object.values(k.p || {}).reduce((a, p) => a + (p.b || 0), 0) >= k.entries));
+    const flights = kids.filter((k) => !isLaterDay(k.name));
+    return flights.length > 0 && flights.some((k) => k.polls > 0 || k.regDone) &&
+      flights.every((k) => bulletsKnownIn(k) || (!k.polls && !k.regDone && (!k.start || k.start > now)));
   }
 
   function resultsByName(state, keep) {
@@ -507,7 +556,9 @@
     } : null;
     const res = resultsByName(state, keep);
     const map = new Map();
-    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], untracked: 0 }), map.get(n));
+    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], untracked: 0, unknown: false }), map.get(n));
+    const knownCache = new Map();
+    const known = (num) => { if (!knownCache.has(num)) knownCache.set(num, watchedFromStart(state, num)); return knownCache.get(num); };
     for (const e of Object.values(state.events)) {
       if (keep && !keep(String(e.num))) continue;
       for (const [n0, p] of Object.entries(e.p || {})) {
@@ -515,6 +566,7 @@
         const k = r.nums.get(e.num) || { num: e.num, bullets: 0, buyin: e.buyin, tracked: true };
         k.bullets += p.b || 0; r.nums.set(e.num, k);
         r.bullets += p.b || 0; r.busts += (p.x || []).length;
+        if (!known(e.num)) r.unknown = true; // some bullets in this event are not attributed: counts are a minimum
         if (p.st === 's' && e.phase !== 'Completed') r.seatedIn.push(e.num);
         const lb = (p.x || [])[p.x.length - 1]; if (lb && lb > r.lastBust) r.lastBust = lb;
       }
@@ -540,7 +592,7 @@
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
         buyins, prizes, net: prizes - buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
-        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0,
+        seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0 || r.unknown,
         cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
@@ -595,7 +647,7 @@
       const bullets = p.b || 0;
       info.bullets += bullets;
       if (p.carry) items.push({ ...base, t: p.f, k: 'carry' });
-      else items.push({ ...base, t: p.f, k: 'seen', first: e.firstPoll === p.f, b: 1, amt: bullets ? -e.buyin : 0 });
+      else items.push({ ...base, t: p.f, k: 'seen', first: e.firstPoll === p.f, approx: !!p.reg, reg: !!p.reg, b: 1, amt: bullets ? -e.buyin : 0 });
       // Re-entry times: stored on the record, plus any older ones still in the feed
       const times = new Set(p.r || []);
       for (const f of state.feed) if (f.k === 'reentry' && f.kid === e.kid && canon(state, f.n) === name) times.add(f.t);
@@ -660,8 +712,28 @@
   }
 
   // Everyone tracked in one event (flight/day), joined with that event's results
+  // A finished event over several flights/days opens on its last day: show everyone from every flight, bullets summed
+  function combinedPlayers(state, e, kids) {
+    const res = new Map(((state.results[e.num] || {}).rows || []).map(([pos, n, cc, prize]) => [canon(state, n), { pos, prize, cc }]));
+    const m = new Map();
+    for (const k of kids.slice().sort((a, b) => (a.start || 0) - (b.start || 0))) for (const [n0, p] of Object.entries(k.p || {})) {
+      const n = canon(state, n0);
+      const r = m.get(n) || { name: n, cc: '', status: 'busted', table: null, seat: null, bullets: 0, carry: false, firstSeen: p.f, busts: [], lastBust: null, regOnly: true };
+      r.cc = r.cc || p.cc || ''; r.bullets += p.b || 0; r.busts = r.busts.concat(p.x || []);
+      if (p.st === 'end') r.status = 'end';
+      if (!p.reg) r.regOnly = false;
+      m.set(n, r);
+    }
+    const out = [...m.values()].map((r) => { const c = res.get(r.name); const busts = r.busts.sort((a, b) => a - b);
+      return { ...r, busts, lastBust: busts[busts.length - 1] || null, pos: c ? c.pos : null, prize: c ? c.prize : null }; });
+    for (const [n, c] of res) if (!m.has(n)) out.push({ name: n, cc: c.cc, status: 'cashed', table: null, seat: null, bullets: 0, busts: [], lastBust: null, pos: c.pos, prize: c.prize });
+    return out;
+  }
+
   function eventPlayers(state, kid) {
     const e = state.events[kid]; if (!e) return [];
+    const kids = Object.values(state.events).filter((x) => x.num === e.num);
+    if (kids.length > 1 && isLaterDay(e.name) && kids.every((x) => x.phase === 'Completed')) return combinedPlayers(state, e, kids);
     const res = new Map(((state.results[e.num] || {}).rows || []).map(([pos, n, cc, prize]) => [canon(state, n), { pos, prize, cc, raw: n }]));
     const out = Object.entries(e.p || {}).map(([n, p]) => {
       const seat = e.seats && e.seats[n];
@@ -669,7 +741,7 @@
       return { name: n, cc: p.cc || (r && r.cc) || '', status: p.st === 's' ? 'seated' : p.st === 'end' ? 'end' : 'busted',
         table: seat ? seat[0] : null, seat: seat ? seat[1] : null, bullets: p.b || 0, carry: !!p.carry,
         firstSeen: p.f, busts: p.x || [], lastBust: (p.x || [])[(p.x || []).length - 1] || null,
-        atStart: p.f === e.firstPoll, pos: r ? r.pos : null, prize: r ? r.prize : null };
+        atStart: p.f === e.firstPoll, regOnly: !!p.reg, pos: r ? r.pos : null, prize: r ? r.prize : null };
     });
     // Cashers we never saw seated (e.g. results from before tracking)
     for (const [n, r] of res) if (!pOf(state, e, n) && Object.values(state.events).filter((x) => x.num === e.num).every((x) => !pOf(state, x, n)))
