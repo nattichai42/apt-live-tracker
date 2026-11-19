@@ -1,0 +1,59 @@
+{
+ "series": [
+  {
+   "id": "newweek-mtt",
+   "name": "NEWWEEK MTT",
+   "place": "NEWWEEK MTT",
+   "tag": "NEWWEEK MTT '26",
+   "start": "2026-10-06",
+   "end": "2026-10-08",
+   "tz": "Asia/Ho_Chi_Minh",
+   "currency": "VND",
+   "events": 1,
+   "entries": 776,
+   "players": 413,
+   "paid": 1505440000,
+   "played": 1,
+   "known": 0,
+   "watched": false,
+   "bytes": 54821
+  },
+  {
+   "id": "rpt-championship-iv",
+   "name": "RPT Championship IV",
+   "place": "Championship IV",
+   "tag": "Championship IV '26",
+   "start": "2026-09-11",
+   "end": "2026-09-22",
+   "tz": "Asia/Ho_Chi_Minh",
+   "currency": "VND",
+   "events": 117,
+   "entries": 11666,
+   "players": 1568,
+   "paid": 124041600000,
+   "played": 117,
+   "known": 10,
+   "watched": false,
+   "bytes": 739310
+  },
+  {
+   "id": "rpt-championship-iii",
+   "name": "RPT Championship III",
+   "place": "Championship III",
+   "tag": "Championship III '26",
+   "start": "2026-06-03",
+   "end": "2026-06-16",
+   "tz": "Asia/Ho_Chi_Minh",
+   "currency": "VND",
+   "events": 116,
+   "entries": 9855,
+   "players": 1523,
+   "paid": 119621655000,
+   "played": 122,
+   "known": 4,
+   "watched": false,
+   "bytes": 654220
+  }
+ ],
+ "updatedAt": 1795118059
+}

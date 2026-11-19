@@ -33,7 +33,12 @@
     // being played every half minute or so; its engine builds on the APT engine (load apt/tracker.js first)
     gop: { name: 'GOP', full: 'Gods of Poker', engine: 'gop/gop.js', needs: ['apt/tracker.js'], global: 'GOPTracker', page: 'gop/', prefs: 'gop-live-prefs-v1',
       poll: { minInterval: 30, maxInterval: 90, budget: 0.3, publishEvery: 2 },
-      archive: { tool: 'tools/gop-archive.js', dir: 'gop/archive/', list: 'series', key: 'series' } },
+      archive: { tool: 'tools/series-archive.js', dir: 'gop/archive/', list: 'series', key: 'series', note: "Gods of Poker's complete records: every bullet, bust and payout" } },
+    // Royal Poker Tour (Vietnam): standings and payouts per event; re-entries and bust times only from watching live
+    // (a new seat id is a re-entry). Its engine builds on the APT engine too
+    rop: { name: 'RPT', full: 'Royal Poker Tour', engine: 'rop/rop.js', needs: ['apt/tracker.js'], global: 'ROPTracker', page: 'rop/', prefs: 'rop-live-prefs-v1',
+      poll: { minInterval: 20, maxInterval: 60, budget: 1, publishEvery: 2 },
+      archive: { tool: 'tools/series-archive.js', dir: 'rop/archive/', list: 'series', key: 'series', note: 'standings and payouts as published by the Royal Poker Tour (re-entries not credited to players)' } },
     triton: { name: 'Triton', engine: 'triton/triton.js', global: 'TritonTracker', page: 'triton/', prefs: 'triton-live-prefs-v1',
       poll: { minInterval: 15, maxInterval: 60, budget: 0.5, publishEvery: 2 },
       archive: { tool: 'tools/triton-archive.js', dir: 'triton/archive/', list: 'festivals', key: 'festival' } },
@@ -42,7 +47,7 @@
   // id: never changes (links, browser storage). branch: where the poller saves (one per series).
   // start/end: first and last day in the venue's time zone (tz). place: the clock the page shows times in.
   // tag: short name next to the organiser ("APT Taipei '26"). source: what the engine needs to find the series.
-  // Banner (home page): title, mark, sub, art (apt | gop | glpc | triton | tone), watermark.
+  // Banner (home page): title, mark, sub, art (apt | gop | rop | glpc | triton | tone), watermark.
   // storage: browser key of the page's saved copy (defaults to the id).
   const LIST = [
     { id: 'apt-taipei-2026', org: 'apt', branch: 'data', storage: 'apt-live-state-v1',
@@ -75,6 +80,11 @@
       link: 'https://godsofpoker.com/series/taipei-2027',
       title: 'Gods of Poker, Taipei 2027', mark: 'GOP Taipei', sub: 'Gods of Poker · 2027', art: 'gop', watermark: '2027',
       source: { series: 'taipei-2027' } },
+    { id: 'rop-grand-final-2026', org: 'rop', branch: 'rop-grand-final-2026-data',
+      name: 'RPT V Grand Final', tag: "Grand Final '26", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-11-30', end: '2026-12-11',
+      link: 'https://royal-poker.com/en',
+      title: 'Royal Poker Tour V, Grand Final 2026', mark: 'RPT Grand Final', sub: 'Royal Poker Tour · Vietnam', art: 'rop', watermark: 'V',
+      source: { series: 'rpt-v-grand-final' } },
     { id: 'triton-n-cyprus-2026', org: 'triton', branch: 'triton-data', storage: 'triton-live-state-v1',
       name: 'Triton N. Cyprus 2026', tag: "N. Cyprus '26", place: 'Cyprus', tz: 'Europe/Athens', currency: 'USD', start: '2026-11-15', end: '2026-11-30',
       link: 'https://tritonpoker.plus/festival/daca20f2-506a-4377-9c73-2651390b6782',

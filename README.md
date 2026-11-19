@@ -24,6 +24,7 @@ copying one of that organiser's and changing:
   - GLPC: `{ series, seriesUrl, from, to }` (the tournaments listed between those dates)
   - Triton: `{ festival: '<festival id from tritonpoker.plus/festival/<id>>', series }`
   - Gods of Poker: `{ series: '<slug from godsofpoker.com/series/<slug>>' }`
+  - Royal Poker Tour: `{ series: '<festival slug, as in api.royal-poker.com/api/v1/public/series-groups>' }`
 
 Then run `tools/stamp.sh` and push. The *Poll series* workflow starts polling it the day before it starts, and stops two days after it
 ends. To start it earlier, run that workflow by hand with the series id. Its page is
@@ -124,9 +125,31 @@ and the payouts. So nothing is inferred from seats changing, and past series are
 - The page is the APT page: `docs/gop/index.html` is made from `docs/apt/index.html` by `tools/stamp.sh` with
   `data-org="gop"` (edit the APT page; a test fails if the copy is behind). Organiser-specific text sits in
   `data-only="apt"` / `data-only="gop"` blocks.
-- `node tools/gop-archive.js` saves every finished series (`--only <slug>`, `--force`, `--rates`); the poller archives
+- `node tools/series-archive.js --org gop` saves every finished series (`--only <slug>`, `--force`, `--rates`); the poller archives
   a watched series itself when it ends (`--series <id> --from-state`). Rates for their dates are in `docs/gop/archive/fx.json`
   (`tools/rates.js`, shared with the APT archive).
+
+## Royal Poker Tour (`docs/rop/`)
+
+The Royal Poker Tour (royal-poker.com, Vietnam) runs its festivals on its own app, whose public API
+(`api.royal-poker.com/api/v1`) lists a festival's events (`/public/events`, filtered by festival) and, for each, its
+standings (`/public/events/<id>/standings`: every player, their current seat, busted or not) and payouts.
+
+- `docs/rop/rop.js` builds the APT engine's shape from them, like GOP's engine. The API has no per-player entry counts
+  or bust times, so they come from watching: a player back with a new seat id has re-entered, and a bust is timed at
+  the poll that first sees it. An event read only after it finished gives each player one bullet (re-entries are in its
+  entry count, not credited: bullets are a minimum, as for APT series not watched live).
+- Flights and later days share an event's series (`#30 - RPT CHAMPIONSHIP - DAY 1A` ... `FINAL DAY`). A later day's own
+  entry count is the players who reached it; the event's total (`flightGroupEntries`) is used there instead.
+- Results are the last part's places plus flight cashes by players who didn't reach it; they match each event's prize
+  pool in all 117 events of Championship IV.
+- Championship III (June 2026) gives amounts in thousands of VND (first prizes below the buy-in, scaled up), and its
+  payouts and pools disagree in a third of its events: shown as published. Championships I and II have only their
+  schedule on the platform, so they aren't saved.
+- Names typed in capitals are shown in normal case ("TRẦN ĐỨC HÙNG" -> "Trần Đức Hùng").
+- No CORS: the page shows what the poller saved. `node tools/series-archive.js --org rop` saves finished festivals.
+- rptlive.app (mentioned as RPT's live site) didn't answer when this was built (Cloudflare 525); it may be up only
+  during festivals.
 
 ## GLPC VI (Grand Loyal Poker Championships, 18–29 Nov 2026)
 

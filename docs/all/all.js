@@ -34,6 +34,7 @@
   const ADAPT = {
     apt: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     gop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
+    rop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     glpc: { name: (e, E) => E.baseName(e.name), isLater: (e) => !!e.laterDay },
     triton: { nat: (e) => e.cur || 'USD' },
   };

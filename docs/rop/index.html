@@ -1,0 +1,1358 @@
+<!doctype html>
+<!-- Made by tools/stamp.sh from docs/apt/index.html: edit that page, not this one -->
+<html lang="en" data-org="rop">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0c0f">
+<title>Royal Poker Tour Live Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600&display=swap">
+<style>
+/* Styled after the APT site: zinc-950 page, zinc-900 cards, Inter text, Oswald headings, teal status, gold prizes.
+   One deliberate dark look, like the site itself. */
+:root {
+  --bg: #0c0c0f; --card: #18181b; --card2: #1f1f23; --hover: #232328; --line: #27272a; --line2: #3f3f46;
+  --fg: #fafafa; --fg2: #d4d4d8; --muted: #a1a1aa; --dim: #71717a;
+  --teal: #14b8a6; --teal2: #2dd4bf; --teal-soft: rgba(20, 184, 166, .14);
+  --gold: #cea45b; --gold-soft: rgba(206, 164, 91, .14);
+  --rose: #f43f5e; --rose-soft: rgba(244, 63, 94, .14);
+  --amber: #fbbf24; --amber-soft: rgba(251, 191, 36, .14);
+  --sky: #38bdf8; --sky-soft: rgba(56, 189, 248, .14);
+  /* names used by the chart code */
+  --ok: var(--teal2); --bust: var(--rose); --panel: var(--card); --accent: var(--teal);
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --head: 'Oswald', 'Arial Narrow', 'Inter', sans-serif;
+  --r: 8px; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); -webkit-text-size-adjust: 100%; }
+body { padding-bottom: env(safe-area-inset-bottom, 0px); font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* Header */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(12, 12, 15, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--bg); }
+.top-row { display: flex; align-items: center; gap: 8px; padding-block: 12px 4px; }
+.home { flex: none; display: grid; place-items: center; width: 34px; height: 34px; margin-left: -6px; border-radius: 8px; color: var(--fg); }
+.home:hover { background: var(--card); } .home svg { width: 22px; height: 22px; }
+.brand { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.brand h1 { font: 600 20px/1 var(--head); letter-spacing: .02em; text-transform: uppercase; margin: 0; white-space: nowrap; }
+.brand { overflow: hidden; }
+.brand span { font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.brand a { color: inherit; text-decoration: none; } .brand a:hover { text-decoration: underline; }
+.ctl { position: relative; display: flex; align-items: center; flex: none; }
+.menu-btn { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); cursor: pointer; }
+.menu-btn:hover, .menu-btn[aria-expanded="true"] { background: var(--card); }
+.menu-btn svg { width: 20px; height: 20px; }
+.menu { position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; width: 230px; padding: 6px; background: var(--card); border: 1px solid var(--line2); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35); display: grid; gap: 2px; }
+.mrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 8px; border-radius: 6px; font-size: 13.5px; color: var(--fg2); }
+.mrow .sel { padding-block: 4px; min-width: 92px; }
+button.mrow { width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left; font: inherit; color: var(--fg2); }
+button.mrow:hover { background: var(--hover); }
+.mrow small { color: var(--dim); font-size: 12px; }
+.sel, .btn { border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+.sel { appearance: none; padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 13px) 52%, calc(100% - 9px) 52%; background-size: 4px 4px; background-repeat: no-repeat; max-width: 100%; }
+.btn:hover, .sel:hover { border-color: var(--dim); }
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-bottom: 6px; min-width: 0; }
+.status span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+.dot.live { background: var(--teal); animation: pulse 2s infinite; }
+.dot.err { background: var(--rose); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, .6); } 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+.tabs { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+.tab { border: 0; background: none; padding: 8px 0 10px; cursor: pointer; color: var(--muted); font: 600 15px/1 var(--head); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; border-bottom: 2px solid transparent; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--teal); }
+.tab .n { font: 500 11px var(--sans); color: var(--dim); margin-left: 5px; letter-spacing: 0; }
+
+/* Layout */
+main { padding-block: 16px 48px; }
+.grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) {
+  .grid.two { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+  .tabs .tab[data-tab="events"] { display: none; }
+  .grid.two #view-events { display: block !important; grid-column: 2; grid-row: 1; }
+  #view-feed, #view-players { grid-column: 1; grid-row: 1; }
+}
+.section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 22px 0 10px; }
+.section-h:first-child { margin-top: 0; }
+.section-h h2 { font: 600 16px/1.1 var(--head); letter-spacing: .05em; text-transform: uppercase; margin: 0; color: var(--fg); }
+.section-h .t { font-size: 12px; color: var(--dim); }
+.empty { padding: 22px 12px; color: var(--dim); text-align: center; font-size: 13px; }
+.more { display: block; width: 100%; margin-top: 10px; text-align: center; }
+
+/* Filters */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.chip { border: 1px solid var(--line2); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.chip[aria-pressed="true"].bust { background: var(--rose-soft); border-color: var(--rose); color: var(--rose); }
+.chip[aria-pressed="true"].re { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+.chip[aria-pressed="true"].entry { background: var(--sky-soft); border-color: var(--sky); color: var(--sky); }
+.chip.toggle input { accent-color: var(--teal); margin: 0; }
+.chip.toggle:has(input:checked) { border-color: var(--teal); color: var(--teal2); background: var(--teal-soft); }
+.search { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line2); background: var(--card); border-radius: 6px; padding: 7px 10px; font-size: 16px; }
+.search::placeholder { color: var(--dim); }
+@media (min-width: 700px) { .search { font-size: 13px; } }
+.sel.small { font-size: 12.5px; padding-block: 5px; }
+
+/* Event cards (APT style) */
+.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+@media (min-width: 980px) { #view-events .cards { grid-template-columns: minmax(0, 1fr); } }
+.card { display: grid; gap: 10px; border: 0; border-radius: var(--r); background: var(--card); padding: 14px 16px; cursor: pointer; text-align: left; width: 100%; transition: background .15s; }
+.card:hover { background: var(--hover); }
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
+.card-top .when { color: var(--muted); font-weight: 600; }
+.phase { font-weight: 700; font-size: 12.5px; color: var(--teal); white-space: nowrap; }
+.phase.itm { color: var(--gold); } .phase.done { color: var(--dim); }
+.card h3 { margin: 0; font-size: 14.5px; font-weight: 500; line-height: 1.3; color: var(--fg); text-wrap: pretty; }
+.num-tag { font-size: 12px; font-weight: 600; color: var(--muted); margin-right: 4px; }
+.part { display: inline-block; font-size: 11px; font-weight: 600; color: var(--fg2); background: var(--card2); border: 1px solid var(--line2); border-radius: 4px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
+.stats4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; text-align: center; }
+.stats4 .k, .kv .k { font-size: 11px; color: var(--dim); }
+.stats4 .v { font-size: 14px; font-weight: 600; color: var(--fg2); }
+.mix { display: grid; gap: 6px; }
+.mix-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); }
+.mix-bar i { display: block; height: 100%; }
+.mix-bar .p { background: var(--teal); } .mix-bar .r { background: var(--amber); } .mix-bar .m { background: var(--line2); } .mix-bar .w { background: var(--sky); } .mix-bar .c { background: #0f766e; }
+.mix-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.mix-legend b { color: var(--fg2); font-weight: 600; }
+.mix-legend .sw { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 5px; vertical-align: 1px; }
+.sw.p { background: var(--teal); } .sw.r { background: var(--amber); } .sw.m { background: var(--line2); } .sw.o { background: var(--rose); } .sw.w { background: var(--sky); } .sw.c { background: #0f766e; }
+
+/* Lists (starting soon, completed) */
+.list { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.list li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); align-items: center; }
+.list li:first-child { border-top: 0; }
+.list .when { font-size: 12px; font-weight: 600; color: var(--muted); }
+.list .nm { font-size: 13.5px; font-weight: 500; color: var(--fg); overflow-wrap: anywhere; }
+.list .sub { font-size: 12px; color: var(--dim); margin-top: 2px; overflow-wrap: anywhere; }
+.list .sub b { color: var(--gold); font-weight: 600; }
+.list .sub b.bag { color: var(--teal2); }
+.list .right { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.list .right b { display: block; color: var(--fg2); font-weight: 600; }
+.list.click li { cursor: pointer; } .list.click li:hover { background: var(--hover); }
+.list .empty { display: block; }
+
+/* Bust feed */
+.feed { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.feed li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); }
+.feed li.day { display: block; padding: 7px 14px; font: 600 12px var(--head); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--card2); }
+.feed li.fresh { animation: flash 2.5s ease-out; }
+@keyframes flash { from { background: var(--teal-soft); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .feed li.fresh { animation: none; } }
+.feed .t { font-size: 12px; color: var(--dim); font-weight: 500; }
+.who { min-width: 0; }
+.who .nm { font-weight: 500; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .nm:hover { text-decoration: underline; }
+.who .ev { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap; text-align: center; }
+.badge.bust { background: var(--rose-soft); color: var(--rose); }
+.badge.reentry { background: var(--amber-soft); color: var(--amber); }
+.badge.entry { background: var(--sky-soft); color: var(--sky); }
+.badge.cash { background: var(--gold-soft); color: var(--gold); }
+.badge.seat, .badge.end { background: var(--teal-soft); color: var(--teal2); }
+
+/* Players */
+.summary { display: grid; gap: 8px; margin-bottom: 8px; }
+.sum-group { background: var(--card); border-radius: var(--r); padding: 10px 14px 12px; }
+.sum-group h3 { margin: 0 0 8px; font: 600 12px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sum-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
+.sum-grid .k { font-size: 11px; color: var(--dim); }
+.sum-grid .v { font-size: 16px; font-weight: 600; color: var(--fg); line-height: 1.25; overflow-wrap: anywhere; }
+.sum-grid .s { font-size: 11px; color: var(--dim); }
+.pos { color: var(--teal2) !important; } .neg { color: var(--rose) !important; } .gold { color: var(--gold) !important; }
+.note { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
+.note.warn { color: var(--amber); }
+.plist { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.plist li { border-top: 1px solid var(--line); } .plist li:first-child { border-top: 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; cursor: pointer; width: 100%; border: 0; background: transparent; text-align: left; align-items: center; }
+.row:hover { background: var(--hover); }
+.row .nm { font-weight: 500; overflow-wrap: anywhere; }
+.row .meta { color: var(--dim); font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; margin-top: 1px; }
+.row .num { text-align: right; white-space: nowrap; }
+.row .num .big { font-size: 14px; font-weight: 600; color: var(--gold); }
+.row .num .small { font-size: 12px; color: var(--dim); }
+.tag { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 4px; }
+.tag.seat { background: var(--teal-soft); color: var(--teal2); }
+.tag.out { background: var(--card2); color: var(--muted); }
+
+/* Notes */
+.others { margin-top: 24px; font-size: 13px; color: var(--dim); } .others a { color: var(--muted); }
+details.notes { margin-top: 24px; color: var(--muted); font-size: 13px; background: var(--card); border-radius: var(--r); padding: 12px 16px; }
+details.notes summary { cursor: pointer; color: var(--fg); font: 600 14px var(--head); letter-spacing: .05em; text-transform: uppercase; }
+details.notes h4 { margin: 14px 0 4px; color: var(--fg2); font-size: 13px; }
+details.notes p, details.notes li { margin: 4px 0; max-width: 72ch; }
+details.notes ul { padding-left: 18px; margin: 4px 0; }
+
+/* Sheet */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 40; }
+.sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow: auto; background: var(--bg); border-radius: 14px 14px 0 0; border-top: 1px solid var(--line2);
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 760px) { .sheet { left: auto; top: 0; bottom: 0; width: 460px; max-height: none; border-radius: 0; border-top: 0; border-left: 1px solid var(--line2); } }
+.sheet-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.sheet-head .spacer { flex: 1; }
+.sheet h2 { margin: 0; font: 600 22px/1.15 var(--head); letter-spacing: .02em; overflow-wrap: anywhere; }
+.sheet .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.sheet-pf { margin: 12px 0 0; }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; background: var(--card); border-radius: var(--r); padding: 12px 14px; }
+.kv .v { font-size: 16px; font-weight: 600; color: var(--fg); }
+.kv .s { font-size: 11px; color: var(--dim); margin-top: 1px; overflow-wrap: anywhere; }
+.more-h { margin: 18px 0 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#sheet-more { margin-top: 12px; }
+.gtable { width: 100%; border-collapse: collapse; margin: 8px 0 4px; background: var(--card); border-radius: var(--r); overflow: hidden; font-size: 12.5px; }
+.gtable th, .gtable td { padding: 8px 6px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
+.gtable th:first-child, .gtable td:first-child { padding-left: 12px; } .gtable th:last-child, .gtable td:last-child { padding-right: 12px; }
+@media (max-width: 420px) { .gtable { font-size: 11.5px; } .gtable th, .gtable td { padding: 8px 4px; } .gtable th:first-child, .gtable td:first-child { padding-left: 10px; } .gtable th:last-child, .gtable td:last-child { padding-right: 10px; } }
+/* a table still too wide for the screen scrolls sideways instead of widening the panel */
+#sheet-games-wrap { overflow-x: auto; }
+.gtable th { font-weight: 500; color: var(--dim); font-size: 11px; border-top: 0; }
+.gtable th:first-child, .gtable td:first-child { text-align: left; }
+.gtable td:first-child { color: var(--fg2); font-weight: 600; }
+.hint { font-size: 12px; color: var(--dim); margin: 0 0 10px; }
+.chart-h { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+.chart-h h3, .tl-h { margin: 0; font: 600 13px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.chart-h span { font-size: 11px; color: var(--dim); }
+.chart { position: relative; margin: 6px 0 16px; background: var(--card); border-radius: var(--r); padding: 10px 6px 4px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+.chart .lbl { fill: var(--dim); font: 10.5px var(--sans); }
+.chart .grid { stroke: var(--line); }
+.chart .zero { stroke: var(--line2); stroke-dasharray: 3 3; }
+.chart .day { stroke: var(--line); stroke-dasharray: 2 3; }
+.chart .ln { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.chart .ln.up { stroke: var(--teal2); } .chart .ln.down { stroke: var(--rose); }
+.chart .pt-in, .chart .pt-out { stroke: var(--card); stroke-width: 1.5; }
+.chart .pt-in { fill: var(--rose); } .chart .pt-out { fill: var(--gold); }
+.chart .end { font: 600 11.5px var(--sans); }
+.chart .tip { position: absolute; pointer-events: none; background: var(--card2); border: 1px solid var(--line2); border-radius: 6px; padding: 6px 9px; font-size: 12px; line-height: 1.4; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); max-width: 230px; z-index: 2; }
+.chart .tip .m { color: var(--muted); font-size: 11px; }
+.seg { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 4px 0 10px; }
+.seg button { border: 1px solid var(--line2); background: transparent; border-radius: 999px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.seg button .n { font-size: 11px; opacity: .7; margin-left: 4px; }
+.sheet .plist .row { padding: 9px 14px; }
+.tl { list-style: none; margin: 8px 0 0; padding: 0; background: var(--card); border-radius: var(--r); overflow: hidden; }
+.tl li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); align-items: start; }
+.tl li:first-child { border-top: 0; }
+.tl .mk { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--dim); }
+.tl li.bust .mk { background: var(--rose); } .tl li.reentry .mk { background: var(--amber); } .tl li.cash .mk { background: var(--gold); }
+.tl li.buyin .mk { background: transparent; border: 1.5px solid var(--rose); } .tl li.end .mk, .tl li.seen .mk, .tl li.carry .mk { background: var(--teal); }
+.tl .when { font-size: 11.5px; color: var(--dim); }
+.tl .what { font-size: 13px; color: var(--fg2); overflow-wrap: anywhere; }
+.tl .amt { text-align: right; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.tl .amt small { display: block; font-weight: 400; font-size: 11px; color: var(--dim); }
+.tl .amt.minus { color: var(--rose); } .tl .amt.plus { color: var(--gold); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <a class="home" href="../" aria-label="Back to all series"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+      <div class="brand"><h1><a href="../" title="All series">APT Taipei 2026</a></h1><span>Live tracker</span></div>
+      <div class="ctl">
+        <button id="menu-btn" class="menu-btn" type="button" aria-label="Settings" aria-haspopup="true" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg></button>
+        <div id="menu" class="menu" hidden>
+          <label class="mrow"><span>Currency</span><select id="fx" class="sel small" aria-label="Currency shown"></select></label>
+          <label class="mrow" id="row-interval"><span>Update every</span><select id="interval" class="sel small" aria-label="How often this page polls">
+          <option value="15">15s</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2m</option><option value="0">Off</option>
+        </select></label>
+          <button id="refresh" class="mrow" type="button"><span>Update now</span><small>↻</small></button>
+        </div>
+      </div>
+    </div>
+    <div class="status" aria-live="polite"><span id="dot" class="dot"></span><span id="status-text">Starting…</span></div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" data-tab="events" aria-selected="false">Events<span class="n" id="n-events"></span></button>
+      <button class="tab" role="tab" data-tab="feed" aria-selected="true">Bust feed<span class="n" id="n-feed"></span></button>
+      <button class="tab" role="tab" data-tab="players" aria-selected="false">Players<span class="n" id="n-players"></span></button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid two" id="grid">
+    <section id="view-feed" role="tabpanel" aria-label="Bust feed">
+      <div class="section-h"><h2>Bust feed</h2><span class="t" id="feed-count"></span></div>
+      <div class="filters">
+        <button class="chip bust" data-kind="bust" aria-pressed="true">Busts</button>
+        <button class="chip re" data-kind="reentry" aria-pressed="true">Re-entries</button>
+        <button class="chip entry" data-kind="entry" aria-pressed="false">New entries</button>
+        <select id="feed-event" class="sel small" aria-label="Event"><option value="">All events</option></select>
+        <select id="feed-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
+        <input id="feed-q" class="search" type="search" placeholder="Search player" aria-label="Search player" autocomplete="off">
+      </div>
+      <ul class="feed" id="feed"></ul>
+      <button class="btn more" id="feed-more" type="button" hidden>Show more</button>
+    </section>
+
+    <section id="view-events" role="tabpanel" aria-label="Events" hidden>
+      <div class="section-h"><h2>Running now</h2><span class="t">tap for players</span></div>
+      <div class="cards" id="events"></div>
+      <div class="section-h"><h2>Starting soon</h2></div>
+      <ul class="list" id="soon"></ul>
+      <div class="section-h"><h2>Completed</h2><span class="t" id="done-count"></span></div>
+      <ul class="list click" id="done"></ul>
+      <button class="btn more" id="done-more" type="button" hidden>Show all completed</button>
+    </section>
+
+    <section id="view-players" role="tabpanel" aria-label="Players" hidden>
+      <div class="section-h"><h2>Players</h2><span class="t" id="players-count"></span></div>
+      <div class="filters">
+        <input id="players-q" class="search" type="search" placeholder="Search player" aria-label="Search players" autocomplete="off">
+        <select id="players-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
+        <select id="players-sort" class="sel small" aria-label="Sort players">
+          <option value="prizes">Prizes</option><option value="net">Net</option><option value="bullets">Bullets</option>
+          <option value="reentries">Re-entries</option><option value="buyins">Buy-in</option><option value="itm">ITM %</option>
+          <option value="lastBust">Latest bust</option><option value="seated">Seated now</option><option value="name">Name</option>
+        </select>
+        <button id="players-dir" class="btn" type="button" aria-label="Sort direction">↓</button>
+        <label class="chip toggle"><input type="checkbox" id="players-finished"> Finished events only</label>
+        <label class="chip toggle"><input type="checkbox" id="players-fromstart"> All bullets known</label>
+      </div>
+      <p class="note" id="summary-h"></p>
+      <div class="summary" id="players-summary" aria-label="Summary of the players listed"></div>
+      <ul class="plist" id="players"></ul>
+      <button class="btn more" id="players-more" type="button" hidden>Show more</button>
+    </section>
+  </div>
+
+  <nav class="others" aria-label="Other trackers"><a href="../">All series</a> · <a href="../glpc/">GLPC VI</a> · <a href="../triton/">Triton N. Cyprus</a></nav>
+  <details class="notes">
+    <summary>How the numbers work</summary>
+    <div data-only="gop" hidden>
+    <h4>Where the data comes from</h4>
+    <ul>
+      <li>Gods of Poker publishes complete records for every event: each bullet bought (with its time), each bust (with its time, table and seat) and the payouts. A poller on GitHub reads the events being played about every half minute and saves its record every couple of minutes; this page loads that record and refreshes it every minute (the site doesn't let other pages read it directly).</li>
+      <li>So bullets, re-entries and busts are exact, for past series too: nothing is inferred from seats changing.</li>
+      <li>Times are the venue's local time.</li>
+    </ul>
+    <h4>Event cards</h4>
+    <ul>
+      <li>A bullet counts in the flight where it was bought. A later day (Day 2, Final Day) and an "ITM holding" table show players carried over from the flights, plus new entries where registration is still open.</li>
+      <li>Satellites and side events Gods of Poker leaves unnumbered are shown without a number.</li>
+    </ul>
+    </div>
+    <div data-only="rop" hidden>
+    <h4>Where the data comes from</h4>
+    <ul>
+      <li>The Royal Poker Tour app publishes each event's standings (every player, their seat, busted or not) and payouts. A poller on GitHub reads the events being played about every 20 s and saves its record every couple of minutes; this page loads that record and refreshes it every minute (the site doesn't let other pages read it directly).</li>
+      <li>A player who comes back with a new seat has re-entered; a bust is timed at the poll that first saw it.</li>
+      <li>An event read only after it finished (every event of a past series) gives each player one bullet: its re-entries are in the entry count but not credited to anyone, so bullets and buy-ins there are a minimum (≥).</li>
+      <li>Times are Vietnam time.</li>
+    </ul>
+    <h4>Event cards</h4>
+    <ul>
+      <li>A later day (Day 2, Final Day) shows players carried over from the flights; its entries are the whole event's. Results add the final day's places to the flight cashes of players who didn't reach it.</li>
+      <li>Satellites and events without a number are shown without one.</li>
+    </ul>
+    </div>
+    <div data-only="apt">
+    <h4>Where the data comes from</h4>
+    <ul>
+      <li>This page reads the APT site's live seating for every running event, from your browser (every 60 s by default). A player whose seat disappears is logged as busted; a busted player who sits down again while registration is open is a re-entry.</li>
+      <li>A poller on GitHub does the same around the clock and saves its record every few minutes. This page loads that record on open, then continues live.</li>
+      <li>Payouts (places and prizes) come from the site's payout pages, checked every minute while an event is in the money. Chip counts on the site are not live, so they are not shown.</li>
+      <li>Times are the venue's local time. A bust is stamped at the poll that first saw the seat empty.</li>
+    </ul>
+    <h4>Event cards</h4>
+    <ul>
+      <li>Entries (official) = players seen + re-entries + waiting for a seat + missed. The coloured bar shows that split.</li>
+      <li>When an event finishes, its full registration list (an unlinked page of the APT site) adds every player we never saw at a table, with one bullet. The list has no entry counts, so re-entries we didn't see stay unattributed.</li>
+      <li>Waiting for a seat: registered (counted in entries and players left) but not in the seating list yet.</li>
+      <li>Missed bullets were never seen: busted before tracking began, a re-entry bought at the table without leaving the seat (the seating list doesn't change and the site has no live chip counts), or a bust and re-entry between two polls.</li>
+      <li>A return counts as a re-entry only while registration is open and the official entry count goes up since the bust. The count often updates after the seating list, so the tracker waits up to 3 minutes for it; if it doesn't rise, the bust is undone as a data glitch. The seat doesn't matter: a rebuy can land back in the same seat.</li>
+      <li>A later day (Day 2, Final Day) shows players carried over from the flights, plus new entries if registration is open.</li>
+      <li>"Over" means we counted more bullets than the official entries: registrations cancelled after seating.</li>
+      <li>For a later day (Day 2, Final Day) the entries cover every flight, so missed is only known when all flights were watched from their start.</li>
+    </ul>
+    </div>
+    <h4>Players</h4>
+    <ul>
+      <li>Buy-in = bullets seen × buy-in. A ≥ means some of that player's events were not watched from the start; there one bullet is counted.</li>
+      <li>"Finished events only" counts an event once every flight and day has ended, so prizes still to be won (and buy-ins of events still running) are left out.</li>
+      <li>"All bullets known" keeps events whose bullets counted (seen at the tables, re-entries seen, and registered players) add up to the official entries, allowing 2 entries or 1% for cancelled registrations. Elsewhere some re-entries can't be credited to anyone, so players' bullets and buy-ins there are a minimum (≥).</li>
+      <li>Players are matched by name; name edits by the floor (e.g. reordered names) are merged.</li>
+    </ul>
+  </details>
+</main>
+
+<div id="sheet-bg" class="sheet-bg" hidden></div>
+<aside id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-name" hidden>
+  <div class="sheet-head">
+    <button class="btn" id="sheet-back" type="button" hidden>← Event</button>
+    <span class="spacer"></span>
+    <button class="btn" id="sheet-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <h2 id="sheet-name"></h2>
+  <div class="sub" id="sheet-sub"></div>
+  <div class="filters sheet-pf" id="sheet-pfilters" hidden>
+    <label class="chip toggle"><input type="checkbox" id="sheet-finished"> Finished events only</label>
+    <label class="chip toggle"><input type="checkbox" id="sheet-known"> All bullets known</label>
+  </div>
+  <div class="kv" id="sheet-stats"></div>
+  <div id="sheet-more" hidden>
+    <div class="summary" id="sheet-more-stats"></div>
+  </div>
+  <div id="sheet-chart-wrap" hidden>
+    <div class="chart-h"><h3>Bankroll</h3><span><span style="color:var(--rose)">●</span> buy-in &nbsp;<span style="color:var(--gold)">●</span> cash</span></div>
+    <div class="chart" id="sheet-chart"></div>
+  </div>
+  <div id="sheet-games-wrap"><h3 class="more-h">By game</h3>
+    <table class="gtable" id="sheet-games"></table></div>
+  <div class="hint" id="sheet-hint"></div>
+  <div id="sheet-event" hidden>
+    <div class="seg" id="sheet-seg" role="group" aria-label="Player status">
+      <button type="button" data-seg="seated" aria-pressed="true">Seated<span class="n"></span></button>
+      <button type="button" data-seg="busted" aria-pressed="false">Busted<span class="n"></span></button>
+      <button type="button" data-seg="reentered" aria-pressed="false">Re-entered<span class="n"></span></button>
+      <button type="button" data-seg="bagged" aria-pressed="false">Bagged<span class="n"></span></button>
+      <button type="button" data-seg="cashed" aria-pressed="false">Cashed<span class="n"></span></button>
+      <button type="button" data-seg="all" aria-pressed="false">All<span class="n"></span></button>
+    </div>
+    <div class="filters">
+      <input id="sheet-q" class="search" type="search" placeholder="Search this event" aria-label="Search players in this event" autocomplete="off">
+      <select id="sheet-country" class="sel small country-sel" aria-label="Country"><option value="">All countries</option></select>
+      <button class="btn" id="sheet-feed" type="button">Busts in feed →</button>
+    </div>
+    <ul class="plist" id="sheet-list"></ul>
+  </div>
+  <div id="sheet-tl-wrap"><h3 class="tl-h">Timeline</h3><ul class="tl" id="sheet-tl"></ul></div>
+</aside>
+
+<script src="../fx.js?v=cd5c922312"></script>
+<script src="../series.js?v=39e53b469f"></script>
+<script src="../apt/tracker.js?v=bcf744ec7c"></script>
+<script src="rop.js?v=186b07bb4f"></script>
+<script>
+(function () {
+  'use strict';
+  // Which series this page shows: a past one saved by tools/apt-archive.js (?f=<series slug>), or one in
+  // docs/series.js (?s=<id>, else APT's running one)
+  // One page for the organisers that share APT's tournament software: <html data-org="..."> (docs/gop/index.html is
+  // made from this file by tools/stamp.sh)
+  const ORG = document.documentElement.dataset.org || 'apt', O = Series.ORGANISERS[ORG], E = window[O.global];
+  const params = new URLSearchParams(location.search);
+  const FEST = /^[a-z0-9-]{3,80}$/.test(params.get('f') || '') ? params.get('f') : null;
+  const MODE = FEST ? 'archive' : 'live';
+  const SER = FEST ? { id: FEST, org: ORG, tz: Series.tzOf(FEST, 'Asia/Taipei'), place: '', name: O.name, mark: O.name, sub: '', source: { series: FEST },
+    link: `${E.SITE}/series/${FEST}` } : Series.pick(ORG, params.get('s'));
+  const T = E.configure(SER.source);
+  for (const x of document.querySelectorAll('[data-only]')) x.hidden = x.dataset.only !== ORG;
+  // "#36"; an engine may hide numbers it made up (GOP's unnumbered events)
+  const hash = (n) => (T.numLabel ? T.numLabel(n) : '#' + n);
+  const withNum = (n, text) => [hash(n), text].filter(Boolean).join(' ');
+  const $ = (s) => document.querySelector(s);
+  const LS_STATE = Series.storageKey(SER), LS_PREFS = O.prefs;
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  };
+
+  // Where the GitHub history lives: ?repo=owner/name, else derived from <owner>.github.io/<repo>/
+  function repoSlug() {
+    const q = new URLSearchParams(location.search).get('repo');
+    if (q && /^[\w.-]+\/[\w.-]+$/.test(q)) return q;
+    const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
+    const seg = location.pathname.split('/').filter(Boolean)[0];
+    if (m && seg) return `${m[1]}/${seg}`;
+    return null;
+  }
+  const REPO = repoSlug();
+  const STATE_URL = REPO && MODE === 'live' ? `https://raw.githubusercontent.com/${REPO}/${SER.branch}/state.json` : null;
+
+  let raw = T.emptyState(), state = raw; // raw: as polled and saved; state: what's shown (maybe converted)
+  if (MODE === 'live') try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
+  const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
+  const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
+
+  let ghAt = 0, ghAdopted = 0, lastErr = null, polling = false, nextAt = 0, timer = null, freshSince = 0, backoff = 0;
+  let feedLimit = 150, playersLimit = 60, eventFilter = '', openPlayer = null, openEvent = null, eventSeg = 'seated', backToEvent = null;
+
+  /* ---------- formatting ---------- */
+  const tz = SER.tz;
+  const fTime = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+  const fDay = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' });
+  const fDate = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric', month: 'short' });
+  const fFull = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const dayKey = (t) => fDay.format(new Date(t * 1000));
+  const nf = new Intl.NumberFormat('en-US');
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? nf.format(v) : '—');
+  const money = (v) => (v < 0 ? '−' : '') + curSym() + nf.format(Math.round(Math.abs(v || 0)));
+  // 3,500 -> 3.5K, 16,500 -> 16.5K, 165,000 -> 165K, 1,555,940 -> 1.56M (never round a buy-in to a different number)
+  const plainShort = (v) => {
+    const a = Math.abs(v), s = v < 0 ? '−' : '';
+    if (a >= 1e9) return s + (a / 1e9).toFixed(a >= 1e10 ? 1 : 2).replace(/\.?0+$/, '') + 'B';
+    if (a >= 1e6) return s + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
+    if (a >= 1e5) return s + Math.round(a / 1e3) + 'K';
+    if (a >= 1e3) return s + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+    return s + Math.round(a);
+  };
+  const CUR_SYM = { USD: '$', EUR: '€', GBP: '£', THB: '฿', TWD: 'NT$', VND: '₫', HKD: 'HK$', CNY: 'CN¥', JPY: '¥', KRW: '₩', SGD: 'S$', AUD: 'A$', MYR: 'RM', PHP: '₱', INR: '₹', CAD: 'C$' };
+  // Money: the shown currency's symbol in front (−$12.4K, +NT$4.9M); plainShort() for chips, blinds and chart axes
+  const curSym = () => { const c = curLabel(); return CUR_SYM[c] || c + ' '; };
+  const short = (v) => (v < 0 ? '−' : '') + curSym() + plainShort(Math.abs(v));
+  const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + short(Math.abs(v));
+  const ord = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+  const flag = (cc) => (cc && /^[A-Z]{2}$/.test(cc)) ? String.fromCodePoint(...[...cc].map((c) => 0x1F1E6 + c.charCodeAt(0) - 65)) : '';
+  const withFlag = (cc, name) => (flag(cc) ? flag(cc) + ' ' : '') + name;
+  const ago = (t) => { const s = Math.max(0, Math.round(Date.now() / 1000 - t)); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : Math.round(s / 3600) + 'h ago'; };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const PART = /\s*-\s*\b((?:Turbo )?Flight \w+|Day \d+|Final Day|Final Table)\b/i;
+  // Short event name for lists: no "[Event 1]", guarantee, sponsor or long game notes in brackets
+  const cleanName = (name) => String(name || '').replace(/^\[Event \d+\]\s*/, '').replace(/\s*-\s*(?:TWD|USD) [\d,]+ GTD.*$/i, '').replace(/\s*-\s*Sponsored by .*$/i, '').replace(/\s*\([^)]{12,}\)/g, '').trim();
+  const partOf = (name) => { const m = String(name || '').match(PART); return m ? m[1] : ''; };
+  const baseOf = (name) => cleanName(String(name || '').replace(/\s*-\s*\b((?:Turbo )?Flight \w+|Day \d+|Final Day|Final Table)\b.*$/i, ''));
+  const evShort = (e) => e ? `${withNum(e.num, baseOf(e.name))}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
+  const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
+  const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
+  // The series' own currency (KRW in Korea, PHP in Manila...): from its entry, else its events
+  const NATIVE_LABEL = () => SER.currency || (Object.values(raw.events || {}).find((e) => e.currency) || {}).currency || 'TWD';
+  const NATIVE_OF = (e) => e.currency || NATIVE_LABEL(), FIXED_FX = false, FX_FALLBACK = null;
+
+  /* ---------- currency ---------- */
+  // Amounts in each event's own currency, or in one picked at the top (shared by all the trackers):
+  // a buy-in converted at the rate of the event's start date, a prize at the rate of its finish date.
+  let fxCur = FX.pick();
+  if (FIXED_FX && !fxCur) fxCur = 'USD'; // several currencies at once: pick one
+  let fxShown = '', fxBusy = false, fxTried = '';
+  const evEnd = (e) => e.doneAt || e.lastPoll || e.start;
+  function fxNeeds(src) {
+    const dates = [], curs = new Set([fxCur]);
+    for (const e of Object.values(src.events || {})) { if (!e.polls && !e.start) continue; curs.add(NATIVE_OF(e)); if (e.start) dates.push(FX.ymd(e.start)); const end = evEnd(e); if (end) dates.push(FX.ymd(end)); }
+    return { dates, curs: [...curs] };
+  }
+  // A converted copy for display: raw keeps polling and saving in its own currency
+  function display(src) {
+    if (!fxCur) return { s: src, ok: true };
+    const out = { ...src, events: {}, results: {} }, byNum = new Map();
+    let ok = true, approx = false;
+    const fac = (from, d) => {
+      let f = FX.factor(from, fxCur, d);
+      if (f != null && !FX.exact(from, fxCur, d)) approx = true;
+      if (f == null && FX_FALLBACK) { f = FX_FALLBACK(from, fxCur, d); approx = true; }
+      if (f == null) ok = false;
+      return f == null ? 1 : f;
+    };
+    for (const [k, e] of Object.entries(src.events || {})) {
+      const from = NATIVE_OF(e), d = FX.ymd(e.start || src.updatedAt || Date.now() / 1000);
+      const f = fac(from, d);
+      out.events[k] = f === 1 ? e : { ...e, buyin: Math.round((e.buyin || 0) * f), prizePool: Math.round((e.prizePool || 0) * f), ...(e.gtd ? { gtd: Math.round(e.gtd * f) } : {}) };
+      const key = String(e.num), end = evEnd(e) || 0, cur = byNum.get(key);
+      if (!cur || end > cur.end) byNum.set(key, { end, from });
+    }
+    for (const [num, r] of Object.entries(src.results || {})) {
+      const info = byNum.get(String(num));
+      if (!info) { out.results[num] = r; continue; }
+      const f = fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000));
+      out.results[num] = f === 1 ? r : { ...r, rows: r.rows.map((row) => [row[0], row[1], row[2], Math.round(row[3] * f), ...row.slice(4)]) };
+    }
+    return { s: ok ? out : src, ok, approx };
+  }
+  // Rebuild what's shown from raw (after new data or a currency change), loading missing rates if needed
+  function refresh() {
+    const v = display(raw);
+    // Switching to a currency whose rates haven't loaded yet: keep showing the previous currency meanwhile
+    if (v.ok || !fxShown) { state = v.s; fxShown = v.ok ? fxCur : ''; }
+    render();
+    const sig = fxCur + '|' + Object.keys(raw.events || {}).length + '|' + Object.keys(raw.results || {}).length;
+    if ((!v.ok || v.approx) && fxCur && !fxBusy && fxTried !== sig) {
+      fxBusy = true; fxTried = sig; setStatus();
+      const n = fxNeeds(raw);
+      FX.ensure(n.dates, n.curs).catch(() => {}).then(() => { fxBusy = false; refresh(); });
+    }
+  }
+  const curLabel = () => fxShown || NATIVE_LABEL();
+  function fillFx() {
+    const sel = $('#fx'); const nat = NATIVE_LABEL();
+    const opts = [];
+    if (!FIXED_FX) { const o = new Option(nat, ''); o.title = 'Each event in its own currency'; opts.push(o); }
+    for (const c of FX.LIST) if (FIXED_FX || c !== nat) opts.push(new Option(c, c));
+    sel.replaceChildren(...opts); sel.value = fxCur;
+  }
+  $('#fx').addEventListener('change', (e) => { fxCur = e.target.value; FX.choose(fxCur); fxTried = ''; refresh(); });
+
+  /* ---------- data plumbing ---------- */
+  function persist() {
+    if (MODE !== 'live') return; // a past series comes from the site's own files
+    if (!store.set(LS_STATE, JSON.stringify(raw))) {
+      const slim = { ...raw, feed: raw.feed.slice(-1500) };
+      store.set(LS_STATE, JSON.stringify(slim));
+    }
+  }
+  async function loadGitHub() {
+    if (!STATE_URL) return;
+    try {
+      const r = await fetch(STATE_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const s = await r.json();
+      ghAt = s.updatedAt || 0;
+      // The GitHub poller watches around the clock, so its record is the complete one: take every new save,
+      // even when this page polled more recently (it may have been closed or in the background meanwhile).
+      // The page's own polling then continues from it.
+      if (s && s.v === 1 && (s.updatedAt || 0) > ghAdopted) {
+        T.repair(s);
+        freshSince = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
+        raw = s; ghAdopted = s.updatedAt; persist(); refresh();
+      }
+    } catch (e) { console.warn('GitHub history unavailable', e); }
+  }
+  // A past series: its saved file, and its name and dates from the archive's index
+  let archLoaded = false;
+  async function loadArchive() {
+    try {
+      const [r, idx, fx] = await Promise.all([fetch(`archive/${FEST}.json`), fetch('archive/index.json').then((x) => x.json()).catch(() => ({ series: [] })),
+        fetch('archive/fx.json').then((x) => x.json()).catch(() => null)]);
+      FX.seed(fx); // the saved series' dates' rates
+      if (!r.ok) throw new Error(r.status === 404 ? 'No saved series with this id' : 'HTTP ' + r.status);
+      const s = T.unpack(await r.json()); T.repair(s);
+      raw = state = s; archLoaded = true; lastErr = null;
+      const info = (idx.series || []).find((x) => x.id === FEST);
+      if (info) {
+        const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        Object.assign(SER, { name: info.name, mark: O.name + ' ' + info.place, sub: `${fmt(info.start)} – ${fmt(info.end)}`, place: info.place, currency: info.currency });
+        Series.fillBrand(SER); document.title = info.name;
+      }
+      if (!raw.feed.length) { document.querySelector('.tab[data-tab="feed"]').hidden = true; if (prefs.tab === 'feed') selectTab('players'); }
+      fillFx(); // the currency menu offers the series' own currency first
+    } catch (e) { lastErr = String(e.message || e); }
+    refresh();
+  }
+  async function poll() {
+    if (MODE !== 'live') return;
+    if (polling) return;
+    polling = true; setStatus();
+    const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
+    if (T.BROWSER_POLL === false) { // the site doesn't answer other pages: re-read the GitHub poller's record
+      try { await loadGitHub(); freshSince = before; lastErr = null; } catch (e) { lastErr = String(e.message || e); }
+      polling = false; refresh(); schedule(); return;
+    }
+    try {
+      const s = await T.pollOnce(raw, { interval: prefs.interval || 60, listEvery: 300, resultsEvery: 60, finalEvery: 300, concurrency: 4 });
+      lastErr = s.errors.length && !s.events ? s.errors[0] : null;
+      // If the site refuses requests, wait longer (2 min, doubling to 10 min) until it accepts them again
+      backoff = s.throttled ? Math.min(600, Math.max(120, backoff * 2, s.retryAfter || 0)) : 0;
+      if (s.throttled) lastErr = 'site is limiting requests, slowing down';
+      freshSince = before;
+      persist();
+    } catch (e) { lastErr = String(e.message || e); }
+    polling = false;
+    refresh();
+    schedule();
+  }
+  function schedule() {
+    clearTimeout(timer);
+    if (MODE !== 'live') return;
+    const iv = Number(prefs.interval);
+    if (!iv) { nextAt = 0; setStatus(); return; }
+    const wait = Math.max(iv, backoff);
+    nextAt = Date.now() + wait * 1000;
+    timer = setTimeout(poll, wait * 1000);
+    setStatus();
+  }
+  function setStatus() {
+    const dot = $('#dot'), txt = $('#status-text');
+    if (MODE !== 'live') {
+      dot.className = 'dot' + (lastErr ? ' err' : '');
+      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : (O.archive && O.archive.note ? 'Past series · ' + O.archive.note : Object.values(state.events).some((e) => e.polls) ? 'Past series · watched live: bullets, busts and payouts as they happened' : 'Past series · entries, registrations and payouts as published by APT') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
+      return;
+    }
+    const iv = Number(prefs.interval);
+    dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
+    const parts = [];
+    if (polling) parts.push('Updating…');
+    else if (lastErr) parts.push(lastErr);
+    else if (state.updatedAt) parts.push((iv ? 'Live · ' : 'Paused · ') + fTime.format(new Date(state.updatedAt * 1000)) + ' ' + SER.place);
+    if (iv && nextAt && !polling) parts.push('next ' + Math.max(0, Math.round((nextAt - Date.now()) / 1000)) + 's');
+    parts.push(STATE_URL ? (ghAt ? 'history ' + ago(ghAt) : 'loading history') : 'no history (?repo=owner/name)');
+    txt.textContent = parts.join(' · ');
+  }
+  setInterval(setStatus, 1000);
+
+  /* ---------- shared bits ---------- */
+  function resultIndex() {
+    const m = new Map();
+    for (const [n0, r] of Object.entries(state.results || {})) for (const [pos, n, , prize] of r.rows) m.set(n0 + '|' + n, { pos, prize });
+    return m;
+  }
+  const regionName = (() => { try { const d = new Intl.DisplayNames(['en'], { type: 'region' }); return (cc) => { try { return d.of(cc) || cc; } catch { return cc; } }; } catch { return (cc) => cc; } })();
+  // Country menus: flag, name and player count, most common first; rebuilt only when the list changes
+  function fillCountries(sel, ccs) {
+    const counts = new Map();
+    for (const cc of ccs) if (cc && /^[A-Z]{2}$/.test(cc)) counts.set(cc, (counts.get(cc) || 0) + 1);
+    if (prefs.country && !counts.has(prefs.country)) counts.set(prefs.country, 0);
+    const list = [...counts].sort((a, b) => b[1] - a[1] || regionName(a[0]).localeCompare(regionName(b[0])));
+    const sig = list.map(([c, n]) => c + n).join(',');
+    if (sel.dataset.sig !== sig) {
+      sel.replaceChildren(new Option('All countries', ''), ...list.map(([cc, n]) => new Option(`${flag(cc)} ${regionName(cc)} (${n})`, cc)));
+      sel.dataset.sig = sig;
+    }
+    sel.value = prefs.country || '';
+  }
+  // Small label/value tile
+  const tile = (parent, k, v, sub, cls) => {
+    const d = el('div'); d.appendChild(el('div', 'k', k)); d.appendChild(el('div', 'v' + (cls ? ' ' + cls : ''), v));
+    if (sub) d.appendChild(el('div', 's', sub)); parent.appendChild(d); return d;
+  };
+  // Entries split into players seen / re-entries / waiting for a seat / missed, as a bar plus the numbers.
+  // A later day (Final Day) shows players carried over from the flights instead.
+  function entriesMix(e) {
+    const box = el('div', 'mix');
+    if (e.entries == null) return box;
+    const p = e.unique || 0, r = e.reentriesSeen || 0, w = e.waiting || 0, c = e.carried || 0, m = e.untracked;
+    const parts = e.laterDay
+      ? [['c', c, 'carried over'], ['p', p, 'new'], ['r', r, r === 1 ? 're-entry' : 're-entries']]
+      : [['p', p, p === 1 ? 'player' : 'players'], ['r', r, r === 1 ? 're-entry' : 're-entries'], ['w', w, 'waiting for a seat']];
+    const field = parts.reduce((a, x) => a + x[1], 0);
+    // A later day's entry count covers every flight, so its bar is scaled to today's field instead
+    const total = (e.laterDay && m == null ? field : Math.max(e.entries, field)) || 1;
+    const bar = el('div', 'mix-bar'); bar.setAttribute('role', 'img');
+    bar.setAttribute('aria-label', `${e.entries} entries: ` + parts.map((x) => `${x[1]} ${x[2]}`).join(', ') + `, ${m == null ? 'unknown' : m} missed`);
+    for (const [cls, n] of parts) if (n > 0) { const i = el('i', cls); i.style.width = (n / total * 100) + '%'; bar.appendChild(i); }
+    if (m) { const i = el('i', 'm'); i.style.width = (m / total * 100) + '%'; bar.appendChild(i); }
+    box.appendChild(bar);
+    const lg = el('div', 'mix-legend');
+    const item = (sw, n, label) => { const s = el('span'); s.appendChild(el('span', 'sw ' + sw)); s.appendChild(el('b', '', n)); s.append(' ' + label); lg.appendChild(s); };
+    for (const [cls, n, label] of parts) if (n > 0 || cls === 'p' || cls === 'r') item(cls, nf.format(n), label);
+    if (e.over) item('o', '+' + nf.format(e.over), 'over (cancelled)');
+    else if (!(e.laterDay && m == null)) item('m', m == null ? '?' : nf.format(m), 'missed');
+    box.appendChild(lg);
+    return box;
+  }
+
+  /* ---------- bust feed ---------- */
+  function renderFeed() {
+    const ul = $('#feed');
+    { const seen = new Set(), ccs = []; for (const f of state.feed) if (!seen.has(f.n)) { seen.add(f.n); ccs.push(f.cc); } fillCountries($('#feed-country'), ccs); }
+    const q = $('#feed-q').value.trim().toLowerCase();
+    const res = resultIndex();
+    const items = [];
+    for (let i = state.feed.length - 1; i >= 0 && items.length < feedLimit + 1; i--) {
+      const f = state.feed[i];
+      if (!prefs.kinds[f.k]) continue;
+      if (eventFilter && String(f.num) !== eventFilter) continue;
+      if (q && !f.n.toLowerCase().includes(q)) continue;
+      if (prefs.country && f.cc !== prefs.country) continue;
+      items.push(f);
+    }
+    const more = items.length > feedLimit; if (more) items.pop();
+    ul.replaceChildren();
+    if (!items.length) ul.appendChild(el('li', 'empty', state.feed.length ? 'Nothing matches these filters.' : 'Waiting for the first busts.'));
+    let lastDay = '';
+    for (const f of items) {
+      const d = dayKey(f.t);
+      if (d !== lastDay) { ul.appendChild(el('li', 'day', d)); lastDay = d; }
+      const li = el('li', f.t > freshSince && freshSince ? 'fresh' : '');
+      li.appendChild(el('span', 't', fTime.format(new Date(f.t * 1000))));
+      const who = el('div', 'who');
+      const nm = el('div', 'nm', withFlag(f.cc, f.n));
+      nm.tabIndex = 0; nm.setAttribute('role', 'button');
+      nm.addEventListener('click', () => openSheet(f.n));
+      nm.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') openSheet(f.n); });
+      who.appendChild(nm);
+      who.appendChild(el('div', 'ev', evShort(state.events[f.kid])));
+      li.appendChild(who);
+      const r = f.k === 'bust' ? res.get(f.num + '|' + f.n) : null;
+      const [cls, label] = r ? ['cash', `${ord(r.pos)} · ${short(r.prize)}`]
+        : f.k === 'bust' ? ['bust', f.b > 1 ? `Busted · B${f.b}` : 'Busted']
+        : f.k === 'reentry' ? ['reentry', `Bullet ${f.b}`] : ['entry', 'New'];
+      li.appendChild(el('span', 'badge ' + cls, label));
+      ul.appendChild(li);
+    }
+    $('#feed-more').hidden = !more;
+    const busts = state.feed.filter((f) => f.k === 'bust').length;
+    $('#feed-count').textContent = plural(busts, 'bust', 'busts');
+    $('#n-feed').textContent = busts ? nf.format(busts) : '';
+  }
+
+  /* ---------- events ---------- */
+  function renderEvents() {
+    const now = Math.floor(Date.now() / 1000);
+    const evs = T.liveEvents(state, now);
+    const box = $('#events');
+    box.replaceChildren();
+    $('#n-events').textContent = evs.filter((e) => e.phase !== 'Completed').length || '';
+    const sel = $('#feed-event'); const cur = sel.value;
+    const nums = [...new Map(evs.map((e) => [e.num, e])).values()];
+    sel.replaceChildren(new Option('All events', ''), ...nums.map((e) => new Option(withNum(e.num, baseOf(e.name)).slice(0, 40), String(e.num))));
+    sel.value = nums.some((e) => String(e.num) === cur) ? cur : '';
+    if (!evs.length) { box.appendChild(el('div', 'empty', 'No event is running right now.')); return; }
+    for (const e of evs) {
+      const c = el('button', 'card'); c.type = 'button';
+      const top = el('div', 'card-top');
+      let when;
+      if (e.phase === 'Completed') when = 'Finished';
+      else if (e.regClose && e.regClose > now) when = `Reg closes ${fTime.format(new Date(e.regClose * 1000))} · ${dur(e.regClose - now)}`;
+      else when = 'Reg closed';
+      if (!e.trackedFromStart && e.firstPoll) when += ` · watched since ${fTime.format(new Date(e.firstPoll * 1000))}`;
+      top.appendChild(el('span', 'when', when));
+      top.appendChild(el('span', 'phase' + (e.phase === 'In The Money' || e.phase === 'Final Table' ? ' itm' : e.phase === 'Completed' ? ' done' : ''), e.phase));
+      c.appendChild(top);
+      const h = el('h3'); if (hash(e.num)) h.appendChild(el('span', 'num-tag', hash(e.num))); h.append(baseOf(e.name));
+      if (partOf(e.name)) h.appendChild(el('span', 'part', partOf(e.name)));
+      c.appendChild(h);
+      const st = el('div', 'stats4');
+      tile(st, 'Buy-in', short(e.buyin)); tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Busts', num(e.busts));
+      c.appendChild(st);
+      c.appendChild(entriesMix(e));
+      c.addEventListener('click', () => showEvent(e.kid));
+      box.appendChild(c);
+    }
+  }
+
+  function renderSoon() {
+    const ul = $('#soon'); ul.replaceChildren();
+    const list = T.upcoming(state, Math.floor(Date.now() / 1000), 12);
+    if (!list.length) { ul.appendChild(el('li', 'empty', 'Nothing else starts in the next 12 hours.')); return; }
+    for (const e of list.slice(0, 15)) {
+      const li = el('li');
+      li.appendChild(el('span', 'when', fTime.format(new Date(e.start * 1000))));
+      const mid = el('div');
+      const nm = el('div', 'nm'); if (hash(e.num)) nm.appendChild(el('span', 'num-tag', hash(e.num))); nm.append(baseOf(e.name));
+      if (partOf(e.name)) nm.appendChild(el('span', 'part', partOf(e.name)));
+      mid.appendChild(nm); li.appendChild(mid);
+      const right = el('div', 'right'); right.appendChild(el('b', '', short(e.buyin))); right.append('buy-in');
+      li.appendChild(right);
+      ul.appendChild(li);
+    }
+  }
+
+  let doneLimit = 15;
+  function renderDone() {
+    const ul = $('#done'); ul.replaceChildren();
+    const list = T.completedEvents(state);
+    $('#done-count').textContent = list.length ? plural(list.length, 'event', 'events') : '';
+    if (!list.length) { ul.appendChild(el('li', 'empty', 'No event has finished yet.')); $('#done-more').hidden = true; return; }
+    for (const e of list.slice(0, doneLimit)) {
+      const li = el('li'); li.tabIndex = 0; li.setAttribute('role', 'button');
+      li.appendChild(el('span', 'when', e.finished ? fDate.format(new Date(e.finished * 1000)) : ''));
+      const mid = el('div');
+      const nm = el('div', 'nm'); if (hash(e.num)) nm.appendChild(el('span', 'num-tag', hash(e.num))); nm.append(baseOf(e.name));
+      if (e.part) nm.appendChild(el('span', 'part', e.part));
+      mid.appendChild(nm);
+      const sub = el('div', 'sub');
+      if (e.kind === 'flight') {
+        sub.appendChild(el('b', 'bag', `${nf.format(e.bagged)} bagged`));
+        if (e.next) sub.append(` → ${e.next.part}${e.next.start ? ' ' + fFull.format(new Date(e.next.start * 1000)) : ''}`);
+      } else if (e.winner) { sub.append('🏆 '); sub.appendChild(el('b', '', withFlag(e.winner.cc, e.winner.name))); sub.append(` · ${short(e.winner.prize)}`); }
+      else sub.textContent = e.final ? '' : 'Payouts being posted';
+      mid.appendChild(sub);
+      li.appendChild(mid);
+      const right = el('div', 'right'); right.appendChild(el('b', '', nf.format(e.entries))); right.append('entries · ' + short(e.buyin));
+      li.appendChild(right);
+      const open = () => showEvent(e.kid);
+      li.addEventListener('click', open);
+      li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') open(); });
+      ul.appendChild(li);
+    }
+    $('#done-more').hidden = list.length <= doneLimit;
+  }
+
+  /* ---------- event panel ---------- */
+  function showEvent(kid) {
+    const ev = state.events[kid];
+    if (ev && ev.phase === 'Completed') {
+      const r = state.results[ev.num];
+      const allDone = Object.values(state.events).filter((x) => x.num === ev.num).every((x) => x.phase === 'Completed');
+      eventSeg = allDone && r && r.rows.length ? 'cashed' : 'bagged';
+    } else if (eventSeg === 'cashed' || eventSeg === 'bagged') eventSeg = 'seated';
+    openEvent = kid; openPlayer = null; backToEvent = null;
+    $('#sheet-q').value = '';
+    renderEventSheet();
+    $('#sheet').hidden = false; $('#sheet-bg').hidden = false; $('#sheet').scrollTop = 0;
+    $('#sheet-close').focus();
+  }
+
+  function renderEventSheet() {
+    const e = state.events[openEvent]; if (!e) return closeSheet();
+    const now = Math.floor(Date.now() / 1000);
+    const info = T.liveEvents(state, now).find((x) => x.kid === e.kid) || {};
+    $('#sheet-back').hidden = true;
+    $('#sheet-event').hidden = false; $('#sheet-tl-wrap').hidden = true; $('#sheet-chart-wrap').hidden = true; $('#sheet-pfilters').hidden = true; $('#sheet-more').hidden = true; $('#sheet-games-wrap').hidden = true; $('#sheet-stats').hidden = false;
+    $('#sheet-name').textContent = withNum(e.num, String(e.name).replace(/^\[Event \d+\]\s*/, ''));
+    $('#sheet-sub').textContent = [e.phase, money(e.buyin), e.regClose ? (e.regClose > now ? 'reg closes ' + fTime.format(new Date(e.regClose * 1000)) : 'reg closed') : '',
+      e.firstPoll ? (info.trackedFromStart ? 'watched from the start' : 'watched since ' + fTime.format(new Date(e.firstPoll * 1000))) : ''].filter(Boolean).join(' · ');
+    const st = $('#sheet-stats'); st.replaceChildren();
+    const psAll = T.eventPlayers(state, e.kid);
+    fillCountries($('#sheet-country'), psAll.map((p) => p.cc));
+    // The country filter narrows the lists and their counts; the totals above stay for the whole field
+    const ps = prefs.country ? psAll.filter((p) => p.cc === prefs.country) : psAll;
+    // A finished event over several flights: the numbers cover every flight (bullets counted from registration lists)
+    const allFlights = e.phase === 'Completed' && T.isLaterDay(e.name) && Object.values(state.events).filter((x) => x.num === e.num).length > 1;
+    if (allFlights) {
+      const players = psAll.filter((p) => p.bullets > 0).length, counted = psAll.reduce((a, p) => a + (p.bullets || 0), 0);
+      tile(st, 'Entries', num(e.entries)); tile(st, 'Players', num(players)); tile(st, 'Cashed', num(psAll.filter((p) => p.pos != null).length));
+      tile(st, 'Bullets counted', num(counted)); tile(st, 'Re-entries', num(Math.max(0, counted - players)));
+      tile(st, 'Missed', num(Math.max(0, (e.entries || 0) - counted)), 're-entries no one is credited with', counted < e.entries ? 'gold' : '');
+    } else {
+    tile(st, 'Entries', num(e.entries)); tile(st, 'Left', num(e.remaining)); tile(st, 'Seated', num(psAll.filter((p) => p.status === 'seated').length));
+    tile(st, 'Busts', num(psAll.reduce((a, p) => a + p.busts.length, 0))); tile(st, 'Re-entries', num(info.reentriesSeen || 0)); tile(st, 'Missed', num(info.untracked), '', info.untracked ? 'gold' : '');
+    }
+    const hint = $('#sheet-hint'); hint.replaceChildren();
+    if (info.entries != null) hint.appendChild(entriesMix(info));
+    const groups = {
+      seated: ps.filter((p) => p.status === 'seated').sort((a, b) => (a.table || 9999) - (b.table || 9999) || (a.seat ?? 0) - (b.seat ?? 0) || a.name.localeCompare(b.name)),
+      busted: ps.filter((p) => p.status === 'busted').sort((a, b) => (b.lastBust || 0) - (a.lastBust || 0)),
+      reentered: ps.filter((p) => p.bullets > 1).sort((a, b) => b.bullets - a.bullets || (b.lastBust || 0) - (a.lastBust || 0)),
+      bagged: ps.filter((p) => p.status === 'end').sort((a, b) => a.name.localeCompare(b.name)),
+      cashed: ps.filter((p) => p.pos != null).sort((a, b) => a.pos - b.pos),
+      all: ps.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    };
+    document.querySelectorAll('#sheet-seg button').forEach((b) => {
+      const n = groups[b.dataset.seg].length;
+      b.setAttribute('aria-pressed', String(b.dataset.seg === eventSeg));
+      b.querySelector('.n').textContent = nf.format(n);
+      b.hidden = !n && b.dataset.seg !== eventSeg && b.dataset.seg !== 'all';
+    });
+    const q = $('#sheet-q').value.trim().toLowerCase();
+    let rows = groups[eventSeg] || [];
+    if (q) rows = rows.filter((p) => p.name.toLowerCase().includes(q));
+    const ul = $('#sheet-list'); ul.replaceChildren();
+    if (!rows.length) ul.appendChild(el('li', 'empty', q || prefs.country ? 'No player matches.' : 'Nobody here yet.'));
+    for (const p of rows.slice(0, 600)) {
+      const li = el('li'); const b = el('button', 'row'); b.type = 'button';
+      const left = el('div');
+      left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
+      const meta = el('div', 'meta');
+      if (p.status === 'seated') meta.appendChild(el('span', '', p.table ? `Table ${p.table} · Seat ${p.seat}` : 'Waiting for a seat'));
+      if (p.lastBust) meta.appendChild(el('span', '', (p.status === 'seated' ? 'last bust ' : 'out ') + fTime.format(new Date(p.lastBust * 1000))));
+      if (p.regOnly) meta.appendChild(el('span', '', 'registered, not seen at a table'));
+      if (p.bullets > 1) meta.appendChild(el('span', '', `bullet ${p.bullets}`));
+      if (p.status === 'cashed') meta.appendChild(el('span', '', 'paid before tracking'));
+      left.appendChild(meta);
+      const right = el('div', 'num');
+      if (p.pos != null) { right.appendChild(el('div', 'big', ord(p.pos))); right.appendChild(el('div', 'small', short(p.prize))); }
+      else right.appendChild(el('span', 'badge ' + (p.status === 'seated' ? 'seat' : p.status === 'end' ? 'end' : 'bust'),
+        p.status === 'seated' ? (p.bullets > 1 ? 'Re-entered' : 'Seated') : p.status === 'end' ? 'Bagged' : 'Busted'));
+      b.append(left, right);
+      b.addEventListener('click', () => { const ev = openEvent; openSheet(p.name); backToEvent = ev; $('#sheet-back').hidden = false; });
+      li.appendChild(b); ul.appendChild(li);
+    }
+  }
+
+  /* ---------- players ---------- */
+  // Totals for exactly the players listed (after country, search and sort filters), in three groups
+  function renderSummary(rows, q) {
+    const sum = (f) => rows.reduce((a, p) => a + (f(p) || 0), 0);
+    const n = rows.length;
+    const bullets = sum((p) => p.bullets), entered = sum((p) => p.events);
+    const buyins = sum((p) => p.buyins), prizes = sum((p) => p.prizes), net = prizes - buyins;
+    const itmPlayers = rows.filter((p) => p.cashes > 0).length, cashes = sum((p) => p.cashes), cashedEvents = sum((p) => p.cashedEvents);
+    const winners = rows.filter((p) => p.net > 0).length, losers = rows.filter((p) => p.net < 0).length, wins = sum((p) => p.wins);
+    const partial = rows.some((p) => p.partial);
+    const pct = (a, b) => (b ? (a / b * 100).toFixed(1) + '%' : '—');
+    const groups = [
+      ['Field', [['Players', nf.format(n), ''], ['Bullets', nf.format(bullets), n ? (bullets / n).toFixed(2) + ' each' : ''], ['Re-entries', nf.format(Math.max(0, bullets - entered)), pct(bullets - entered, entered)]]],
+      ['Money', [['Buy-in', (partial ? '≥' : '') + short(buyins), n ? short(buyins / n) + ' each' : ''], ['Prizes', short(prizes), cashes ? short(prizes / cashes) + ' per cash' : '', 'gold'],
+        ['Net', signed(net), buyins ? 'ROI ' + pct(net, buyins) : '', net > 0 ? 'pos' : net < 0 ? 'neg' : '']]],
+      ['Results', [['Cashes', nf.format(cashes), wins ? plural(wins, 'win', 'wins') : ''], ['ITM', pct(cashedEvents, bullets), `${nf.format(cashedEvents)}/${nf.format(bullets)} bullets`], ['Cashing players', nf.format(itmPlayers), ''],
+        ['Winning', pct(winners, n), nf.format(winners) + ' players', 'pos'], ['Losing', pct(losers, n), nf.format(losers) + ' players', 'neg']]],
+    ];
+    const box = $('#players-summary'); box.replaceChildren();
+    for (const [title, tiles] of groups) {
+      const g = el('div', 'sum-group'); g.appendChild(el('h3', '', title));
+      const grid = el('div', 'sum-grid');
+      for (const [k, v, sub, cls] of tiles) tile(grid, k, v, sub, cls);
+      g.appendChild(grid); box.appendChild(g);
+    }
+    const scope = [prefs.finished ? 'Finished events' : '', prefs.country ? `${flag(prefs.country)} ${regionName(prefs.country)}` : '', q ? `“${q}”` : '',
+      prefs.sort === 'seated' ? 'seated now' : prefs.sort === 'lastBust' ? 'with a bust seen' : ''].filter(Boolean).join(' · ');
+    const h = $('#summary-h');
+    const someMin = rows.some((p) => p.partial);
+    h.className = 'note' + (!prefs.fromStart && someMin ? ' warn' : '');
+    h.textContent = (scope ? scope + ' · ' : '') + (prefs.fromStart ? 'Events where every bullet is known (bullets counted add up to the entries)' : someMin ? '≥ Some events have re-entries no player is credited with: bullets and buy-ins there are a minimum' : 'All events');
+  }
+
+  function renderPlayers() {
+    const all = T.players(state, { fromStart: !!prefs.fromStart, finished: !!prefs.finished });
+    $('#n-players').textContent = all.length ? nf.format(all.length) : '';
+    const q = $('#players-q').value.trim().toLowerCase();
+    fillCountries($('#players-country'), all.map((p) => p.cc));
+    let rows = q ? all.filter((p) => p.name.toLowerCase().includes(q)) : all;
+    if (prefs.country) rows = rows.filter((p) => p.cc === prefs.country);
+    const k = prefs.sort;
+    const dir = prefs.sortDir === 'asc' ? 1 : -1; // -1 = high to low (A to Z for names)
+    const val = (p) => k === 'seated' ? (p.seatedIn.length ? 1 : 0) : k === 'lastBust' ? (p.lastBust || 0) : p[k];
+    rows = rows.slice().sort(k === 'name'
+      ? (a, b) => a.name.localeCompare(b.name) * -dir
+      : (a, b) => ((val(a) - val(b)) * dir) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));
+    if (k === 'seated') rows = rows.filter((p) => p.seatedIn.length);
+    if (k === 'lastBust') rows = rows.filter((p) => p.lastBust);
+    $('#players-count').textContent = plural(rows.length, 'player', 'players');
+    renderSummary(rows, q);
+    const ul = $('#players'); ul.replaceChildren();
+    if (!rows.length) ul.appendChild(el('li', 'empty', all.length ? 'No players match.' : 'Loading players…'));
+    for (const p of rows.slice(0, playersLimit)) {
+      const li = el('li'); const b = el('button', 'row'); b.type = 'button';
+      const left = el('div');
+      left.appendChild(el('div', 'nm', withFlag(p.cc, p.name)));
+      const meta = el('div', 'meta');
+      meta.appendChild(el('span', '', `${plural(p.bullets, 'bullet', 'bullets')} · ${plural(p.events, 'event', 'events')}`));
+      meta.appendChild(el('span', '', p.cashes ? `${plural(p.cashes, 'cash', 'cashes')} · ${p.partial ? '≤' : ''}${Math.round(p.itm * 100)}% ITM` : 'no cash'));
+      if (p.seatedIn.length) meta.appendChild(el('span', 'tag seat', 'Seated #' + p.seatedIn.join(', #')));
+      else if (p.lastBust) meta.appendChild(el('span', 'tag out', 'Out ' + fTime.format(new Date(p.lastBust * 1000))));
+      left.appendChild(meta);
+      const right = el('div', 'num');
+      right.appendChild(el('div', 'big', p.prizes ? short(p.prizes) : '—'));
+      right.appendChild(el('div', 'small ' + (p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : ''), signed(p.net)));
+      right.appendChild(el('div', 'small', 'in ' + (p.partial ? '≥' : '') + short(p.buyins)));
+      b.append(left, right);
+      b.addEventListener('click', () => openSheet(p.name));
+      li.appendChild(b); ul.appendChild(li);
+    }
+    $('#players-more').hidden = rows.length <= playersLimit;
+  }
+
+  /* ---------- player panel ---------- */
+  function whenText(it) {
+    if (!it.t) return '';
+    const d = new Date((it.before ? it.t + 1 : it.t) * 1000);
+    if (it.approx) return fDay.format(d);
+    if (it.before) return fDay.format(d) + ', before ' + fTime.format(d) + ' (before tracking)';
+    return fFull.format(d);
+  }
+  function describe(it) {
+    const ev = withNum(it.num, baseOf(it.ev || '')) + (partOf(it.ev) ? ' · ' + partOf(it.ev) : '');
+    switch (it.k) {
+      case 'bust': return `Busted · ${ev}`;
+      case 'reentry': return `Re-entered (bullet ${it.b}) · ${ev}`;
+      case 'cash': return `${ord(it.pos)} place · ${ev}`;
+      case 'end': return `In at the end · ${ev}`;
+      case 'carry': return `Carried over · ${ev}`;
+      case 'buyin': return `Bought in (not watched) · ${ev}`;
+      default: return it.first ? `Seated when tracking began · ${ev}` : `Entered · ${ev}`;
+    }
+  }
+
+  // Monotone cubic interpolation (same idea as d3.curveMonotoneX) as an SVG path
+  function smoothPath(p) {
+    if (p.length < 2) return '';
+    const n = p.length, d = [], m = new Array(n);
+    for (let i = 0; i < n - 1; i++) d.push((p[i + 1][1] - p[i][1]) / ((p[i + 1][0] - p[i][0]) || 1));
+    m[0] = d[0]; m[n - 1] = d[n - 2];
+    for (let i = 1; i < n - 1; i++) {
+      if (d[i - 1] * d[i] <= 0) { m[i] = 0; continue; }
+      const h0 = p[i][0] - p[i - 1][0], h1 = p[i + 1][0] - p[i][0];
+      const s = (d[i - 1] * h1 + d[i] * h0) / (h0 + h1);
+      m[i] = (Math.sign(d[i - 1]) + Math.sign(d[i])) * Math.min(Math.abs(d[i - 1]), Math.abs(d[i]), 0.5 * Math.abs(s));
+    }
+    let out = `M${p[0][0]},${p[0][1]}`;
+    for (let i = 0; i < n - 1; i++) {
+      const h = (p[i + 1][0] - p[i][0]) / 3;
+      out += `C${p[i][0] + h},${p[i][1] + m[i] * h} ${p[i + 1][0] - h},${p[i + 1][1] - m[i + 1] * h} ${p[i + 1][0]},${p[i + 1][1]}`;
+    }
+    return out;
+  }
+
+  // Smooth chart of the running bankroll: one point per buy-in or cash, in time order
+  function drawBankroll(box, items) {
+    box.replaceChildren();
+    const pts = [{ i: 0, bank: 0, it: null }];
+    items.filter((it) => it.amt).forEach((it, k) => pts.push({ i: k + 1, bank: it.bank, it }));
+    if (pts.length < 2) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    const W = Math.max(260, box.clientWidth || 360), H = 170;
+    const lo = Math.min(0, ...pts.map((p) => p.bank)), hi = Math.max(0, ...pts.map((p) => p.bank));
+    const span = hi - lo || 1;
+    const mag = Math.pow(10, Math.floor(Math.log10(span / 3)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => span / x <= 4) || mag * 10;
+    const y0 = Math.floor(lo / step) * step, y1 = Math.ceil(hi / step) * step;
+    const ticks = []; for (let v = y0; v <= y1 + step / 2; v += step) ticks.push(v);
+    const labW = Math.max(...ticks.map((v) => plainShort(v).length)) * 6.6 + 8;
+    const m = { l: labW, r: 52, t: 10, b: 22 };
+    const n = pts.length - 1;
+    const x = (i) => m.l + (W - m.l - m.r) * (i / n);
+    const y = (v) => m.t + (H - m.t - m.b) * (1 - (v - y0) / (y1 - y0 || 1));
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('role', 'img');
+    const last = pts[pts.length - 1].bank;
+    svg.setAttribute('aria-label', `Bankroll over ${n} buy-ins and cashes, now ${last >= 0 ? 'up' : 'down'} ${money(Math.abs(last))}`);
+    const add = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
+    for (const v of ticks) {
+      add('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 0 ? 'zero' : 'grid' });
+      add('text', { x: m.l - 6, y: y(v) + 3.5, 'text-anchor': 'end', class: 'lbl' }, plainShort(v));
+    }
+    let prevDay = '', lastLabelX = -99;
+    pts.slice(1).forEach((p) => {
+      const d = p.it.t ? fDate.format(new Date(p.it.t * 1000)) : '';
+      if (d && d !== prevDay) {
+        const xx = x(p.i - 1) + (x(p.i) - x(p.i - 1)) / 2;
+        if (prevDay) add('line', { x1: xx, x2: xx, y1: m.t, y2: H - m.b, class: 'day' });
+        const w = d.length * 6.2;
+        const left = Math.min(Math.max(m.l, xx - w / 2), W - m.r - w);
+        if (left > lastLabelX + 8) { add('text', { x: left, y: H - 6, class: 'lbl', 'text-anchor': 'start' }, d); lastLabelX = left + w; }
+        prevDay = d;
+      }
+    });
+    const xy = pts.map((p) => [x(p.i), y(p.bank)]);
+    const dPath = smoothPath(xy);
+    const z = y(0);
+    const uid = 'bk' + Math.random().toString(36).slice(2, 8);
+    const defs = add('defs', {});
+    const grad = (id, color, from, to) => {
+      const g = document.createElementNS(NS, 'linearGradient');
+      g.setAttribute('id', id); g.setAttribute('gradientUnits', 'userSpaceOnUse');
+      g.setAttribute('x1', 0); g.setAttribute('x2', 0); g.setAttribute('y1', from); g.setAttribute('y2', to);
+      [[0, 0.35], [1, 0.02]].forEach(([o, a]) => { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('stop-color', color); st.setAttribute('stop-opacity', a); g.appendChild(st); });
+      defs.appendChild(g);
+    };
+    const clip = (id, y0c, h) => {
+      const c = document.createElementNS(NS, 'clipPath'); c.setAttribute('id', id);
+      const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', 0); r.setAttribute('width', W); r.setAttribute('y', y0c); r.setAttribute('height', Math.max(0, h));
+      c.appendChild(r); defs.appendChild(c);
+    };
+    grad(uid + 'gu', '#2dd4bf', m.t, z); grad(uid + 'gd', '#f43f5e', H - m.b, z);
+    clip(uid + 'cu', 0, z); clip(uid + 'cd', z, H - z);
+    const area = dPath + `L${xy[xy.length - 1][0]},${z}L${xy[0][0]},${z}Z`;
+    add('path', { d: area, fill: `url(#${uid}gu)`, 'clip-path': `url(#${uid}cu)` });
+    add('path', { d: area, fill: `url(#${uid}gd)`, 'clip-path': `url(#${uid}cd)` });
+    add('path', { d: dPath, class: 'ln up', 'clip-path': `url(#${uid}cu)` });
+    add('path', { d: dPath, class: 'ln down', 'clip-path': `url(#${uid}cd)` });
+    for (const p of pts.slice(1)) add('circle', { cx: x(p.i), cy: y(p.bank), r: p.it.amt > 0 ? 4 : 2.75, class: p.it.amt > 0 ? 'pt-out' : 'pt-in' });
+    const endTxt = add('text', { x: x(n) + 6, y: y(last) + 4, class: 'end' }, (last > 0 ? '+' : last < 0 ? '−' : '') + short(Math.abs(last)));
+    endTxt.style.fill = last > 0 ? 'var(--teal2)' : last < 0 ? 'var(--rose)' : 'var(--fg)';
+    const hl = add('circle', { r: 6, fill: 'none', stroke: 'var(--fg)', 'stroke-width': 1.5, opacity: 0 });
+    box.appendChild(svg);
+    const tip = el('div', 'tip'); tip.hidden = true; box.appendChild(tip);
+    const show = (ev) => {
+      const r = svg.getBoundingClientRect(), k = W / r.width;
+      const mx = (ev.clientX - r.left) * k;
+      const i = Math.max(1, Math.min(n, Math.round((mx - m.l) / ((W - m.l - m.r) / n))));
+      const p = pts[i];
+      hl.setAttribute('cx', x(p.i)); hl.setAttribute('cy', y(p.bank)); hl.setAttribute('opacity', 1);
+      tip.replaceChildren(el('div', 'm', whenText(p.it)), el('div', '', describe(p.it)),
+        el('div', 'm', (p.it.amt < 0 ? '−' : '+') + nf.format(Math.abs(p.it.amt)) + ' → ' + (p.bank > 0 ? '+' : p.bank < 0 ? '−' : '') + nf.format(Math.abs(p.bank))));
+      tip.hidden = false;
+      const px = x(p.i) / k + 6, py = y(p.bank) / k + 10;
+      tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, px - tip.offsetWidth / 2)) + 'px';
+      tip.style.top = Math.max(0, py - tip.offsetHeight - 12) + 'px';
+    };
+    svg.addEventListener('pointermove', show);
+    svg.addEventListener('pointerdown', show);
+    svg.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') { tip.hidden = true; hl.setAttribute('opacity', 0); } });
+  }
+
+  // The Players tab's filters (finished events, all bullets known) as a smaller state,
+  // so a player's panel shows the same events as the list it was opened from
+  function scoped(src) {
+    const only = null;
+    if (!prefs.fromStart && !prefs.finished && !only) return src;
+    const memo = new Map();
+    const ok = (num) => { const k = String(num); if (!memo.has(k)) memo.set(k, (!only || only(num)) && (!prefs.fromStart || T.watchedFromStart(src, num)) && (!prefs.finished || T.eventFinished(src, num))); return memo.get(k); };
+    const out = { ...src, events: {}, results: {} };
+    for (const [k, e] of Object.entries(src.events || {})) if (ok(e.num)) out.events[k] = e;
+    for (const [n, r] of Object.entries(src.results || {})) if (ok(n)) out.results[n] = r;
+    return out;
+  }
+  function syncFilters() {
+    $('#players-finished').checked = $('#sheet-finished').checked = !!prefs.finished;
+    $('#players-fromstart').checked = $('#sheet-known').checked = !!prefs.fromStart;
+  }
+  function openSheet(name) {
+    name = T.canon(state, name);
+    openPlayer = name; openEvent = null; backToEvent = null;
+    $('#sheet-event').hidden = true; $('#sheet-tl-wrap').hidden = false; $('#sheet-back').hidden = true;
+    $('#sheet-pfilters').hidden = false; syncFilters();
+    const view = scoped(state);
+    const p = T.players(view).find((x) => x.name === name);
+    $('#sheet-name').textContent = withFlag(p && p.cc, name);
+    $('#sheet-sub').textContent = p ? [p.cc ? regionName(p.cc) : '', p.seatedIn.length ? 'seated now in #' + p.seatedIn.join(', #') : p.lastBust ? 'last bust ' + fFull.format(new Date(p.lastBust * 1000)) : ''].filter(Boolean).join(' · ') : '';
+    const st = $('#sheet-stats'); st.replaceChildren(); st.hidden = true; // the player's numbers are the summary cards below
+    $('#sheet-hint').textContent = p && p.partial ? '≥ Some events were not watched from the start; one bullet is counted there.' : '';
+    const tl = $('#sheet-tl'); tl.replaceChildren();
+    const items = T.playerTimeline(view, name);
+    if (!p && view !== state) $('#sheet-hint').textContent = 'No events of this player match these filters.';
+    $('#sheet-chart-wrap').hidden = !items.some((i) => i.amt);
+    if (!items.length) tl.appendChild(el('li', 'empty', 'No tracked activity yet.'));
+    for (const it of items.slice().reverse()) {
+      const li = el('li', it.k);
+      li.appendChild(el('span', 'mk'));
+      const mid = el('div');
+      mid.appendChild(el('div', 'when', whenText(it)));
+      mid.appendChild(el('div', 'what', describe(it)));
+      li.appendChild(mid);
+      const a = el('div', 'amt' + (it.amt < 0 ? ' minus' : it.amt > 0 ? ' plus' : ''));
+      if (it.amt) { a.append((it.amt < 0 ? '−' : '+') + short(Math.abs(it.amt))); a.appendChild(el('small', '', 'bank ' + signed(it.bank))); }
+      li.appendChild(a);
+      tl.appendChild(li);
+    }
+    const wasHidden = $('#sheet').hidden;
+    $('#sheet').hidden = false; $('#sheet-bg').hidden = false;
+    drawBankroll($('#sheet-chart'), items); // measure now that the sheet is visible
+    renderMore(p, items);
+    if (wasHidden) $('#sheet-close').focus();
+  }
+
+  /* ---------- career stats in the player panel ---------- */
+  // Game from the event name: Triton and APT spell these out ("PLO", "Short Deck Ante-Only", "NLH/PLO", "Mixed Games")
+  const gameOf = (name) => {
+    const n = String(name || '');
+    if (/mixed|\b\d+[- ]game\b|h\.?o\.?r\.?s\.?e|nlh\s*\/\s*plo|plo\s*\/\s*nlh/i.test(n)) return 'Mixed';
+    if (/short ?deck|\bSD\b|ante[- ]only|6\+/i.test(n)) return 'Short Deck';
+    if (/\bPLO\b|omaha|pot[- ]limit/i.test(n)) return 'PLO';
+    return 'NLH';
+  };
+  function renderMore(p, items) {
+    const box = $('#sheet-more');
+    if (!p || !items.length) { box.hidden = true; $('#sheet-games-wrap').hidden = true; return; }
+    box.hidden = false; $('#sheet-games-wrap').hidden = false;
+    // Per event: what was spent, won, bullets fired and the best place
+    const byNum = new Map();
+    for (const it of items) {
+      if (!it.num && it.num !== 0) continue;
+      const k = String(it.num), r = byNum.get(k) || { name: it.ev || '', spent: 0, prize: 0, bullets: 0, cashed: false };
+      if (it.amt < 0) { r.spent -= it.amt; r.bullets++; }
+      if (it.k === 'cash') { r.prize += it.prize || 0; r.cashed = true; }
+      if (!r.name && it.ev) r.name = it.ev;
+      byNum.set(k, r);
+    }
+    const cashes = items.filter((it) => it.k === 'cash');
+    const best = cashes.slice().sort((a, b) => a.pos - b.pos || b.prize - a.prize)[0];
+    const big = cashes.slice().sort((a, b) => b.prize - a.prize)[0];
+    const top9 = cashes.filter((c) => c.pos <= 9).length;
+    const tagOf = (n) => (typeof tag === 'function' ? tag(n) : hash(n)); // APT has no tag() helper
+    const ge = p.partial ? '≥' : '', le = p.partial ? '≤' : '';
+    const pctS = (a, b) => (b ? Math.round(a / b * 100) + '%' : '—');
+    const fests = new Set([...byNum.keys()].map((k) => k.split('@')[1]).filter(Boolean));
+    const groups = [
+      ['Money', [['Buy-in', ge + short(p.buyins), p.bullets ? short(p.buyins / p.bullets) + ' / bullet' : ''], ['Prizes', short(p.prizes), p.cashes ? short(p.prizes / p.cashes) + ' / cash' : '', 'gold'],
+        ['Net', signed(p.net), p.buyins ? 'ROI ' + le + (p.net >= 0 ? '+' : '−') + Math.abs(Math.round(p.net / p.buyins * 100)) + '%' : '', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '']]],
+      ['Field', [['Events', nf.format(p.events), fests.size ? plural(fests.size, 'festival', 'festivals') : ''], ['Bullets', ge + nf.format(p.bullets), p.events ? (p.bullets / p.events).toFixed(2) + ' / event' : ''],
+        ['Re-entries', ge + nf.format(Math.max(0, p.bullets - p.events)), '']]],
+      ['Results', [['Cashes', nf.format(p.cashes), p.wins ? plural(p.wins, 'win', 'wins') : top9 ? top9 + ' top-9' : ''], ['ITM', le + pctS(p.cashedEvents || 0, p.bullets), `${p.cashedEvents || 0}/${p.bullets} bullets`],
+        ['Best', best ? ord(best.pos) : '—', best ? tagOf(best.num) : ''], ['Biggest cash', big ? short(big.prize) : '—', big ? tagOf(big.num) : '', big ? 'gold' : ''],
+        ['Top-9', nf.format(top9), ''], ['Since', (() => { const t = Math.min(...items.filter((i) => i.t).map((i) => i.t)); return Number.isFinite(t) ? fDate.format(new Date(t * 1000)) : '—'; })(), '']]],
+    ];
+    const sum = $('#sheet-more-stats'); sum.replaceChildren();
+    for (const [title, tiles] of groups) {
+      const g = el('div', 'sum-group'); g.appendChild(el('h3', '', title));
+      const grid = el('div', 'sum-grid'); for (const [k, v, sub, cls] of tiles) tile(grid, k, v, sub, cls);
+      g.appendChild(grid); sum.appendChild(g);
+    }
+    // By game, ITM per bullet
+    const games = new Map();
+    for (const [, r] of byNum) { const g = gameOf(r.name), x = games.get(g) || { events: 0, bullets: 0, spent: 0, prize: 0, cashes: 0 }; x.events++; x.bullets += r.bullets; x.spent += r.spent; x.prize += r.prize; if (r.cashed) x.cashes++; games.set(g, x); }
+    const tb = $('#sheet-games'); tb.replaceChildren();
+    const head = el('tr'); for (const h of ['Game', 'Events', 'ITM', 'Buy-in', 'Prizes', 'Net']) head.appendChild(el('th', '', h)); tb.appendChild(head);
+    for (const [g, x] of [...games.entries()].sort((a, b) => b[1].spent - a[1].spent)) {
+      const tr = el('tr'); const net = x.prize - x.spent;
+      tr.appendChild(el('td', '', g)); tr.appendChild(el('td', '', String(x.events))); tr.appendChild(el('td', '', le + pctS(x.cashes, x.bullets)));
+      tr.appendChild(el('td', '', ge + short(x.spent))); tr.appendChild(el('td', 'gold', x.prize ? short(x.prize) : '—'));
+      tr.appendChild(el('td', net > 0 ? 'pos' : net < 0 ? 'neg' : '', signed(net)));
+      tb.appendChild(tr);
+    }
+  }
+  function closeSheet() { openPlayer = null; openEvent = null; backToEvent = null; $('#sheet').hidden = true; $('#sheet-bg').hidden = true; }
+  $('#sheet-back').addEventListener('click', () => { if (backToEvent) { const k = backToEvent; showEvent(k); } });
+  $('#sheet-feed').addEventListener('click', () => {
+    const e = state.events[openEvent]; if (!e) return;
+    eventFilter = String(e.num); closeSheet(); selectTab('feed'); render();
+  });
+  document.querySelectorAll('#sheet-seg button').forEach((b) => b.addEventListener('click', () => { eventSeg = b.dataset.seg; renderEventSheet(); }));
+  $('#sheet-q').addEventListener('input', () => renderEventSheet());
+  $('#sheet-close').addEventListener('click', closeSheet);
+  $('#sheet-bg').addEventListener('click', closeSheet);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (openPlayer || openEvent)) closeSheet(); });
+
+  function render() {
+    renderEvents(); renderFeed();
+    if (!$('#view-players').hidden) renderPlayers(); else $('#n-players').textContent = '';
+    renderSoon(); renderDone();
+    if (openEvent) renderEventSheet();
+    else if (openPlayer) { const back = backToEvent; openSheet(openPlayer); if (back) { backToEvent = back; $('#sheet-back').hidden = false; } }
+    setStatus();
+    openLinked();
+  }
+  // Linked from the all-series page: ?player=<name> or ?event=<event id> opens that panel once the data has it
+  const LINKED = (() => { const q = new URLSearchParams(location.search); return { player: q.get('player'), event: q.get('event') }; })();
+  function openLinked() {
+    if (!LINKED.player && !LINKED.event) return;
+    if (LINKED.event ? !state.events[LINKED.event] : !Object.keys(state.events || {}).length) return;
+    const { player, event } = LINKED; LINKED.player = LINKED.event = null;
+    if (event) showEvent(event); else openSheet(player);
+  }
+
+  /* ---------- controls ---------- */
+  function selectTab(tab) {
+    if (MODE === 'live') { prefs.tab = tab; savePrefs(); } // a past series doesn't change the live view's tab
+    document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    for (const t of ['feed', 'events', 'players']) $('#view-' + t).hidden = t !== tab;
+    if (tab === 'players') renderPlayers();
+    if (window.innerWidth >= 980 && tab === 'events') selectTab('feed');
+  }
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+  document.querySelectorAll('.chip[data-kind]').forEach((c) => {
+    c.setAttribute('aria-pressed', String(!!prefs.kinds[c.dataset.kind]));
+    c.addEventListener('click', () => { prefs.kinds[c.dataset.kind] = !prefs.kinds[c.dataset.kind]; c.setAttribute('aria-pressed', String(prefs.kinds[c.dataset.kind])); savePrefs(); feedLimit = 150; renderFeed(); });
+  });
+  $('#feed-event').addEventListener('change', (e) => { eventFilter = e.target.value; feedLimit = 150; renderFeed(); });
+  $('#feed-q').addEventListener('input', () => { feedLimit = 150; renderFeed(); });
+  document.querySelectorAll('.country-sel').forEach((sel) => sel.addEventListener('change', (e) => {
+    prefs.country = e.target.value; savePrefs(); feedLimit = 150; playersLimit = 60;
+    renderFeed(); if (!$('#view-players').hidden) renderPlayers(); if (openEvent) renderEventSheet();
+  }));
+  $('#feed-more').addEventListener('click', () => { feedLimit += 150; renderFeed(); });
+  $('#players-q').addEventListener('input', () => { playersLimit = 60; renderPlayers(); });
+  $('#players-sort').value = prefs.sort;
+  const setDirBtn = () => {
+    const asc = prefs.sortDir === 'asc', b = $('#players-dir');
+    b.textContent = prefs.sort === 'name' ? (asc ? 'Z→A' : 'A→Z') : (asc ? '↑ Low' : '↓ High');
+    b.setAttribute('aria-label', prefs.sort === 'name' ? (asc ? 'Sorted Z to A' : 'Sorted A to Z') : (asc ? 'Sorted lowest first' : 'Sorted highest first'));
+  };
+  setDirBtn();
+  $('#players-dir').addEventListener('click', () => { prefs.sortDir = prefs.sortDir === 'asc' ? 'desc' : 'asc'; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
+  $('#players-sort').addEventListener('change', (e) => { prefs.sort = e.target.value; savePrefs(); setDirBtn(); playersLimit = 60; renderPlayers(); });
+  $('#players-more').addEventListener('click', () => { playersLimit += 60; renderPlayers(); });
+  $('#players-finished').checked = !!prefs.finished;
+  const filtersChanged = () => { savePrefs(); playersLimit = 60; syncFilters(); if (!$('#view-players').hidden) renderPlayers(); if (openPlayer) { const b = backToEvent; openSheet(openPlayer); if (b) { backToEvent = b; $('#sheet-back').hidden = false; } } };
+  $('#players-finished').addEventListener('change', (e) => { prefs.finished = e.target.checked; filtersChanged(); });
+  $('#sheet-finished').addEventListener('change', (e) => { prefs.finished = e.target.checked; filtersChanged(); });
+  $('#sheet-known').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; filtersChanged(); });
+  $('#players-fromstart').checked = !!prefs.fromStart;
+  $('#players-fromstart').addEventListener('change', (e) => { prefs.fromStart = e.target.checked; filtersChanged(); });
+  $('#done-more').addEventListener('click', () => { doneLimit = 1e9; renderDone(); });
+  $('#interval').value = String(prefs.interval);
+  $('#interval').addEventListener('change', (e) => { prefs.interval = Number(e.target.value); savePrefs(); schedule(); });
+  $('#refresh').addEventListener('click', () => { clearTimeout(timer); poll(); });
+  // Back from the background: load the GitHub record first (it kept watching), then poll live
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) return;
+    await loadGitHub();
+    if (Number(prefs.interval) && Date.now() > nextAt) { clearTimeout(timer); poll(); }
+  });
+
+  /* ---------- settings menu ---------- */
+  const menuBtn = $('#menu-btn'), menu = $('#menu');
+  const setMenu = (open) => { menu.hidden = !open; menuBtn.setAttribute('aria-expanded', String(open)); };
+  menuBtn.addEventListener('click', (e) => { e.stopPropagation(); setMenu(menu.hidden); });
+  document.addEventListener('click', (e) => { if (!menu.hidden && !menu.contains(e.target)) setMenu(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { setMenu(false); menuBtn.focus(); } });
+  $('#refresh').addEventListener('click', () => setMenu(false));
+
+  /* ---------- boot ---------- */
+  Series.fillBrand(SER); Series.fillNav($('nav.others'), MODE === 'live' ? SER : null, '../');
+  fillFx();
+  if (fxCur) setTimeout(refresh, 0);
+  if (MODE === 'archive') {
+    // Nothing runs or polls in a past series
+    $('#row-interval').hidden = true; $('#refresh').hidden = true;
+    for (const id of ['#events', '#soon']) { const box = $(id); box.hidden = true; box.previousElementSibling.hidden = true; }
+    selectTab('players'); render(); loadArchive(); return;
+  }
+  selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
+  render();
+  (async () => {
+    await loadGitHub();
+    setInterval(loadGitHub, 5 * 60 * 1000);
+    if (Number(prefs.interval)) poll(); else setStatus();
+  })();
+})();
+</script>
+</body>
+</html>

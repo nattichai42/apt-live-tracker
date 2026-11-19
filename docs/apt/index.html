@@ -337,6 +337,20 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       <li>Satellites and side events Gods of Poker leaves unnumbered are shown without a number.</li>
     </ul>
     </div>
+    <div data-only="rop" hidden>
+    <h4>Where the data comes from</h4>
+    <ul>
+      <li>The Royal Poker Tour app publishes each event's standings (every player, their seat, busted or not) and payouts. A poller on GitHub reads the events being played about every 20 s and saves its record every couple of minutes; this page loads that record and refreshes it every minute (the site doesn't let other pages read it directly).</li>
+      <li>A player who comes back with a new seat has re-entered; a bust is timed at the poll that first saw it.</li>
+      <li>An event read only after it finished (every event of a past series) gives each player one bullet: its re-entries are in the entry count but not credited to anyone, so bullets and buy-ins there are a minimum (≥).</li>
+      <li>Times are Vietnam time.</li>
+    </ul>
+    <h4>Event cards</h4>
+    <ul>
+      <li>A later day (Day 2, Final Day) shows players carried over from the flights; its entries are the whole event's. Results add the final day's places to the flight cashes of players who didn't reach it.</li>
+      <li>Satellites and events without a number are shown without one.</li>
+    </ul>
+    </div>
     <div data-only="apt">
     <h4>Where the data comes from</h4>
     <ul>
@@ -411,7 +425,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=cd5c922312"></script>
-<script src="../series.js?v=6e5b2187f1"></script>
+<script src="../series.js?v=39e53b469f"></script>
 <script src="tracker.js?v=bcf744ec7c"></script>
 <script>
 (function () {
@@ -643,7 +657,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const dot = $('#dot'), txt = $('#status-text');
     if (MODE !== 'live') {
       dot.className = 'dot' + (lastErr ? ' err' : '');
-      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : (ORG !== 'apt' ? `Past series · ${O.full || O.name}'s complete records: every bullet, bust and payout` : Object.values(state.events).some((e) => e.polls) ? 'Past series · watched live: bullets, busts and payouts as they happened' : 'Past series · entries, registrations and payouts as published by APT') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
+      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : (O.archive && O.archive.note ? 'Past series · ' + O.archive.note : Object.values(state.events).some((e) => e.polls) ? 'Past series · watched live: bullets, busts and payouts as they happened' : 'Past series · entries, registrations and payouts as published by APT') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
       return;
     }
     const iv = Number(prefs.interval);

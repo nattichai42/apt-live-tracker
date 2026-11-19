@@ -249,3 +249,71 @@ test('docs/gop/index.html is the APT page made by tools/stamp.sh (edit the APT p
   assert.deepEqual(strip('gop/index.html', common), strip('apt/index.html', common));
   assert.match(fs.readFileSync(path.join(DOCS, 'gop/index.html'), 'utf8'), /<html lang="en" data-org="gop">/);
 });
+
+test('RPT: watched live, a new seat is a re-entry and a bust is timed by the poll that sees it', async () => {
+  const R = require('../docs/rop/rop.js').configure({ series: 'test' });
+  const st = R.emptyState();
+  const start = Math.floor(Date.now() / 1000) - 3600;
+  const ev = (id, name, extra) => ({ publicId: id, name, seriesPublicId: 'srs_main', seriesGroupPublicId: 'grp', startTime: new Date(start * 1000).toISOString(), buyIn: 1000, fee: 100, buyInCurrency: 'VND', status: 'running', totalEntry: 3, ...extra });
+  let standings = { e1: [], fd: [] }, payouts = { e1: [], fd: [] }, events = [ev('e1', '#7 - MAIN - DAY 1A'), ev('fd', '#7 - MAIN - FINAL DAY', { status: 'scheduled', startTime: new Date((start + 86400) * 1000).toISOString(), flightGroupEntries: 3 })];
+  const row = (pid, name, seat, busted) => ({ playerPublicId: pid, playerName: name, seatPublicId: seat, country: 'VN', isBusted: busted, stack: busted ? 0 : 1000, tableNumber: 1, seatNumber: 2, rank: 1 });
+  const fetchFn = async (u) => {
+    const url = new URL(u), p = url.pathname;
+    const body = p.endsWith('/series-groups') ? { data: [{ slug: 'test', publicId: 'grp', name: 'Test', startDate: '2026-01-01', endDate: '2027-01-01', effectiveStatus: 'active' }] }
+      : p.endsWith('/public/events') ? { data: events, pagination: { currentPage: 1, totalPages: 1 } }
+      : p.endsWith('/standings') ? { data: standings[p.split('/').at(-2)], pagination: { currentPage: 1, totalPages: 1 } }
+      : { payouts: payouts[p.split('/').at(-2)] };
+    return { ok: true, json: async () => body };
+  };
+  standings.e1 = [row('a', 'TRẦN ĐỨC HÙNG', 's1', false), row('b', 'Bo', 's2', false)];
+  await R.pollOnce(st, { fetchFn });
+  standings.e1 = [row('a', 'TRẦN ĐỨC HÙNG', 's3', false), row('b', 'Bo', 's2', true)]; // Hùng re-entered (new seat), Bo busted
+  await R.pollOnce(st, { fetchFn, listEvery: 1e9 });
+  const e1 = st.events.e1;
+  const hung = e1.p['Trần Đức Hùng'];
+  assert.ok(hung, 'names typed in capitals are shown in normal case');
+  assert.equal(hung.b, 2); assert.equal(hung.r.length, 1); assert.equal(hung.x.length, 1, 'the bust before the re-entry');
+  assert.equal(e1.p.Bo.st, 'x'); assert.equal(e1.p.Bo.x.length, 1);
+  assert.deepEqual(st.feed.map((f) => f.k).sort(), ['bust', 'bust', 'reentry']);
+  // Final day: carried over; results are its places plus flight cashes by players who didn't reach it
+  events = events.map((e) => ({ ...e, status: 'completed' }));
+  standings.fd = [row('a', 'TRẦN ĐỨC HÙNG', 's3', true)];
+  payouts.e1 = [{ winners: [{ rank: 2, playerPublicId: 'b', playerName: 'Bo', amount: 500 }, { rank: 1, playerPublicId: 'a', playerName: 'TRẦN ĐỨC HÙNG', amount: 500 }] }];
+  payouts.fd = [{ winners: [{ rank: 1, playerPublicId: 'a', playerName: 'TRẦN ĐỨC HÙNG', amount: 3000 }] }];
+  st.listAt = 0; await R.pollOnce(st, { fetchFn });
+  assert.equal(st.events.fd.p['Trần Đức Hùng'].carry, 1);
+  assert.deepEqual(st.results[7].rows.map((r) => [r[0], r[1], r[3]]), [[1, 'Trần Đức Hùng', 3000], [2, 'Bo', 500]]);
+  assert.equal(st.events.fd.p['Trần Đức Hùng'].st, 'end', 'a finished event marks its winner busted: not a bust');
+});
+
+test('RPT archive: index and files agree, results match the prize pools, rates for every event', () => {
+  const R = require('../docs/rop/rop.js');
+  const ix = read('rop/archive/index.json');
+  assert.ok(ix.series.length > 0);
+  const files = fs.readdirSync(path.join(DOCS, 'rop/archive')).filter((f) => f.endsWith('.json') && !['index.json', 'fx.json'].includes(f));
+  assert.deepEqual(files.map((f) => f.slice(0, -5)).sort(), ix.series.map((s) => s.id).sort());
+  FX.seed(read('rop/archive/fx.json'));
+  for (const f of ix.series) {
+    const st = read(`rop/archive/${f.id}.json`); R.repair(st);
+    const ev = Object.values(st.events);
+    assert.ok(ev.every((e) => e.phase === 'Completed'), `${f.id}: finished`);
+    assert.ok(R.players(st).length > 0, `${f.id}: players`);
+    let ok = 0, n = 0;
+    for (const [num, r] of Object.entries(st.results)) {
+      const kids = ev.filter((e) => e.num === Number(num));
+      const pool = Math.max(0, ...kids.map((e) => e.prizePool || 0)); if (!pool || kids.some((e) => e.sat)) continue; // (satellites pay seats)
+      const paid = r.rows.reduce((a, x) => a + x[3], 0);
+      n++; if (Math.abs(paid - pool) <= pool * 0.02) ok++;
+      // amounts in the wrong unit (the site's thousands of VND) would be off by 1000x
+      assert.ok(paid <= pool * 3 && paid >= pool / 30, `${f.id} #${num}: paid ${paid} for a prize pool of ${pool}`);
+    }
+    // Championship III's own payouts and prize pools disagree in a third of its events (the site's figures)
+    if (f.id !== 'rpt-championship-iii') assert.ok(ok >= n * 0.95, `${f.id}: results match the prize pool in ${ok} of ${n} events`);
+    for (const e of ev) assert.notEqual(FX.factor(e.currency, 'USD', FX.ymd(e.start)), null, `${f.id}: ${e.currency} on ${FX.ymd(e.start)}`);
+  }
+});
+
+test('docs/rop/index.html is the APT page made by tools/stamp.sh', () => {
+  const strip = (f) => fs.readFileSync(path.join(DOCS, f), 'utf8').split('\n').filter((l) => ![/^<html /, /^<title>/, /^<script src="[^"]*(tracker|gop|rop)\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/].some((re) => re.test(l)));
+  assert.deepEqual(strip('rop/index.html'), strip('apt/index.html'));
+});

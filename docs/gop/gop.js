@@ -329,10 +329,13 @@
     return out;
   }
   const numLabel = (n) => (Number(n) > SYNTH ? '' : '#' + n);
+  // Finished series, for tools/series-archive.js: [{ slug, name }]
+  const finished = async (fetchFn) => (((await getData(fetchFn, `${SITE}/series/__data.json`)).festivals) || [])
+    .filter((f) => f.isComplete && f.production !== false).map((f) => ({ slug: f.slug, name: clean(f.title) }));
 
   const shared = ['players', 'playerTimeline', 'liveEvents', 'eventPlayers', 'completedEvents', 'upcoming', 'watchedFromStart', 'eventFinished',
     'isLaterDay', 'baseName', 'canon', 'similarNames', 'unflatten', 'ACTIVE'];
-  const api = { SITE, BASE, SERIES, SERIES_URL, BROWSER_POLL, emptyState, pollOnce, repair, build, slim, numLabel, zoned, getData,
+  const api = { SITE, BASE, SERIES, SERIES_URL, BROWSER_POLL, emptyState, pollOnce, repair, build, slim, numLabel, zoned, getData, finished,
     pack: (s) => s, unpack: (s) => s };
   for (const k of shared) api[k] = APT[k];
   // source: the series' entry in docs/series.js ({ series: '<slug in godsofpoker.com/series/<slug>>' })

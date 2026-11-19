@@ -86,6 +86,11 @@ h2 { font: 600 21px/1.1 var(--head); margin: 24px 0 10px; letter-spacing: .01em;
     linear-gradient(150deg, #1d1238 0%, #130b25 55%, #0a0612 100%); }
 .art.gop .mark b { color: #f5d08a; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
 .art.gop .rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg at 78% 18%, rgba(245, 208, 138, .06) 0 5deg, transparent 5deg 15deg); }
+.art.rop { background:
+    radial-gradient(55% 80% at 80% 15%, rgba(250, 204, 120, .4), transparent 60%),
+    radial-gradient(70% 85% at 10% 95%, rgba(185, 28, 28, .6), transparent 60%),
+    linear-gradient(160deg, #3a0d12 0%, #22070b 55%, #120305 100%); }
+.art.rop .mark b { color: #f8d48a; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
 .art.triton { background:
     radial-gradient(55% 80% at 50% 40%, rgba(214, 178, 106, .28), transparent 65%),
     linear-gradient(180deg, #0d1018 0%, #05060a 100%); }
@@ -144,7 +149,7 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   <footer>Data from each organiser's public live pages, saved by pollers on GitHub. Not affiliated with the organisers.</footer>
 </div>
 
-<script src="series.js?v=6e5b2187f1"></script>
+<script src="series.js?v=39e53b469f"></script>
 <script>
 (function () {
   'use strict';
@@ -176,7 +181,7 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   function art(s) {
     const a = el('div', 'art ' + s.art);
     if (s.art === 'apt') a.insertAdjacentHTML('beforeend', '<svg class="skyline" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true"><path fill="#0b0d16" d="M0 120V70h18v-22h14v30h12V40h16v38h10V58h20v62h8V30l8-8 8 8v90h10V64h14V20h6V6l3-6 3 6v14h6v100h10V52h18v68h12V36h20v84h10V62h16v58h14V44h12v76h18V58h22v62h20V74h12v46z"/></svg>');
-    if (s.art === 'glpc' || s.art === 'gop') a.appendChild(el('div', 'rays'));
+    if (s.art === 'glpc' || s.art === 'gop' || s.art === 'rop') a.appendChild(el('div', 'rays'));
     if (s.art === 'triton' || s.art === 'all') a.appendChild(el('div', 'lines'));
     if (s.art === 'tone') a.appendChild(el('div', 'swoosh'));
     a.appendChild(el('div', 'watermark', s.watermark));
