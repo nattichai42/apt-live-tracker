@@ -18,15 +18,20 @@
   // One engine and one page per organiser. prefs: browser storage key for the page's settings (shared by its series).
   // poll: the GitHub poller's pace (seconds between rounds at least, requests per second on average, minutes between
   // saves); a series can override it with its own poll: {...}.
+  // archive: where a finished series is saved for good (tool, folder, the list in its index.json, and the field of a
+  // series' source that names its file). The poller runs the tool when a series it watched is over. Without one
+  // (GLPC), a finished series stays on its data branch.
   const ORGANISERS = {
     // APT seating is only seen by polling (busts and re-entries happen between looks), so it is polled hardest:
     // 3 requests/s is half of what the site took without refusing in a test; the poller backs off if it ever refuses
     apt: { name: 'APT', engine: 'apt/tracker.js', global: 'APTTracker', page: 'apt/', prefs: 'apt-live-prefs-v1',
-      poll: { minInterval: 5, maxInterval: 30, budget: 3, publishEvery: 1 } },
+      poll: { minInterval: 5, maxInterval: 30, budget: 3, publishEvery: 1 },
+      archive: { tool: 'tools/apt-archive.js', dir: 'apt/archive/', list: 'series', key: 'series' } },
     glpc: { name: 'GLPC', engine: 'glpc/glpc.js', global: 'GLPCTracker', page: 'glpc/', prefs: 'glpc-live-prefs-v1',
       poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 } },
     triton: { name: 'Triton', engine: 'triton/triton.js', global: 'TritonTracker', page: 'triton/', prefs: 'triton-live-prefs-v1',
-      poll: { minInterval: 15, maxInterval: 60, budget: 0.5, publishEvery: 2 } },
+      poll: { minInterval: 15, maxInterval: 60, budget: 0.5, publishEvery: 2 },
+      archive: { tool: 'tools/triton-archive.js', dir: 'triton/archive/', list: 'festivals', key: 'festival' } },
   };
 
   // id: never changes (links, browser storage). branch: where the poller saves (one per series).
@@ -98,12 +103,15 @@
     [/vietnam|hanoi|da[ -]?nang|phu[ -]?quoc|ho[ -]?chi[ -]?minh|saigon/i, 'Asia/Ho_Chi_Minh'], [/macau/i, 'Asia/Macau'], [/japan|tokyo|osaka/i, 'Asia/Tokyo'],
     [/cambodia|phnom penh/i, 'Asia/Phnom_Penh'], [/thailand|bangkok|pattaya/i, 'Asia/Bangkok'], [/cyprus/i, 'Asia/Nicosia']];
   const tzOf = (name, fallback) => (TZ.find(([re]) => re.test(name)) || [, fallback || 'UTC'])[1];
-  // Over: two days past its last day, or every event it listed has finished
+  // Over: two days past its last day, or its last day has come and every event it listed has finished
   function over(s, state) {
     const t = today(s.tz); if (t > shift(s.end, 2)) return true;
+    if (t < s.end) return false;
     const ev = Object.values((state && state.events) || {});
     return ev.length > 0 && ev.every((e) => e.phase === 'Completed' || e.closed);
   }
+  // The id of a series' file in its organiser's archive (null when the organiser has none)
+  const archiveId = (s) => { const a = ORGANISERS[s.org].archive; return a ? s.source[a.key] : null; };
 
   // The footer links on each page: home, every player, and the other series running or coming up
   function fillNav(nav, current, root) {
@@ -124,5 +132,5 @@
     document.title = `${s.name} Tracker`;
   }
 
-  return { ORGANISERS, LIST, status, byId, ofOrg, pick, pageUrl, storageKey, pollable, pollOpts, over, fillNav, fillBrand, tzOf };
+  return { ORGANISERS, LIST, status, byId, ofOrg, pick, pageUrl, storageKey, pollable, pollOpts, over, archiveId, fillNav, fillBrand, tzOf };
 });

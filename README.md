@@ -27,8 +27,15 @@ copying one of that organiser's and changing:
 Then run `tools/stamp.sh` and push. The *Poll series* workflow starts polling it the day before it starts, and stops two days after it
 ends. To start it earlier, run that workflow by hand with the series id. Its page is
 `<organiser page>?s=<id>`; the organiser's page without `?s=` shows its running series (else the next, else the latest).
-A Triton festival also joins the Triton all-time view, and the all-series page picks every series up by itself. Once a Triton festival
-has ended, `node tools/triton-archive.js` moves it into the archive.
+A Triton festival also joins the Triton all-time view, and the all-series page picks every series up by itself.
+
+**When a series ends** nothing needs doing. Once it is over (`over()` in `docs/series.js`: two days past its last day, or
+its last day has come and every event has finished), its poller's last run polls 20 more minutes for late payouts, then
+saves the series in its organiser's archive from its own record (`node poller/ctl.js archive <id> state.json`, which runs
+the organiser's archive tool with `--series <id> --from-state`) and commits that to main. From then on the home page shows
+it under Past and the scheduled start leaves it alone. GLPC has no archive yet: a finished GLPC series stays on its data
+branch, and its page keeps reading it from there. If that commit ever fails (the run says so), run the same command on a
+copy of the series' `state.json` from its data branch and push.
 
 **New organiser**: write an engine `docs/<org>/<org>.js` with the same interface as the others: `configure(source)`,
 `emptyState`, `pollOnce`, `repair`, `players(state, { detail, fromStart, finished })`, `playerTimeline`,
@@ -36,7 +43,8 @@ has ended, `node tools/triton-archive.js` moves it into the archive.
 Copy the closest page into `docs/<org>/index.html` and point it at the new engine. Add the organiser to `ORGANISERS` in
 `docs/series.js` (with `poll` pace), and add a `<script>` for the engine to `docs/all/index.html` and a line to
 `tools/stamp.sh`. If its events read differently (flights, later days, currency per event), add an `ADAPT` entry in
-`docs/all/all.js`. Then add its series as above.
+`docs/all/all.js`. Then add its series as above. For its finished series to be saved for good, give it an `archive` entry in `ORGANISERS`
+and a tool taking `--series <id> --from-state <state.json>` (see `tools/apt-archive.js`).
 
 ## How busts and re-entries are detected
 
@@ -180,7 +188,8 @@ Every player and event the trackers hold, across every series in `docs/series.js
 to `docs/apt/archive/<series slug>.json` plus `index.json`. The APT page shows one with `apt/?f=<slug>`. The home page
 lists them under Past, and the all-series page includes them. Run it again to add a series that has since ended (`--only <slug>`,
 `--force` to refetch, `--repack` to rewrite the files without requests). For a series we watched live, archive its own record
-instead, which has bust times and re-entries: `--from-state <state.json> --only <slug>`.
+instead, which has bust times and re-entries: `--series <id in docs/series.js> --from-state <state.json>` (the poller does this
+by itself when a series ends). `fx.json` only grows: days already saved aren't asked for again.
 
 - A finished series still serves every event's entries, buy-in and times, its payouts, and its registration list (everyone
   who registered, once each, with country). Each registered player counts one bullet per flight.

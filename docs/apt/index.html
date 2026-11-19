@@ -394,7 +394,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=913361b8f8"></script>
-<script src="../series.js?v=3ebaa9259a"></script>
+<script src="../series.js?v=daca991ee3"></script>
 <script src="tracker.js?v=2612d8c4ad"></script>
 <script>
 (function () {
@@ -615,7 +615,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const dot = $('#dot'), txt = $('#status-text');
     if (MODE !== 'live') {
       dot.className = 'dot' + (lastErr ? ' err' : '');
-      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : 'Past series · entries, registrations and payouts as published by APT' + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
+      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : (Object.values(state.events).some((e) => e.polls) ? 'Past series · watched live: bullets, busts and payouts as they happened' : 'Past series · entries, registrations and payouts as published by APT') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
       return;
     }
     const iv = Number(prefs.interval);

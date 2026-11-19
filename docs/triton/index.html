@@ -407,7 +407,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=913361b8f8"></script>
-<script src="../series.js?v=3ebaa9259a"></script>
+<script src="../series.js?v=daca991ee3"></script>
 <script src="triton.js?v=421b8f312a"></script>
 <script>
 (function () {
@@ -699,7 +699,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const dot = $('#dot'), txt = $('#status-text');
     if (MODE !== 'live') {
       dot.className = 'dot' + (lastErr ? ' err' : '');
-      txt.textContent = lastErr || (!loaded ? 'Loading…' : fxBusy ? 'Loading exchange rates…' : (MODE === 'archive' ? 'Past festival · results as published by Triton' : 'All festivals since 2018') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
+      txt.textContent = lastErr || (!loaded ? 'Loading…' : fxBusy ? 'Loading exchange rates…' : (MODE === 'archive' ? (Object.values(state.events).some((e) => e.polls > 1) ? 'Past festival · watched live, with every bust as it happened' : 'Past festival · results as published by Triton') : 'All festivals since 2018') + (fxShown ? ` · in ${fxShown} at each date's rate` : ''));
       return;
     }
     const iv = Number(prefs.interval);

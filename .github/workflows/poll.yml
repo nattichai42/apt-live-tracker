@@ -6,6 +6,8 @@ run-name: ${{ inputs.series && format('Poll {0}', inputs.series) || 'Start polle
 # - Run with a series id, it polls that series for 5 h 45 min, saving to the series' data branch, and queues its own
 #   next run first. A run waits in its series' concurrency group and starts the moment the previous one ends, so
 #   polling continues even when GitHub delays or skips the schedule; the scheduled start is only the fallback.
+# - Once a series is over (docs/series.js: over), its last run polls briefly for late payouts, saves the series in its
+#   organiser's archive (docs/<org>/archive/) and commits that to main; the schedule then leaves it alone.
 
 on:
   schedule:
@@ -20,6 +22,7 @@ on:
 permissions:
   contents: write
   actions: write   # lets a run start or queue runs of this workflow
+  pages: write     # asks for a site build after committing an archive
 
 concurrency:
   group: poll-${{ inputs.series || 'start' }}
@@ -62,15 +65,40 @@ jobs:
             echo "no previous state on $BRANCH, starting fresh"
           fi
       - name: Queue the next run
+        id: next
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if node poller/ctl.js over "$SERIES" state/state.json; then
+            echo "over=true" >> "$GITHUB_OUTPUT"
             echo "Not queueing another run."
           else
             gh workflow run poll.yml --ref main -f series="$SERIES" && echo "Queued the next run." || echo "::warning::Could not queue the next run; the schedule is the fallback."
           fi
-      - name: Poll for 5 h 45 min
+      - name: Poll for 5 h 45 min (20 min when the series is over)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node poller/poll.js --series "$SERIES" --state state/state.json --minutes 345
+          MINUTES: ${{ steps.next.outputs.over == 'true' && '20' || '345' }}
+        run: node poller/poll.js --series "$SERIES" --state state/state.json --minutes "$MINUTES"
+      - name: Archive the finished series
+        if: ${{ steps.next.outputs.over == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # On today's main (others may have pushed during the run); retried when the push loses a race
+        run: |
+          git config user.name "apt-tracker-bot"
+          git config user.email "apt-tracker-bot@users.noreply.github.com"
+          for attempt in 1 2 3 4; do
+            git fetch -q --depth=1 origin main && git reset -q --hard origin/main
+            node poller/ctl.js archive "$SERIES" state/state.json || { code=$?; [ "$code" = 3 ] && exit 0; exit "$code"; }
+            git add docs
+            if git diff --cached --quiet; then echo "Archive unchanged."; exit 0; fi
+            git commit -qm "Archive $SERIES (saved by its poller when it ended)"
+            if git push -q origin HEAD:main; then
+              echo "Archived $SERIES to main."
+              gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" >/dev/null 2>&1 || true
+              exit 0
+            fi
+            sleep $((attempt * 15))
+          done
+          echo "::error::Could not push the archive of $SERIES"; exit 1
