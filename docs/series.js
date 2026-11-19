@@ -29,6 +29,11 @@
       archive: { tool: 'tools/apt-archive.js', dir: 'apt/archive/', list: 'series', key: 'series' } },
     glpc: { name: 'GLPC', engine: 'glpc/glpc.js', global: 'GLPCTracker', page: 'glpc/', prefs: 'glpc-live-prefs-v1',
       poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 } },
+    // Gods of Poker: complete records on every event page (each bullet, bust and payout), so a poll reads the events
+    // being played every half minute or so; its engine builds on the APT engine (load apt/tracker.js first)
+    gop: { name: 'GOP', full: 'Gods of Poker', engine: 'gop/gop.js', needs: ['apt/tracker.js'], global: 'GOPTracker', page: 'gop/', prefs: 'gop-live-prefs-v1',
+      poll: { minInterval: 30, maxInterval: 90, budget: 0.3, publishEvery: 2 },
+      archive: { tool: 'tools/gop-archive.js', dir: 'gop/archive/', list: 'series', key: 'series' } },
     triton: { name: 'Triton', engine: 'triton/triton.js', global: 'TritonTracker', page: 'triton/', prefs: 'triton-live-prefs-v1',
       poll: { minInterval: 15, maxInterval: 60, budget: 0.5, publishEvery: 2 },
       archive: { tool: 'tools/triton-archive.js', dir: 'triton/archive/', list: 'festivals', key: 'festival' } },
@@ -37,7 +42,7 @@
   // id: never changes (links, browser storage). branch: where the poller saves (one per series).
   // start/end: first and last day in the venue's time zone (tz). place: the clock the page shows times in.
   // tag: short name next to the organiser ("APT Taipei '26"). source: what the engine needs to find the series.
-  // Banner (home page): title, mark, sub, art (apt | glpc | triton | tone), watermark.
+  // Banner (home page): title, mark, sub, art (apt | gop | glpc | triton | tone), watermark.
   // storage: browser key of the page's saved copy (defaults to the id).
   const LIST = [
     { id: 'apt-taipei-2026', org: 'apt', branch: 'data', storage: 'apt-live-state-v1',
@@ -65,6 +70,11 @@
       link: 'https://www.theasianpokertour.com/series/apt-championship-taiwan-2027',
       title: 'APT Championship, Taipei 2027', mark: 'APT Championship', sub: 'Taipei · 2027', art: 'apt', watermark: '2027',
       source: { series: 'apt-championship-taiwan-2027' } },
+    { id: 'gop-taipei-2027', org: 'gop', branch: 'gop-taipei-2027-data',
+      name: 'GOP Taipei 2027', tag: "Taipei '27", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2027-02-12', end: '2027-02-22',
+      link: 'https://godsofpoker.com/series/taipei-2027',
+      title: 'Gods of Poker, Taipei 2027', mark: 'GOP Taipei', sub: 'Gods of Poker · 2027', art: 'gop', watermark: '2027',
+      source: { series: 'taipei-2027' } },
     { id: 'triton-n-cyprus-2026', org: 'triton', branch: 'triton-data', storage: 'triton-live-state-v1',
       name: 'Triton N. Cyprus 2026', tag: "N. Cyprus '26", place: 'Cyprus', tz: 'Europe/Athens', currency: 'USD', start: '2026-11-15', end: '2026-11-30',
       link: 'https://tritonpoker.plus/festival/daca20f2-506a-4377-9c73-2651390b6782',

@@ -23,6 +23,7 @@ copying one of that organiser's and changing:
   - APT: `{ series: '<slug from theasianpokertour.com/series/<slug>>' }`
   - GLPC: `{ series, seriesUrl, from, to }` (the tournaments listed between those dates)
   - Triton: `{ festival: '<festival id from tritonpoker.plus/festival/<id>>', series }`
+  - Gods of Poker: `{ series: '<slug from godsofpoker.com/series/<slug>>' }`
 
 Then run `tools/stamp.sh` and push. The *Poll series* workflow starts polling it the day before it starts, and stops two days after it
 ends. To start it earlier, run that workflow by hand with the series id. Its page is
@@ -100,6 +101,32 @@ them again on every load (the tests fail until they're re-saved).
 ```bash
 node poller/poll.js --series apt-taipei-2026 --state state/state.json --minutes 10 --no-publish
 ```
+
+## Gods of Poker (`docs/gop/`)
+
+Gods of Poker (godsofpoker.com) runs on the same tournament software as APT, but its pages publish complete records: every
+event page lists one row per bullet (its purchase and time), each bust with its time, table and seat, every player's id,
+and the payouts. So nothing is inferred from seats changing, and past series are as exact as series watched live.
+
+- `docs/gop/gop.js` reads the series list and the event pages (`/event/<id>/__data.json`), keeps their rows, and rebuilds
+  the state from them on every poll in the APT engine's shape. Counting, timelines and event lists are the APT engine's
+  (`gop.js` needs `apt/tracker.js` loaded first; `ORGANISERS.gop.needs` says so).
+- A bullet is a purchase, counted in the first flight it appears in. Later days and "ITM holding" tables show the same
+  purchase for players carried over. Purchases add up to the official entries exactly in 529 of the 531 played events of
+  the 7 past series (the other two are a 2-entry Final Day and a Flip-Out stage).
+- GOP's "DO NOT USE" leftovers (duplicates of a real flight) and per-event summaries are ignored. Satellites and side
+  events numbered 0 get numbers of our own from 1001, which the page doesn't show.
+- Players are known by GOP's player id. Profiles with the same name are one player unless they played in one event
+  together or their countries disagree; a payout to an entrant's second profile (same name, maybe in another word order)
+  is credited to the entrant.
+- The site doesn't answer other sites' pages (no CORS), so the page shows what the poller saved and re-reads it every
+  minute. The poller reads the events being played about every 30 s (each event page is ~0.5 MB).
+- The page is the APT page: `docs/gop/index.html` is made from `docs/apt/index.html` by `tools/stamp.sh` with
+  `data-org="gop"` (edit the APT page; a test fails if the copy is behind). Organiser-specific text sits in
+  `data-only="apt"` / `data-only="gop"` blocks.
+- `node tools/gop-archive.js` saves every finished series (`--only <slug>`, `--force`, `--rates`); the poller archives
+  a watched series itself when it ends (`--series <id> --from-state`). Rates for their dates are in `docs/gop/archive/fx.json`
+  (`tools/rates.js`, shared with the APT archive).
 
 ## GLPC VI (Grand Loyal Poker Championships, 18–29 Nov 2026)
 

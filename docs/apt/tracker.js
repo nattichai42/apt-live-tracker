@@ -156,7 +156,8 @@
 
   // "[Event 1] National Cup Championship - Flight A - TWD 20,000,000 GTD" -> "[Event 1] National Cup Championship"
   const baseName = (name) => clean(name).split(/ - (?=(?:Turbo )?Flight\b|Day \d|Final Day|Final Table)/)[0];
-  const isLaterDay = (name) => /\b(Day [2-9]|Final Day|Final Table)\b/i.test(name || '');
+  // ("ITM Holding": Gods of Poker's table for players already in the money from a flight)
+  const isLaterDay = (name) => /\b(Day [2-9]|Final Day|Final Table|ITM Holding)\b/i.test(name || '');
 
   // Most bullets one player may fire, from the event name: Freezeout = 1, "1 Re-Entry" = 2, "2 Re-Entry" = 3
   function maxBulletsOf(name) {

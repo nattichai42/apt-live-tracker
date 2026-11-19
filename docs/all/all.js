@@ -33,6 +33,7 @@
   // Final Day) whose players came through earlier flights; laterCovers: a later day's entry count covers every flight.
   const ADAPT = {
     apt: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
+    gop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     glpc: { name: (e, E) => E.baseName(e.name), isLater: (e) => !!e.laterDay },
     triton: { nat: (e) => e.cur || 'USD' },
   };
@@ -169,26 +170,31 @@
       return true;
     } catch (e) { errors[s.id] = String(e.message || e); return false; }
   }
-  // Past APT series (tools/apt-archive.js) join as sources of their own, unless still a live entry in docs/series.js
+  // Past series of the organisers with a series archive (APT, GOP: tools/<org>-archive.js) join as sources of their own,
+  // unless still a live entry in docs/series.js
   let archivesAdded = false;
   async function addArchives() {
     if (archivesAdded) return []; archivesAdded = true;
     const added = [];
-    try {
-      const [idx, fx] = await Promise.all([fetch('../apt/archive/index.json').then((r) => r.json()), fetch('../apt/archive/fx.json').then((r) => r.json()).catch(() => null)]);
-      FX.seed(fx); // their dates' rates, saved with them
-      for (const f of idx.series || []) {
-        const dup = SRC.find((x) => x.org === 'apt' && x.entry.source && x.entry.source.series === f.id);
-        if (dup) SRC.splice(SRC.indexOf(dup), 1); // archived since: the saved file replaces the live record
-        const s = { id: 'apt:' + f.id, org: 'apt', entry: { currency: f.currency }, E: window[ORG.apt.global], name: f.name, short: ORG.apt.name, tag: f.tag,
-          page: `../apt/?f=${encodeURIComponent(f.id)}`, file: `../apt/archive/${f.id}.json`, archived: true };
-        s.ad = adapt(s.org); s.nat = (e) => s.ad.nat(e, s.entry);
-        SRC.push(s); SRC_BY[s.id] = s; added.push(s);
-      }
-      ORGS = [...new Set(SRC.map((s) => s.org))];
-      for (const o of ORGS) if (prefs.on[o] == null) prefs.on[o] = true;
-      fillSrcChips();
-    } catch (e) { console.warn('APT archive unavailable', e); }
+    const orgs = Object.keys(ORG).filter((o) => ORG[o].archive && ORG[o].archive.list === 'series' && window[ORG[o].global]);
+    await Promise.all(orgs.map(async (o) => {
+      const dir = '../' + ORG[o].archive.dir;
+      try {
+        const [idx, fx] = await Promise.all([fetch(dir + 'index.json').then((r) => r.json()), fetch(dir + 'fx.json').then((r) => r.json()).catch(() => null)]);
+        FX.seed(fx); // their dates' rates, saved with them
+        for (const f of idx.series || []) {
+          const dup = SRC.find((x) => x.org === o && x.entry.source && x.entry.source.series === f.id);
+          if (dup) SRC.splice(SRC.indexOf(dup), 1); // archived since: the saved file replaces the live record
+          const s = { id: `${o}:${f.id}`, org: o, entry: { currency: f.currency }, E: window[ORG[o].global], name: f.name, short: ORG[o].name, tag: f.tag,
+            page: `../${ORG[o].page}?f=${encodeURIComponent(f.id)}`, file: `${dir}${f.id}.json`, archived: true };
+          s.ad = adapt(s.org); s.nat = (e) => s.ad.nat(e, s.entry);
+          SRC.push(s); SRC_BY[s.id] = s; added.push(s);
+        }
+      } catch (e) { console.warn(`${ORG[o].name} archive unavailable`, e); }
+    }));
+    ORGS = [...new Set(SRC.map((s) => s.org))];
+    for (const o of ORGS) if (prefs.on[o] == null) prefs.on[o] = true;
+    fillSrcChips();
     return added;
   }
   let loading = false;
@@ -328,7 +334,7 @@
   let RULES = People.rules(null);
   // What docs/people.json may call a source: its id, its organiser, and a past APT series' slug (also as the live entry it was)
   const calledOf = (s) => {
-    const slug = s.id.startsWith('apt:') ? s.id.slice(4) : s.entry && s.entry.source && s.entry.source.series;
+    const slug = s.archived ? s.id.slice(s.org.length + 1) : s.entry && s.entry.source && s.entry.source.series;
     const entry = slug && Series.LIST.find((x) => x.org === s.org && x.source.series === slug);
     return [s.org, slug, entry && entry.id].filter(Boolean);
   };

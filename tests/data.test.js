@@ -185,3 +185,67 @@ test('APT: one player under two spellings in a series is one player', () => {
   assert.equal(c[0].bullets, 1, 'and its cash is not an extra bullet');
   assert.equal(ps.filter((p) => /^Le /.test(p.name)).length, 2, '"Le Tuan Anh" and "Le Anh Tuan" are two names');
 });
+
+test('GOP: bullets are purchases, counted once across flights, holding tables and later days', () => {
+  const G = require('../docs/gop/gop.js').configure({ series: 'test' });
+  const st = G.emptyState(), now = Math.floor(Date.UTC(2027, 1, 20) / 1000);
+  const at = (h) => Math.floor(Date.UTC(2027, 1, 12, h) / 1000);
+  // #5: Flight A (Ann twice, Bo), Flight B (Cy), holding table (Bo from A), Day 2 (Ann, Cy carried; Di new); a "DO NOT USE" copy
+  const ev = (kid, name, number, start, extra) => ({ kid, title: name, name, number: String(number), num: number, start, phase: 'Completed', p: {}, polls: 1, entries: 0, ...extra });
+  st.events = {
+    a: ev('a', 'Main Event - Flight A', 5, at(1), { entries: 3 }), b: ev('b', 'Main Event - Flight B', 5, at(5), { entries: 1 }),
+    h: ev('h', 'Main Event - (Flight A - ITM) - ITM Holding', 5, at(0), { entries: 1 }), d2: ev('d2', 'Main Event - Day 2', 5, at(24), { entries: 5 }),
+    s1: ev('s1', 'Satellite to Main Event', 0, at(2), { entries: 1 }), s2: ev('s2', 'Satellite to Main Event', 0, at(30), { entries: 1 }),
+  };
+  st.people = { ann: ['Ann Lee', 'TW'], bo: ['Bo Chan', 'HK'], cy: ['Cy Wu', 'TW'], di: ['Di Ko', 'KR'], ann2: ['Lee Ann', 'TW'] };
+  //            [pid, purchase, bought, busted, table, seat, chips]
+  st.events.a.q = [['ann', 'p1', at(1), at(2)], ['ann', 'p2', at(2) + 60, 0], ['bo', 'p3', at(1), 0]];
+  st.events.b.q = [['cy', 'p4', at(5), 0]];
+  st.events.h.q = [['bo', 'p3', at(1), 0]];
+  st.events.d2.q = [['ann', 'p2', at(2) + 60, at(25)], ['cy', 'p4', at(5), 0], ['di', 'p5', at(24), at(26)]];
+  st.events.s1.q = [['bo', 'p6', at(2), 0]]; st.events.s2.q = [['bo', 'p7', at(30), 0]];
+  st.events.d2.pay = [[1, 'cy', 1000], [2, 'ann2', 600], [3, 'bo', 300]]; // 'ann2': Ann's second profile (her name in another order)
+  G.build(st, now);
+  const b = (kid, n) => (st.events[kid].p[n] || {}).b;
+  assert.deepEqual([b('a', 'Ann Lee'), b('a', 'Bo Chan'), b('b', 'Cy Wu'), b('h', 'Bo Chan'), b('d2', 'Ann Lee'), b('d2', 'Di Ko')], [2, 1, 1, 0, 0, 1]);
+  assert.equal(st.events.h.p['Bo Chan'].carry, 1, 'the holding table carries Bo over');
+  assert.equal(st.events.a.p['Ann Lee'].r[0], at(2) + 60, 'the re-entry at its purchase time');
+  assert.deepEqual(st.results[5].rows.map((r) => r[1]), ['Cy Wu', 'Ann Lee', 'Bo Chan'], "a second profile's payout goes to the entrant");
+  const p = G.players(st).find((x) => x.name === 'Ann Lee');
+  assert.equal(p.bullets, 2); assert.equal(p.prizes, 600); assert.equal(p.partial, false);
+  assert.equal(G.watchedFromStart(st, 5), true, '5 purchases for 5 entries');
+  assert.notEqual(st.events.s1.num, st.events.s2.num, 'same-named side events on different days are two events');
+  assert.equal(G.numLabel(st.events.s1.num), '', 'made-up numbers are not shown');
+  // GOP's "DO NOT USE" duplicates are dropped from the list
+  G.configure({ series: 'test' });
+  const s2 = G.emptyState();
+  const t = (id, title) => ({ kholdem_id: id, title, eventNumber: '7', startTime: '2027-02-12T12:00:00', timezone: 'Asia/Taipei', phase: { code: 'concluded' }, status: {} });
+  require('../docs/gop/gop.js'); // (mergeList is internal: go through a fake fetch)
+  return G.pollOnce(s2, { backfill: false, fetchFn: async (u) => ({ ok: true, json: async () => ({ nodes: [null, { type: 'data', data: [{ events: 1 }, { events: 2 }, [3, 4], { kholdem_id: 5, title: 6 }, { kholdem_id: 7, title: 8 }, 'x1', 'Main - Flight A', 'x2', '*(DO NOT USE) Main - Flight A'] }] }) }) })
+    .then(() => { assert.deepEqual(Object.keys(s2.events), ['x1']); });
+});
+
+test('GOP archive: index and files agree, every played event adds up, rates for every event', () => {
+  const G = require('../docs/gop/gop.js');
+  const ix = read('gop/archive/index.json');
+  assert.ok(ix.series.length > 0);
+  const files = fs.readdirSync(path.join(DOCS, 'gop/archive')).filter((f) => f.endsWith('.json') && !['index.json', 'fx.json'].includes(f));
+  assert.deepEqual(files.map((f) => f.slice(0, -5)).sort(), ix.series.map((s) => s.id).sort());
+  FX.seed(read('gop/archive/fx.json'));
+  for (const f of ix.series) {
+    for (const k of ['id', 'name', 'place', 'tag', 'start', 'end', 'tz', 'currency']) assert.ok(f[k], `${f.id}: no ${k}`);
+    const st = read(`gop/archive/${f.id}.json`); G.repair(st);
+    const ev = Object.values(st.events);
+    assert.ok(ev.every((e) => e.phase === 'Completed' && e.polls), `${f.id}: every event read and finished`);
+    assert.ok(f.known >= f.played - 2, `${f.id}: every bullet known in only ${f.known} of ${f.played} events`);
+    assert.ok(G.players(st).length > 0);
+    for (const e of ev) assert.notEqual(FX.factor(e.currency, 'USD', FX.ymd(e.start)), null, `${f.id}: ${e.currency} on ${FX.ymd(e.start)}`);
+  }
+});
+
+test('docs/gop/index.html is the APT page made by tools/stamp.sh (edit the APT page, then run it)', () => {
+  const strip = (f, drop) => fs.readFileSync(path.join(DOCS, f), 'utf8').split('\n').filter((l) => !drop.some((re) => re.test(l)));
+  const common = [/^<html /, /^<title>/, /^<script src="[^"]*(tracker|gop)\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/];
+  assert.deepEqual(strip('gop/index.html', common), strip('apt/index.html', common));
+  assert.match(fs.readFileSync(path.join(DOCS, 'gop/index.html'), 'utf8'), /<html lang="en" data-org="gop">/);
+});

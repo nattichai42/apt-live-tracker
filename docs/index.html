@@ -80,6 +80,12 @@ h2 { font: 600 21px/1.1 var(--head); margin: 24px 0 10px; letter-spacing: .01em;
     linear-gradient(180deg, #3b2a12 0%, #1c140a 100%); }
 .art.glpc .mark b { color: #ffe3a8; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
 .art.glpc .rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg at 50% 30%, rgba(255, 227, 168, .07) 0 6deg, transparent 6deg 18deg); }
+.art.gop { background:
+    radial-gradient(55% 75% at 78% 18%, rgba(245, 200, 110, .38), transparent 60%),
+    radial-gradient(65% 85% at 12% 95%, rgba(124, 58, 237, .55), transparent 60%),
+    linear-gradient(150deg, #1d1238 0%, #130b25 55%, #0a0612 100%); }
+.art.gop .mark b { color: #f5d08a; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.art.gop .rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg at 78% 18%, rgba(245, 208, 138, .06) 0 5deg, transparent 5deg 15deg); }
 .art.triton { background:
     radial-gradient(55% 80% at 50% 40%, rgba(214, 178, 106, .28), transparent 65%),
     linear-gradient(180deg, #0d1018 0%, #05060a 100%); }
@@ -138,7 +144,7 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   <footer>Data from each organiser's public live pages, saved by pollers on GitHub. Not affiliated with the organisers.</footer>
 </div>
 
-<script src="series.js?v=daca991ee3"></script>
+<script src="series.js?v=6e5b2187f1"></script>
 <script>
 (function () {
   'use strict';
@@ -170,7 +176,7 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   function art(s) {
     const a = el('div', 'art ' + s.art);
     if (s.art === 'apt') a.insertAdjacentHTML('beforeend', '<svg class="skyline" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true"><path fill="#0b0d16" d="M0 120V70h18v-22h14v30h12V40h16v38h10V58h20v62h8V30l8-8 8 8v90h10V64h14V20h6V6l3-6 3 6v14h6v100h10V52h18v68h12V36h20v84h10V62h16v58h14V44h12v76h18V58h22v62h20V74h12v46z"/></svg>');
-    if (s.art === 'glpc') a.appendChild(el('div', 'rays'));
+    if (s.art === 'glpc' || s.art === 'gop') a.appendChild(el('div', 'rays'));
     if (s.art === 'triton' || s.art === 'all') a.appendChild(el('div', 'lines'));
     if (s.art === 'tone') a.appendChild(el('div', 'swoosh'));
     a.appendChild(el('div', 'watermark', s.watermark));
@@ -213,19 +219,24 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
 
   const metas = {};
   // Past Triton festivals, saved by tools/triton-archive.js (newest first), shown under Past
-  let tritonPast = [], allTime = null, allSeries = null, aptPast = [];
-  // Past APT series, saved by tools/apt-archive.js (newest first), shown under Past
-  async function loadApt() {
-    try {
-      const idx = await (await fetch('apt/archive/index.json', { cache: 'no-cache' })).json();
-      aptPast = (idx.series || []).map((f) => {
-        const yr = f.start.slice(0, 4), country = (f.name.match(/,\s*([^,\d]+?)\s*\d{4}/) || [, ''])[1];
-        const s = { id: 'apt-' + f.id, path: `apt/?f=${f.id}`, title: f.name, mark: 'APT ' + f.place, sub: [country, yr].filter(Boolean).join(' · '),
-          art: 'apt', watermark: yr, start: f.start, end: f.end, tz: f.tz || 'UTC', currency: f.currency, fixed: 'past', archived: true };
-        metas[s.id] = { finished: f.events, players: f.players, paid: f.paid };
-        return s;
-      });
-    } catch {}
+  let tritonPast = [], allTime = null, allSeries = null, seriesPast = [];
+  // Past series of the organisers with a series archive (APT, GOP: tools/<org>-archive.js), newest first, under Past
+  async function loadArchives() {
+    const orgs = Object.entries(Series.ORGANISERS).filter(([, o]) => o.archive && o.archive.list === 'series');
+    const lists = await Promise.all(orgs.map(async ([org, o]) => {
+      try {
+        const idx = await (await fetch(o.archive.dir + 'index.json', { cache: 'no-cache' })).json();
+        return (idx.series || []).map((f) => {
+          const yr = f.start.slice(0, 4), country = (f.name.match(/,\s*([^,\d]+?)\s*\d{4}/) || [, ''])[1];
+          const s = { id: `${org}-${f.id}`, org, slug: f.id, path: `${o.page}?f=${f.id}`, title: f.name, mark: o.name + ' ' + f.place,
+            sub: [country || o.full, yr].filter(Boolean).join(' · '), art: org, watermark: yr, start: f.start, end: f.end, tz: f.tz || 'UTC',
+            currency: f.currency, fixed: 'past', archived: true };
+          metas[s.id] = { finished: f.events, players: f.players, paid: f.paid };
+          return s;
+        });
+      } catch { return []; }
+    }));
+    seriesPast = lists.flat();
     render();
   }
   async function loadTriton() {
@@ -257,11 +268,11 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
     const archived = new Set(tritonPast.map((t) => t.id.slice(3)));
     for (const s of SERIES) if (!(s.source && archived.has(s.source.festival))) groups[status(s)].push(s);
     // A series in docs/series.js that has since been archived shows once, as its archive banner
-    const aptArchived = new Set(aptPast.map((a) => a.id.slice(4)));
-    for (const k of ['live', 'soon', 'past']) groups[k] = groups[k].filter((x) => !(x.org === 'apt' && aptArchived.has(x.source.series)));
-    groups.past.push(...tritonPast, ...aptPast);
+    const archivedAs = new Set(seriesPast.map((a) => a.org + ':' + a.slug)), isArchived = (x) => archivedAs.has(x.org + ':' + x.source.series);
+    for (const k of ['live', 'soon', 'past']) groups[k] = groups[k].filter((x) => !isArchived(x));
+    groups.past.push(...tritonPast, ...seriesPast);
     // The all-series banner: series with data (running or past), Triton festivals counted separately
-    if (metas.all) metas.all.series = SERIES.filter((x) => x.org !== 'triton' && status(x) !== 'soon' && !(x.org === 'apt' && aptArchived.has(x.source.series))).length + aptPast.length;
+    if (metas.all) metas.all.series = SERIES.filter((x) => x.org !== 'triton' && status(x) !== 'soon' && !isArchived(x)).length + seriesPast.length;
     groups.live.sort((a, b) => (b.start < a.start ? -1 : 1));
     groups.soon.sort((a, b) => (a.start < b.start ? -1 : 1));
     groups.past.sort((a, b) => (b.start < a.start ? -1 : b.start > a.start ? 1 : b.end < a.end ? -1 : 1)); // newest first, by year started
@@ -323,7 +334,8 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
 
   async function load() {
     if (!REPO) return;
-    await Promise.all(SERIES.map(async (s) => {
+    // (a series saves nothing before its poller starts, the day before its first day)
+    await Promise.all(SERIES.filter((s) => Series.status(s) !== 'soon' || Series.pollable(s)).map(async (s) => {
       try {
         const r = await fetch(`https://raw.githubusercontent.com/${REPO}/${s.branch}/meta.json`, { cache: 'no-cache' });
         if (r.ok) metas[s.id] = await r.json();
@@ -334,7 +346,7 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   render();
   load();
   loadTriton();
-  loadApt();
+  loadArchives();
   setInterval(load, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 })();

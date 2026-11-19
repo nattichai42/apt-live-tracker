@@ -17,13 +17,14 @@ const REPO = process.env.REPO || process.env.GITHUB_REPOSITORY || (() => {
 })();
 const BADTEXT = /.{0,40}(\bNaN\b|\bundefined\b|\bInfinity\b|\[object Object\]).{0,20}/;
 const first = (f, list) => { try { return JSON.parse(fs.readFileSync(path.join(DOCS, f), 'utf8'))[list][0].id; } catch { return null; } };
-const aptPast = first('apt/archive/index.json', 'series'), tritonPast = first('triton/archive/index.json', 'festivals');
+const aptPast = first('apt/archive/index.json', 'series'), gopPast = first('gop/archive/index.json', 'series'), tritonPast = first('triton/archive/index.json', 'festivals');
 
 // [url, what shows it has loaded]
 const PAGES = [
   ['', '.banner'],
   ['apt/', '#done-count'],
   aptPast && [`apt/?f=${aptPast}`, '#done-count'],
+  gopPast && [`gop/?f=${gopPast}`, '#done-count'],
   ['glpc/', '#done-count'],
   ['triton/', '#done-count'],
   tritonPast && [`triton/?f=${tritonPast}`, '#done-count'],
