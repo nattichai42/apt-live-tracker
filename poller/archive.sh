@@ -19,9 +19,9 @@ pages() {
   local info
   info=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '"source " + .source.branch + .source.path + ", build type " + .build_type' 2>&1) \
     && echo "Pages: $info" || echo "::warning::Could not read the Pages settings: $info"
-  if [ "$REHEARSE" = --rehearse ]; then echo "Rehearsal: not asking for a site build (nothing changed)."; return 0; fi
+  # (a rehearsal asks too: it only rebuilds the same site, and shows the request is allowed)
   gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" --jq '"Asked for a site build: " + .status' 2>&1 \
-    || echo "::warning::Could not ask for a site build; the push itself should start one."
+    || { echo "::warning::Could not ask for a site build; the push itself should start one."; [ "$REHEARSE" != --rehearse ] || exit 1; }
 }
 
 for attempt in 1 2 3 4; do
