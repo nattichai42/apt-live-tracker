@@ -193,7 +193,8 @@ Every player and event the trackers hold, across every series in `docs/series.js
 - Series don't share player ids, so a person is matched by name in any word order, ignoring accents, hyphens and case
   ("Chen Kuan-Han" = "Kuan Han Chen"), and only when the countries agree or one is missing (`docs/people.js`). Same-name
   players from the same country are merged, and different spellings stay apart, unless `docs/people.json` says otherwise:
-  - `"same": [["Chengxu Hu", "Cheng Xu Hu"], ...]`: names that are one person, merged whatever their countries.
+  - `"same": [["Chengxu Hu", "Cheng Xu Hu"], ["Daniel Smiljkovic"], ...]`: names that are one person, merged whatever their
+    countries (one name alone: everyone under it, for one person whose flag differs between series).
   - `"apart": [{ "name": "Danny Tang", "people": [["triton"], ["apt"]] }]`: one name, several people, each with the series
     listed (an id from `docs/series.js`, a past APT series' slug, `triton`, or an organiser for all its series; series not
     listed go with the first person).

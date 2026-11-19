@@ -6,7 +6,8 @@
  *
  * By hand, in docs/people.json, where that gets it wrong:
  *   "same":  [["Kuan-Han Chen", "Chen Kuanhan"], ...]
- *            names that are one person: merged whatever their countries, also two rows of one series
+ *            names that are one person: merged whatever their countries, also two rows of one series. One name
+ *            alone (["Daniel Smiljkovic"]) merges everyone under it: one person whose flag differs between series
  *   "apart": [{ "name": "Wei Zhang", "people": [["apt"], ["triton", "glpc-vi"]] }, ...]
  *            one name, several people: each list is the series of one of them. A series is named by its id in
  *            docs/series.js, a past APT series by its slug, "triton" for every Triton festival, or an organiser
@@ -26,7 +27,7 @@
   function rules(json) {
     const same = new Map(), apart = new Map(), problems = [];
     for (const group of (json && json.same) || []) {
-      if (!Array.isArray(group) || group.length < 2) { problems.push(`same: ${JSON.stringify(group)} needs two names or more`); continue; }
+      if (!Array.isArray(group) || !group.length) { problems.push(`same: ${JSON.stringify(group)} needs a name`); continue; }
       const keys = group.map(norm), to = keys.map((k) => same.get(k)).find(Boolean) || keys[0];
       for (const k of keys) same.set(k, to);
     }

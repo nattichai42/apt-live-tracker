@@ -160,7 +160,7 @@ test('people: automatic matching and the docs/people.json fixes', () => {
   assert.deepEqual(Object.keys(inApt.rows), ['a']);
   assert.equal(inApt.rows.a.bullets, 2, 'two rows of one series under one "apart" person are merged');
   assert.deepEqual(Object.keys(bo.find((p) => !p.rows.a).rows).sort(), ['b', 'triton']);
-  assert.deepEqual(P.rules({ same: [['x']], apart: [{ name: 'y', people: [['a']] }] }).problems.length, 2, 'malformed fixes are reported');
+  assert.deepEqual(P.rules({ same: [[]], apart: [{ name: 'y', people: [['a']] }] }).problems.length, 2, 'malformed fixes are reported');
   // the file itself is valid
   const json = read('people.json');
   assert.deepEqual(P.rules(json).problems, []);

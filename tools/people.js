@@ -127,7 +127,10 @@ const groups = [
   ['Same letters, split differently', 'usually one person', split.map((x) => [x.a, x.b])],
   ['One letter apart', 'often two people: check before merging', letter.map((x) => [x.a, x.b])],
 ];
-if (asJson) { console.log(JSON.stringify({ groups: Object.fromEntries(groups.map(([t, , l]) => [t, l.slice(0, top).map((ps) => ps.map(who))])), stale, problems: R.problems })); process.exit(0); }
+// --json: each case as its people, with every spelling, the series, and whether the name is theirs alone (a "same" fix
+// merges everyone under a name, so a name shared with someone else isn't safe to merge)
+const plain = (p) => { const k = p.key.split('#')[0]; return { name: p.name, key: k, names: [...new Set(Object.values(p.rows).flatMap((r) => r.names || [r.name]))], cc: p.cc, usd: Math.round(p.usd), sources: Object.keys(p.rows), where: p.where, alone: byKey.get(k).length === 1 }; };
+if (asJson) { console.log(JSON.stringify({ groups: Object.fromEntries(groups.map(([t, , l]) => [t, l.slice(0, top).map((ps) => ps.map(plain))])), stale, problems: R.problems })); process.exit(0); }
 console.log(`${people.length} people from ${lists.length} sources; ${(fixes.same || []).length} "same" and ${(fixes.apart || []).length} "apart" fixes in docs/people.json`);
 for (const x of R.problems) console.log('people.json problem:', x);
 for (const [title, hint, list] of groups) {
