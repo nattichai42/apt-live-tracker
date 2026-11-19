@@ -32,8 +32,14 @@ for o in "gop gop.js Gods of Poker Live Tracker" "rop rop.js Royal Poker Tour Li
   stamp "docs/$org/index.html" "$js"
 done
 stamp docs/glpc/index.html glpc.js
+# USOP runs on Grand Loyal's tracker: its page is the GLPC page with data-org="usop" and GLPC's engine
+sed -e 's#^<html lang="en">$#<html lang="en" data-org="usop">#' \
+    -e 's#^<script src="glpc\.js\(?v=[0-9a-f]*\)\{0,1\}"></script>$#<script src="../glpc/glpc.js"></script>#' \
+    -e '2i<!-- Made by tools/stamp.sh from docs/glpc/index.html: edit that page, not this one -->' \
+    docs/glpc/index.html > docs/usop/index.html
+stamp docs/usop/index.html ../glpc/glpc.js
 stamp docs/triton/index.html triton.js
-for page in docs/apt/index.html docs/gop/index.html docs/rop/index.html docs/glpc/index.html docs/triton/index.html docs/all/index.html; do stamp "$page" ../fx.js; stamp "$page" ../series.js; done
+for page in docs/apt/index.html docs/gop/index.html docs/rop/index.html docs/glpc/index.html docs/usop/index.html docs/triton/index.html docs/all/index.html; do stamp "$page" ../fx.js; stamp "$page" ../series.js; done
 stamp docs/index.html series.js
 # The all-series page uses every engine
 stamp docs/all/index.html ../apt/tracker.js

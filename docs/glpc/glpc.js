@@ -533,6 +533,67 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
     return summary;
   }
 
+  /**
+   * A finished series read once (tools/series-archive.js): every event's details, leaderboard and payouts. The site
+   * keeps old events "active", so each is taken as finished; its leaderboard has one row per player (re-entries only in
+   * the counts), so bullets are one per player and bust times unknown. opts: { fetchFn, concurrency }
+   */
+  async function readPast(state, opts = {}) {
+    const baseFetch = opts.fetchFn || ((u) => fetch(u, { cache: 'no-store' }));
+    const now = nowSec();
+    const summary = { events: 0, errors: [], requests: 0 };
+    const fetchFn = (u) => { summary.requests++; return baseFetch(u); };
+    state.res = state.res || {};
+    if (!Object.keys(state.events).length) mergeList(state, await getJSON(fetchFn, `${API}/tournaments?startDate=${FROM}&endDate=${TO}`), now);
+    const todo = Object.values(state.events).filter((e) => !e.pastRead).sort((a, b) => (a.start || 0) - (b.start || 0));
+    const got = await pool(todo, opts.concurrency || 4, async (e) => {
+      const [d, lb, pay] = await Promise.all([getJSON(fetchFn, `${API}/tournaments/${e.kid}`), getJSON(fetchFn, `${API}/tournaments/${e.kid}/leaderboard`),
+        getJSON(fetchFn, `${API}/tournaments/${e.kid}/payouts`)]);
+      return { e, d, lb, pay };
+    });
+    // Flights before later days, so a later day's players are found as carried over
+    const ok = got.filter((g) => g && !g.error);
+    for (const g of got) if (!g || g.error) summary.errors.push((g && g.error) || 'unknown');
+    for (const g of ok) applyDetail(state, g.e, g.d, now);
+    for (const g of ok.sort((a, b) => isLaterDay(a.e.name) - isLaterDay(b.e.name) || (a.e.start || 0) - (b.e.start || 0))) {
+      const e = g.e;
+      if (Array.isArray(g.lb) && g.lb.length) {
+        applySnapshot(state, e.kid, g.lb, now);
+        e.doneAt = e.start || now; e.doneBy = 'past'; e.lastPoll = e.doneAt;
+        // The site marks everyone busted at the end, the winner too: rank 1 (or whoever is left) won; a flight bagged its survivors
+        for (const p of Object.values(e.p)) {
+          if (!e.next && (p.rank === 1 || (e.sat && p.st === 's'))) { p.st = 'end'; p.won = 1; delete p.pre; }
+          else if (p.st === 's') p.st = 'end';
+        }
+      } else { e.doneAt = e.start || now; e.doneBy = 'past'; }
+      if (Array.isArray(g.pay)) {
+        const pool = (e.prizePool || 0) || (e.gtd || 0) || (e.buyin || 0) * (e.entries || 0);
+        const vnd = (x) => { const v = Number(x) || 0; return pool && v * 1000 > pool * 1.05 ? Math.round(v) : Math.round(v * 1000); };
+        state.res[e.kid] = { at: now, pay: g.pay.map((r) => [Number(r.rank), vnd(r.prize)]).filter((r) => r[0] > 0).sort((a, b) => a[0] - b[0]), since: now, final: true };
+        e.paid = state.res[e.kid].pay.length ? Math.max(...state.res[e.kid].pay.map((r) => r[0])) : 0;
+      }
+      e.pastRead = 1; e.closed = 1; summary.events++;
+    }
+    for (const e of Object.values(state.events)) e.phase = computePhase(e, now);
+    buildResults(state);
+    state.updatedAt = now;
+    return summary;
+  }
+
+  // A finished series as a file of its own: what live polling needs is left out
+  function slim(state) {
+    const out = { v: 1, series: state.series, archive: true, updatedAt: state.updatedAt, events: {}, results: state.results || {}, feed: state.feed || [], aliases: state.aliases || {} };
+    for (const e of Object.values(state.events)) {
+      if (!Object.keys(e.p || {}).length && !(e.entries > 0)) continue; // never played
+      const { ids, pastRead, closed, levelAt, lastChange, regClosedAt, entriesAtFirst, rebuysAtFirst, listed, detAt, breaks, regEndN, regEndLabel, regCloseLabel, startIso, ...keep } = e;
+      const p = {};
+      for (const [k, x] of Object.entries(e.p || {})) { const { id, l, pend, xe, ...rest } = x; p[k] = rest; }
+      out.events[e.kid] = { ...keep, p, phase: 'Completed', doneAt: e.doneAt || e.start };
+    }
+    for (const r of Object.values(out.results)) r.final = true;
+    return out;
+  }
+
   /* ---------- derived views ---------- */
   const kidsOf = (state, num) => Object.values(state.events).filter((e) => e.num === String(num));
   const fromStart = (e) => !!(e.firstPoll && e.start && e.firstPoll - e.start < 900);
@@ -762,7 +823,7 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
       .map((e) => ({ kid: e.kid, num: e.num, name: e.name, start: e.start, buyin: e.buyin, phase: e.phase, sat: e.sat, gtd: e.gtd, regClose: e.regCloseSched }));
   }
 
-  const api = { SITE, API, SERIES, SERIES_URL, ACTIVE, TZ_OFF, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, canon,
+  const api = { readPast, slim, SITE, API, SERIES, SERIES_URL, ACTIVE, TZ_OFF, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, canon,
     emptyState, pollOnce, applySnapshot, applyDetail, mergeList, settle, buildResults, players, playerTimeline, liveEvents, isLaterDay, parseName, label, ccOf, regCloseOf, titleCase };
   // source: the series' entry in docs/series.js ({ series, seriesUrl, from, to })
   api.configure = (source) => {

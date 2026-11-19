@@ -317,3 +317,33 @@ test('docs/rop/index.html is the APT page made by tools/stamp.sh', () => {
   const strip = (f) => fs.readFileSync(path.join(DOCS, f), 'utf8').split('\n').filter((l) => ![/^<html /, /^<title>/, /^<script src="[^"]*(tracker|gop|rop)\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/].some((re) => re.test(l)));
   assert.deepEqual(strip('rop/index.html'), strip('apt/index.html'));
 });
+
+test('Grand Loyal archives (GLPC, USOP): index and files agree, finished, payouts within the pools, rates', () => {
+  const G = require('../docs/glpc/glpc.js');
+  for (const org of ['glpc', 'usop']) {
+    const ix = read(`${org}/archive/index.json`);
+    assert.ok(ix.series.length > 0, `${org}: archive`);
+    const files = fs.readdirSync(path.join(DOCS, org, 'archive')).filter((f) => f.endsWith('.json') && !['index.json', 'fx.json'].includes(f));
+    assert.deepEqual(files.map((f) => f.slice(0, -5)).sort(), ix.series.map((s) => s.id).sort());
+    FX.seed(read(`${org}/archive/fx.json`));
+    for (const f of ix.series) {
+      assert.ok(Series.LIST.some((s) => s.org === org && s.source.series === f.id), `${f.id}: an entry in docs/series.js`);
+      const st = read(`${org}/archive/${f.id}.json`); G.repair(st);
+      const ev = Object.values(st.events);
+      assert.ok(ev.every((e) => e.phase === 'Completed'), `${f.id}: finished`);
+      assert.ok(G.players(st).length > 0, `${f.id}: players`);
+      // Grand Loyal keeps only the top places of a finished event: never more than its pool
+      for (const [num, r] of Object.entries(st.results)) {
+        const kids = ev.filter((e) => e.num === num); if (kids.some((e) => e.sat)) continue;
+        const pool = Math.max(0, ...kids.map((e) => e.prizePool || 0)); if (!pool) continue;
+        assert.ok(r.rows.reduce((a, x) => a + x[3], 0) <= pool * 1.5, `${f.id} #${num}: paid more than its pool`);
+      }
+      for (const e of ev) assert.notEqual(FX.factor('VND', 'USD', FX.ymd(e.start)), null, `${f.id}: VND on ${FX.ymd(e.start)}`);
+    }
+  }
+});
+
+test('docs/usop/index.html is the GLPC page made by tools/stamp.sh', () => {
+  const strip = (f) => fs.readFileSync(path.join(DOCS, f), 'utf8').split('\n').filter((l) => ![/^<html /, /^<script src="[^"]*glpc\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/].some((re) => re.test(l)));
+  assert.deepEqual(strip('usop/index.html'), strip('glpc/index.html'));
+});

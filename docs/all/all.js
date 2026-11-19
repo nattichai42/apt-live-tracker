@@ -36,6 +36,7 @@
     gop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     rop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     glpc: { name: (e, E) => E.baseName(e.name), isLater: (e) => !!e.laterDay },
+    usop: { name: (e, E) => E.baseName(e.name), isLater: (e) => !!e.laterDay },
     triton: { nat: (e) => e.cur || 'USD' },
   };
   const adapt = (org) => ({ name: (e) => e.base || e.name, isLater: () => false, laterCovers: false, nat: (e, s) => e.currency || s.currency || 'USD', ...(ADAPT[org] || {}) });
@@ -43,7 +44,7 @@
   // key: source id; page: its tracker (Triton: the all-time view, which holds every festival)
   const SRC = [];
   for (const x of Series.LIST) {
-    if (x.org === 'triton' || Series.status(x) === 'soon') continue; // nothing saved before it starts
+    if (x.org === 'triton' || x.past || Series.status(x) === 'soon') continue; // nothing saved before it starts (a past-only series joins from its archive)
     const E = window[ORG[x.org].global];
     if (!E) { console.warn(`${x.id}: add a <script> for ${ORG[x.org].engine} to this page`); continue; }
     SRC.push({ id: x.id, org: x.org, entry: x, E, branch: x.branch, name: x.name, short: ORG[x.org].name, tag: x.tag || '', page: Series.pageUrl(x, '../') });

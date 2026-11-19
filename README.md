@@ -165,6 +165,22 @@ built on the public JSON behind grandloyal.vn's tracker (`apitracker.grandloyal.
 - Later days get their event number from the flights that feed them (`multiDayTourId`); the schedule's reused
   numbers for different single-day events (#14/#15/#16 on 20 and 21 Nov) are kept apart as `#14·2` etc.
 
+
+### Past GLPC and USOP series (Grand Loyal's tracker)
+
+USOP festivals run on Grand Loyal's tracker too, so `usop` is an organiser of its own on GLPC's engine and page
+(`docs/usop/index.html` is made from `docs/glpc/index.html` by `tools/stamp.sh`). Grand Loyal doesn't list which
+tournaments belong to which festival, so the past ones are entries in `docs/series.js` with their dates and
+`past: true` (never polled; their page opens the archive): GLPC III, IV and V, USOP Hanoi 2025 (also called "GLPC -
+Powered by USOP"), USOP Vietnam May and August 2026. `node tools/series-archive.js --org glpc|usop` saves them
+(`readPast()` in the engine reads every event once: the site keeps old events "active"); GLPC VI is archived by its
+poller when it ends, like every watched series.
+
+- A finished event's leaderboard has one row per player and its counts include the re-entries: bullets are a minimum.
+- Grand Loyal keeps only the top few places of a finished event's payouts (the Main Event's Final Day: 3), so past
+  results are winners and podiums, not every cash. GLPC VI, watched live, has the full tables.
+- GLPC V has only 27 tournaments on the tracker (11 played): the festival is only partly recorded there.
+
 ## Triton N. Cyprus 2026 (15–30 Nov 2026)
 
 `docs/triton/` (page at `https://<owner>.github.io/<repo>/triton/`), built on the public GraphQL API the

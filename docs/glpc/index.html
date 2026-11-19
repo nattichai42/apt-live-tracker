@@ -411,16 +411,25 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=cd5c922312"></script>
-<script src="../series.js?v=39e53b469f"></script>
-<script src="glpc.js?v=c0e2dc44dc"></script>
+<script src="../series.js?v=ad530c52f6"></script>
+<script src="glpc.js?v=abbce7e2eb"></script>
 <script>
 (function () {
   'use strict';
-  // Which series this page shows (docs/series.js): ?s=<id>, else the organiser's running one
-  const SER = Series.pick('glpc', new URLSearchParams(location.search).get('s'));
-  const T = window.GLPCTracker.configure(SER.source);
+  // One page for the series on Grand Loyal's tracker (GLPC, USOP): <html data-org="..."> (docs/usop/index.html is made
+  // from this file by tools/stamp.sh). Which series: a past one saved by tools/series-archive.js (?f=<id>), or one in
+  // docs/series.js (?s=<id>, else the organiser's running one)
+  const ORG = document.documentElement.dataset.org || 'glpc', O = Series.ORGANISERS[ORG];
+  const params = new URLSearchParams(location.search);
+  const picked = Series.pick(ORG, params.get('s'));
+  // (a series known only from its archive opens as one)
+  const FEST = /^[a-z0-9-]{3,80}$/.test(params.get('f') || '') ? params.get('f') : picked && picked.past ? picked.source.series : null;
+  const MODE = FEST ? 'archive' : 'live';
+  const SER = FEST ? { ...(Series.LIST.find((x) => x.org === ORG && x.source.series === FEST) || { id: FEST, org: ORG, tz: 'Asia/Ho_Chi_Minh', place: 'Vietnam', name: O.name, mark: O.name, sub: '', link: 'https://grandloyal.vn/series', source: { series: FEST } }) }
+    : picked;
+  const T = window[O.global].configure(SER.source);
   const $ = (s) => document.querySelector(s);
-  const LS_STATE = Series.storageKey(SER), LS_PREFS = Series.ORGANISERS.glpc.prefs;
+  const LS_STATE = Series.storageKey(SER), LS_PREFS = O.prefs;
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -436,10 +445,10 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     return null;
   }
   const REPO = repoSlug();
-  const STATE_URL = REPO ? `https://raw.githubusercontent.com/${REPO}/${SER.branch}/state.json` : null;
+  const STATE_URL = REPO && MODE === 'live' ? `https://raw.githubusercontent.com/${REPO}/${SER.branch}/state.json` : null;
 
   let raw = T.emptyState(), state = raw; // raw: as polled and saved; state: what's shown (maybe converted)
-  try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
+  if (MODE === 'live') try { const s = JSON.parse(store.get(LS_STATE) || 'null'); if (s && s.v === 1) { T.repair(s); raw = state = s; } } catch {}
   const prefs = Object.assign({ interval: 60, kinds: { bust: true, reentry: true, entry: false }, tab: 'events', sort: 'prizes' }, (() => { try { return JSON.parse(store.get(LS_PREFS) || '{}'); } catch { return {}; } })());
   const savePrefs = () => store.set(LS_PREFS, JSON.stringify(prefs));
   // Dark by default; the ☀/☾ button switches and is remembered on this device
@@ -566,6 +575,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
   /* ---------- data plumbing ---------- */
   function persist() {
+    if (MODE !== 'live') return; // a past series comes from its saved file
     if (!store.set(LS_STATE, JSON.stringify(raw))) {
       const slim = { ...raw, feed: raw.feed.slice(-1500) };
       store.set(LS_STATE, JSON.stringify(slim));
@@ -588,7 +598,29 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       }
     } catch (e) { console.warn('GitHub history unavailable', e); }
   }
+  // A past series: its saved file, and its name and dates from the archive's index
+  let archLoaded = false;
+  async function loadArchive() {
+    try {
+      const [r, idx, fx] = await Promise.all([fetch(`archive/${FEST}.json`), fetch('archive/index.json').then((x) => x.json()).catch(() => ({ series: [] })),
+        fetch('archive/fx.json').then((x) => x.json()).catch(() => null)]);
+      FX.seed(fx); // the saved series' dates' rates
+      if (!r.ok) throw new Error(r.status === 404 ? 'No saved series with this id' : 'HTTP ' + r.status);
+      const s = await r.json(); T.repair(s);
+      raw = state = s; archLoaded = true; lastErr = null;
+      const info = (idx.series || []).find((x) => x.id === FEST);
+      if (info) {
+        const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        Object.assign(SER, { name: info.name, mark: SER.mark || O.name + ' ' + info.place, sub: `${fmt(info.start)} – ${fmt(info.end)}` });
+        Series.fillBrand(SER); document.title = info.name;
+      }
+      if (!raw.feed || !raw.feed.length) { document.querySelector('.tab[data-tab="feed"]').hidden = true; if (prefs.tab === 'feed') selectTab('players'); }
+      fillFx();
+    } catch (e) { lastErr = String(e.message || e); }
+    refresh();
+  }
   async function poll() {
+    if (MODE !== 'live') return;
     if (polling) return;
     polling = true; setStatus();
     const before = state.feed.length ? state.feed[state.feed.length - 1].t : 0;
@@ -607,6 +639,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   }
   function schedule() {
     clearTimeout(timer);
+    if (MODE !== 'live') return;
     const iv = Number(prefs.interval);
     if (!iv) { nextAt = 0; setStatus(); return; }
     const wait = Math.max(iv, backoff);
@@ -616,6 +649,11 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   }
   function setStatus() {
     const dot = $('#dot'), txt = $('#status-text');
+    if (MODE !== 'live') {
+      dot.className = 'dot' + (lastErr ? ' err' : '');
+      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : 'Past series · ' + ((O.archive && O.archive.note) || 'as saved'));
+      return;
+    }
     const iv = Number(prefs.interval);
     dot.className = 'dot' + (lastErr ? ' err' : iv ? ' live' : '');
     const parts = [];
@@ -1281,9 +1319,15 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   $('#refresh').addEventListener('click', () => setMenu(false));
 
   /* ---------- boot ---------- */
-  Series.fillBrand(SER); Series.fillNav($('nav.others'), SER, '../');
+  Series.fillBrand(SER); Series.fillNav($('nav.others'), MODE === 'live' ? SER : null, '../');
   fillFx();
   if (fxCur) setTimeout(refresh, 0);
+  if (MODE === 'archive') {
+    // Nothing runs or polls in a past series
+    $('#row-interval').hidden = true; $('#refresh').hidden = true;
+    for (const id of ['#events', '#soon']) { const box = $(id); box.hidden = true; if (box.previousElementSibling) box.previousElementSibling.hidden = true; }
+    selectTab('players'); render(); loadArchive(); return;
+  }
   selectTab(prefs.tab === 'events' && window.innerWidth >= 980 ? 'feed' : prefs.tab);
   render();
   (async () => {

@@ -27,8 +27,13 @@
     apt: { name: 'APT', engine: 'apt/tracker.js', global: 'APTTracker', page: 'apt/', prefs: 'apt-live-prefs-v1',
       poll: { minInterval: 5, maxInterval: 30, budget: 3, publishEvery: 1 },
       archive: { tool: 'tools/apt-archive.js', dir: 'apt/archive/', list: 'series', key: 'series' } },
-    glpc: { name: 'GLPC', engine: 'glpc/glpc.js', global: 'GLPCTracker', page: 'glpc/', prefs: 'glpc-live-prefs-v1',
-      poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 } },
+    glpc: { name: 'GLPC', full: 'Grand Loyal Poker Championships', engine: 'glpc/glpc.js', global: 'GLPCTracker', page: 'glpc/', prefs: 'glpc-live-prefs-v1',
+      poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 },
+      archive: { tool: 'tools/series-archive.js', dir: 'glpc/archive/', list: 'series', key: 'series', note: "players, counts and the top places' payouts from Grand Loyal (re-entries in the counts, not credited to players)" } },
+    // USOP festivals run on Grand Loyal's tracker too: GLPC's engine and page (docs/usop/index.html is made from it)
+    usop: { name: 'USOP', full: 'USOP', engine: 'glpc/glpc.js', global: 'GLPCTracker', page: 'usop/', prefs: 'usop-live-prefs-v1',
+      poll: { minInterval: 10, maxInterval: 60, budget: 1, publishEvery: 3 },
+      archive: { tool: 'tools/series-archive.js', dir: 'usop/archive/', list: 'series', key: 'series', note: "players, counts and the top places' payouts from Grand Loyal (re-entries in the counts, not credited to players)" } },
     // Gods of Poker: complete records on every event page (each bullet, bust and payout), so a poll reads the events
     // being played every half minute or so; its engine builds on the APT engine (load apt/tracker.js first)
     gop: { name: 'GOP', full: 'Gods of Poker', engine: 'gop/gop.js', needs: ['apt/tracker.js'], global: 'GOPTracker', page: 'gop/', prefs: 'gop-live-prefs-v1',
@@ -47,8 +52,9 @@
   // id: never changes (links, browser storage). branch: where the poller saves (one per series).
   // start/end: first and last day in the venue's time zone (tz). place: the clock the page shows times in.
   // tag: short name next to the organiser ("APT Taipei '26"). source: what the engine needs to find the series.
-  // Banner (home page): title, mark, sub, art (apt | gop | rop | glpc | triton | tone), watermark.
+  // Banner (home page): title, mark, sub, art (apt | gop | rop | glpc | usop | triton | tone), watermark.
   // storage: browser key of the page's saved copy (defaults to the id).
+  // past: a series from before the site tracked it, known only from its archive (never polled; tools/series-archive.js).
   const LIST = [
     { id: 'apt-taipei-2026', org: 'apt', branch: 'data', storage: 'apt-live-state-v1',
       name: 'APT Championship Taipei 2026', tag: "Championship '26", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2026-11-12', end: '2026-11-29',
@@ -90,6 +96,36 @@
       link: 'https://tritonpoker.plus/festival/daca20f2-506a-4377-9c73-2651390b6782',
       title: 'Triton, Northern Cyprus 2026', mark: 'Triton', sub: 'Northern Cyprus · 2026', art: 'triton', watermark: 'TRITON',
       source: { festival: 'daca20f2-506a-4377-9c73-2651390b6782', series: 'triton-n-cyprus-2026' } },
+    { id: 'glpc-iii', org: 'glpc', branch: 'glpc-iii-data', past: true,
+      name: 'GLPC III', tag: "III", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-01-02', end: '2026-01-12',
+      link: 'https://grandloyal.vn/series',
+      title: 'Grand Loyal Poker Championships III', mark: 'GLPC III', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'III',
+      source: { series: 'glpc-iii', seriesUrl: 'https://grandloyal.vn/series', from: '2026-01-02', to: '2026-01-13' } },
+    { id: 'glpc-iv', org: 'glpc', branch: 'glpc-iv-data', past: true,
+      name: 'GLPC IV', tag: "IV", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-04-17', end: '2026-04-27',
+      link: 'https://grandloyal.vn/series',
+      title: 'Grand Loyal Poker Championships IV', mark: 'GLPC IV', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'IV',
+      source: { series: 'glpc-iv', seriesUrl: 'https://grandloyal.vn/series', from: '2026-04-17', to: '2026-04-28' } },
+    { id: 'glpc-v', org: 'glpc', branch: 'glpc-v-data', past: true,
+      name: 'GLPC V', tag: "V", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-07-29', end: '2026-08-09',
+      link: 'https://grandloyal.vn/series',
+      title: 'Grand Loyal Poker Championships V', mark: 'GLPC V', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'V',
+      source: { series: 'glpc-v', seriesUrl: 'https://grandloyal.vn/series', from: '2026-07-29', to: '2026-08-10' } },
+    { id: 'usop-hanoi-2025', org: 'usop', branch: 'usop-hanoi-2025-data', past: true,
+      name: 'USOP Hanoi 2025', tag: "Hanoi '25", place: 'Hanoi', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2025-10-10', end: '2025-10-22',
+      link: 'https://grandloyal.vn/series',
+      title: 'USOP Hanoi 2025 (GLPC, powered by USOP)', mark: 'USOP Hanoi', sub: 'Grand Loyal · 2025', art: 'usop', watermark: '2025',
+      source: { series: 'usop-hanoi-2025', seriesUrl: 'https://grandloyal.vn/series', from: '2025-10-10', to: '2025-10-23' } },
+    { id: 'usop-vietnam-2026-may', org: 'usop', branch: 'usop-vietnam-2026-may-data', past: true,
+      name: 'USOP Vietnam May 2026', tag: "May '26", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-05-19', end: '2026-06-01',
+      link: 'https://grandloyal.vn/series',
+      title: 'USOP Vietnam 2026 (May)', mark: 'USOP Vietnam', sub: 'May · 2026', art: 'usop', watermark: '2026',
+      source: { series: 'usop-vietnam-2026-may', seriesUrl: 'https://grandloyal.vn/series', from: '2026-05-19', to: '2026-06-02' } },
+    { id: 'usop-vietnam-2026-aug', org: 'usop', branch: 'usop-vietnam-2026-aug-data', past: true,
+      name: 'USOP Vietnam Aug 2026', tag: "Aug '26", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-08-27', end: '2026-09-09',
+      link: 'https://grandloyal.vn/series',
+      title: 'USOP Vietnam 2026 (August)', mark: 'USOP Vietnam', sub: 'August · 2026', art: 'usop', watermark: '2026',
+      source: { series: 'usop-vietnam-2026-aug', seriesUrl: 'https://grandloyal.vn/series', from: '2026-08-27', to: '2026-09-10' } },
     { id: 'glpc-vi', org: 'glpc', branch: 'glpc-data', storage: 'glpc-live-state-v1',
       name: 'GLPC VI', tag: 'VI', place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-11-18', end: '2026-11-29',
       link: 'https://grandloyal.vn/series/121',
@@ -111,11 +147,11 @@
       own.slice().sort((a, b) => (a.end < b.end ? 1 : -1))[0] || null;
   }
   // Link to a series' page from the site's root ('' for the root itself, '../' from a page one folder down)
-  const pageUrl = (s, root) => `${root || ''}${ORGANISERS[s.org].page}${pick(s.org) === s ? '' : '?s=' + encodeURIComponent(s.id)}`;
+  const pageUrl = (s, root) => `${root || ''}${ORGANISERS[s.org].page}${s.past ? '?f=' + encodeURIComponent(s.source.series) : pick(s.org) === s ? '' : '?s=' + encodeURIComponent(s.id)}`;
   const storageKey = (s) => s.storage || s.id + '-state-v1';
   // Poll it now? From the day before it starts until two days after it ends (late results, final payouts)
   const shift = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
-  const pollable = (s) => { const t = today(s.tz); return t >= shift(s.start, -1) && t <= shift(s.end, 2); };
+  const pollable = (s) => { if (s.past) return false; const t = today(s.tz); return t >= shift(s.start, -1) && t <= shift(s.end, 2); };
 
   const pollOpts = (s) => ({ ...ORGANISERS[s.org].poll, ...(s.poll || {}) });
   // A venue's time zone from a series' name or slug (for past series, which have no entry here)

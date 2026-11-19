@@ -40,16 +40,18 @@ async function archive(slug, name, entry) {
   let state;
   if (fromState) state = JSON.parse(fs.readFileSync(fromState, 'utf8'));
   else {
-    E.configure({ series: slug });
+    E.configure(entry ? entry.source : { series: slug });
     state = E.emptyState();
-    // Round 1 reads the list and every event; later rounds retry what failed
+    // Round 1 reads the list and every event; later rounds retry what failed. An engine with readPast() reads a
+    // finished series in one go (its live polling would wait for events to look finished)
+    const read = E.readPast ? (st) => E.readPast(st, { fetchFn, concurrency: 3 }) : (st) => E.pollOnce(st, { fetchFn, concurrency: 3 });
     for (let round = 1; round <= 4; round++) {
-      const s = await E.pollOnce(state, { fetchFn, concurrency: 3 });
+      const s = await read(state);
       if (s.errors.length) console.warn(`  round ${round}: ${s.errors.length} errors (${s.errors.slice(0, 2).join(' | ')})`);
       if (!s.errors.length) break;
       await sleep(3000);
     }
-    const unread = Object.values(state.events).filter((e) => !e.polls).length;
+    const unread = Object.values(state.events).filter((e) => !(E.readPast ? e.pastRead : e.polls)).length;
     if (unread) throw new Error(`${unread} events still unread after 4 rounds: not saved`);
   }
   E.repair(state);
@@ -69,12 +71,12 @@ async function archive(slug, name, entry) {
   };
   const title = f.title || f.name || name || (entry && entry.name) || slug;
   const start = entry ? entry.start : ymdIn(Math.min(...starts), tz), end = entry ? entry.end : ymdIn(Math.max(...starts), tz);
-  const { place, tag } = placeOf(title, start);
+  const { place, tag } = entry ? { place: entry.place, tag: entry.tag } : placeOf(title, start);
   const info = { id: slug, name: title, place, tag, start, end, tz, currency: (entry && entry.currency) || (ev[0] && ev[0].currency) || 'USD',
     events: nums.filter((n) => out.results[n] && out.results[n].rows.length).length, entries: nums.reduce((a, n) => a + official(n), 0),
     players: E.players(out).length, paid: Object.values(out.results).reduce((a, r) => a + r.rows.reduce((b, row) => b + row[3], 0), 0),
     played: nums.filter((n) => official(n) > 0).length, known: nums.filter((n) => official(n) > 0 && E.watchedFromStart(out, n)).length,
-    watched: !!fromState, bytes: fs.statSync(file).size };
+    watched: !!fromState, bytes: fs.statSync(file).size, ...(entry ? { mark: entry.mark, sub: entry.sub } : {}) };
   console.log(`${info.name}: ${info.events} events paid, ${info.entries} entries, ${info.players} players, every bullet known in ${info.known} of ${info.played} played, ${Math.round(info.bytes / 1024)} KB`);
   return info;
 }
@@ -96,12 +98,15 @@ async function archive(slug, name, entry) {
     byId.set(entry.source.series, await archive(entry.source.series, entry.name, entry));
     return finish();
   }
-  // Every finished series on the site; one still polled (docs/series.js) is archived by its poller instead
+  // Every finished series on the site (or, for an organiser whose site doesn't list them, the past ones in
+  // docs/series.js); one still polled is archived by its poller instead
   const polled = new Set(Series.ofOrg(ORG).filter(Series.pollable).map((s) => s.source.series));
-  for (const f of (await E.finished(fetchFn)).filter((x) => !polled.has(x.slug))) {
+  const list = E.finished ? await E.finished(fetchFn)
+    : Series.ofOrg(ORG).filter((s) => Series.status(s) === 'past').map((s) => ({ slug: s.source.series, name: s.name }));
+  for (const f of list.filter((x) => !polled.has(x.slug))) {
     if (only && f.slug !== only) continue;
     if (fs.existsSync(path.join(DIR, f.slug + '.json')) && !force) { console.log('have', f.name); continue; }
-    try { byId.set(f.slug, await archive(f.slug, f.name, Series.LIST.find((x) => x.org === ORG && x.source.series === f.slug))); } catch (e) { console.error(`${f.name}: ${e.message}`); }
+    try { const e = Series.LIST.find((x) => x.org === ORG && x.source.series === f.slug); byId.set(f.slug, await archive(f.slug, f.name, e)); } catch (e) { console.error(`${f.name}: ${e.message}`); }
     await sleep(1000);
   }
   await finish();
