@@ -27,12 +27,20 @@
   const ymd = (sec) => new Date(sec * 1000).toISOString().slice(0, 10);
   const today = () => new Date().toISOString().slice(0, 10);
   const shift = (d, days) => new Date(Date.parse(d + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
-  const put = (d, cur, v) => { if (!(v > 0)) return; (table[d] || (table[d] = {}))[cur] = v; };
+  // Answers of perUsd(), remembered until a rate is added (a page asks the same few thousand questions many times)
+  let memo = new Map();
+  const versions = {};
+  const put = (d, cur, v) => { if (!(v > 0) || (table[d] && table[d][cur] === v)) return; (table[d] || (table[d] = {}))[cur] = v; memo = new Map(); versions[cur] = (versions[cur] || 0) + 1; const m = cur + '|' + d.slice(0, 7); versions[m] = (versions[m] || 0) + 1; };
 
   // Units of `cur` per USD near date d (a future date uses today's): that day, else the closest earlier day
   // within a week, else a later one. Unless strict, fall back to the nearest day known at all (approximate).
   function perUsd(cur, d, strict) {
     if (cur === 'USD') return 1;
+    const key = cur + d + (strict ? '!' : '');
+    if (memo.has(key)) return memo.get(key);
+    const v = lookup(cur, d, strict); memo.set(key, v); return v;
+  }
+  function lookup(cur, d, strict) {
     const t = today(); if (d > t) d = t;
     if (!ECB.has(cur) && d < JSD_FIRST) d = JSD_FIRST;
     for (let i = 0; i <= 7; i++) { const x = table[shift(d, -i)]; if (x && x[cur]) return x[cur]; }
@@ -103,5 +111,7 @@
   const pick = () => store.get(PREF) || '';
   const choose = (c) => store.set(PREF, c || '');
 
-  root.FX = { LIST, ECB, ensure, seed, factor, exact, perUsd, ymd, pick, choose };
+  // version(cur[, 'YYYY-MM']): changes whenever a rate of that currency (in that month) is added, so a page can keep
+  // converted copies until then
+  root.FX = { LIST, ECB, ensure, seed, factor, exact, perUsd, ymd, pick, choose, version: (cur, month) => versions[month ? cur + '|' + month : cur] || 0 };
 })(typeof self !== 'undefined' ? self : this);

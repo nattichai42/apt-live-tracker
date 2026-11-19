@@ -91,6 +91,9 @@ The *Tests* workflow runs on every push to main that touches the site, tools or 
 
 After editing an engine, `docs/fx.js`, `docs/series.js` or `docs/all/all.js`, run `tools/stamp.sh`. It points each
 page at its scripts by content hash (`tracker.js?v=<hash>`), so phones never combine a new page with a cached old engine.
+If you change what the APT engine's `repair()` does, raise `REPAIR` in `docs/apt/tracker.js` and run
+`node tools/apt-archive.js --repack`: saved archives carry the version they were repaired under and pages don't repair
+them again on every load (the tests fail until they're re-saved).
 
 ## Local run
 

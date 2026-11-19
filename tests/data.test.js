@@ -85,8 +85,11 @@ test('APT archive: index and files agree, files are in the current packed form',
     const st = A.unpack(JSON.parse(JSON.stringify(raw)));
     assert.ok(Object.keys(st.events).length > 0, `${f.id}: no events`);
     assert.deepEqual(A.pack(A.unpack(JSON.parse(JSON.stringify(raw)))), raw, `${f.id}: pack(unpack(file)) changes it (run apt-archive.js --repack)`);
-    const c = JSON.parse(JSON.stringify(st)); A.repair(c);
-    assert.deepEqual(c.events, st.events, `${f.id}: repair() would still change it (run apt-archive.js --repack)`);
+    // Pages skip repair() for a file stamped with the current rules, so the file must already be what it would give
+    assert.equal(raw.repaired, A.REPAIR, `${f.id}: saved under older repair rules (run apt-archive.js --repack)`);
+    const c = JSON.parse(JSON.stringify(st)); delete c.repaired; A.repair(c);
+    assert.deepEqual(c.events, st.events, `${f.id}: repair() would still change it (raise REPAIR in tracker.js, then apt-archive.js --repack)`);
+    assert.deepEqual(c.aliases || {}, st.aliases || {}, `${f.id}: repair() would still add aliases (raise REPAIR, then --repack)`);
     assert.equal(A.players(st).length > 0, true, `${f.id}: no players`);
   }
 });

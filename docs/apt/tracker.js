@@ -385,7 +385,16 @@
     return n;
   }
 
+  // Version of repair()'s rules. A saved archive carries the version it was repaired under and isn't repaired again on
+  // every load (tools/apt-archive.js --repack re-saves them); raise it whenever repair() changes what it does.
+  const REPAIR = 2;
   function repair(state) {
+    if (state && state.archive && state.repaired === REPAIR) return 0;
+    const fixed = repair0(state);
+    if (state && state.archive) state.repaired = REPAIR;
+    return fixed;
+  }
+  function repair0(state) {
     for (const e of Object.values(state.events || {})) if (e.currency && !/^[A-Z]{3}$/.test(e.currency)) e.currency = curCode(e.currency);
     let fixed = finishDecided(state);
     fixed += unifyNames(state);
@@ -896,7 +905,7 @@
     return state;
   }
 
-  const api = { pack, unpack, SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
+  const api = { REPAIR, pack, unpack, SITE, SERIES, BASE, ACTIVE, activeKids, eventFinished, eventPlayers, upcoming, completedEvents, watchedFromStart, repair, baseName, similarNames, canon, emptyState, pollOnce, applySnapshot, fetchEventList, mergeList, players, playerTimeline, liveEvents, unflatten, isLaterDay };
   // source: the series' entry in docs/series.js ({ series: '<slug in the APT site's /series/ URLs>' })
   api.configure = (source) => {
     if (source && source.series) { SERIES = source.series; BASE = `${SITE}/series/${SERIES}/events`; }

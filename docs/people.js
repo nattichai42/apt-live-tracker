@@ -20,7 +20,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const norm = (n) => String(n).replace(/[đĐ]/g, 'd').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const normMemo = new Map();
+  const norm = (n) => { let k = normMemo.get(n); if (k === undefined) { k = norm0(n); if (normMemo.size < 500000) normMemo.set(n, k); } return k; };
+  const norm0 = (n) => String(n).replace(/[đĐ]/g, 'd').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ').filter(Boolean).sort().join(' ');
 
   // docs/people.json -> lookups by name key

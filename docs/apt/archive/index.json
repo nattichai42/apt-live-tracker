@@ -15,7 +15,7 @@
    "paid": 19389124766,
    "known": 25,
    "watched": false,
-   "bytes": 276458
+   "bytes": 276507
   },
   {
    "id": "apt-incheon-south-korea-2026",
@@ -32,7 +32,7 @@
    "paid": 15863898834,
    "known": 15,
    "watched": false,
-   "bytes": 394159
+   "bytes": 394417
   },
   {
    "id": "apt-taipei-taiwan-2026",
@@ -49,7 +49,7 @@
    "paid": 562061165,
    "known": 26,
    "watched": false,
-   "bytes": 672610
+   "bytes": 673527
   },
   {
    "id": "apt-jeju-classic-south-korea-2026",
@@ -66,7 +66,7 @@
    "paid": 19399810016,
    "known": 14,
    "watched": false,
-   "bytes": 309517
+   "bytes": 309807
   },
   {
    "id": "apt-championship-taiwan-2025",
@@ -83,7 +83,7 @@
    "paid": 1054611638,
    "known": 26,
    "watched": false,
-   "bytes": 798715
+   "bytes": 800836
   },
   {
    "id": "apt-jeju-south-korea-2025",
@@ -100,7 +100,7 @@
    "paid": 14415575977,
    "known": 26,
    "watched": false,
-   "bytes": 285919
+   "bytes": 286281
   },
   {
    "id": "apt-incheon-south-korea-2025",
@@ -117,7 +117,7 @@
    "paid": 14359927826,
    "known": 13,
    "watched": false,
-   "bytes": 342006
+   "bytes": 342473
   },
   {
    "id": "apt-taipei-taiwan-2025",
@@ -134,7 +134,7 @@
    "paid": 489624795,
    "known": 19,
    "watched": false,
-   "bytes": 563009
+   "bytes": 564827
   },
   {
    "id": "apt-manila-classic-2025",
@@ -151,7 +151,7 @@
    "paid": 345427558,
    "known": 14,
    "watched": false,
-   "bytes": 259045
+   "bytes": 259536
   },
   {
    "id": "apt-phu-quoc-vietnam-2024",
@@ -168,7 +168,7 @@
    "paid": 102905972250,
    "known": 14,
    "watched": false,
-   "bytes": 189518
+   "bytes": 189717
   },
   {
    "id": "apt-manila-2024",
@@ -185,7 +185,7 @@
    "paid": 342935682,
    "known": 34,
    "watched": false,
-   "bytes": 254627
+   "bytes": 254682
   },
   {
    "id": "apt-taipeipc-2024",
@@ -202,7 +202,7 @@
    "paid": 259348988,
    "known": 10,
    "watched": false,
-   "bytes": 412955
+   "bytes": 413657
   },
   {
    "id": "apt-jeju-2024",
@@ -219,7 +219,7 @@
    "paid": 11971454024,
    "known": 14,
    "watched": false,
-   "bytes": 236635
+   "bytes": 237027
   },
   {
    "id": "apt-taipei-2024",
@@ -236,7 +236,7 @@
    "paid": 362585213,
    "known": 15,
    "watched": false,
-   "bytes": 350965
+   "bytes": 351900
   },
   {
    "id": "apt-incheon-south-korea-2023",
@@ -253,7 +253,7 @@
    "paid": 6668673319,
    "known": 7,
    "watched": false,
-   "bytes": 195520
+   "bytes": 195699
   },
   {
    "id": "apt-summer-series-da-nang-vietnam-2023",
@@ -270,7 +270,7 @@
    "paid": 83692869000,
    "known": 9,
    "watched": false,
-   "bytes": 161569
+   "bytes": 161874
   },
   {
    "id": "apt-summer-series-hanoi-vietnam-2023",
@@ -287,7 +287,7 @@
    "paid": 79160230000,
    "known": 10,
    "watched": false,
-   "bytes": 129157
+   "bytes": 130111
   },
   {
    "id": "apt-taipei-2023",
@@ -304,7 +304,7 @@
    "paid": 170028467,
    "known": 4,
    "watched": false,
-   "bytes": 236910
+   "bytes": 238611
   },
   {
    "id": "apt-phu-quoc-2023",
@@ -321,7 +321,7 @@
    "paid": 56207180000,
    "known": 3,
    "watched": false,
-   "bytes": 96435
+   "bytes": 97148
   },
   {
    "id": "apt-hanoi-2023",
@@ -338,7 +338,7 @@
    "paid": 56642480000,
    "known": 3,
    "watched": false,
-   "bytes": 114948
+   "bytes": 115643
   },
   {
    "id": "apt-da-nang-vietnam-vsop-2022",
@@ -355,7 +355,7 @@
    "paid": 40284900910,
    "known": 6,
    "watched": false,
-   "bytes": 93348
+   "bytes": 93483
   },
   {
    "id": "apt-philippines-2022",
@@ -372,7 +372,7 @@
    "paid": 57891900,
    "known": 11,
    "watched": false,
-   "bytes": 95959
+   "bytes": 95972
   }
  ],
  "updatedAt": 1795014346

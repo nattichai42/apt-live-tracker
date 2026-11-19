@@ -240,15 +240,22 @@
     return { s: out, ok, approx };
   }
   function needRates() {
-    const dates = [], curs = new Set([fxCur]);
+    // Each date needs only its own event's currency and the one shown (not every currency on every date: Triton's
+    // dollar festivals need no Taiwan dollar rates, and each of those is a request of its own)
+    const byCur = new Map(), add = (c, d) => { if (!byCur.has(c)) byCur.set(c, new Set()); byCur.get(c).add(d); };
+    let n = 0;
     for (const s of SRC) for (const e of Object.values((raws[s.id] || {}).events || {})) {
-      if (!e.polls && !e.start) continue; curs.add(s.nat(e));
-      if (e.start) dates.push(FX.ymd(e.start)); const end = evEnd(e); if (end) dates.push(FX.ymd(end));
+      if (!e.polls && !e.start) continue;
+      const nat = s.nat(e);
+      for (const t of [e.start, evEnd(e)]) if (t) { const d = FX.ymd(t); n++; if (nat !== fxCur) { add(nat, d); add(fxCur, d); } }
     }
-    const sig = fxCur + '|' + dates.length;
+    const sig = fxCur + '|' + n;
     if (fxBusy || fxTried === sig) return;
     fxBusy = true; fxTried = sig; setStatus();
-    FX.ensure(dates, [...curs]).catch(() => {}).then(() => { fxBusy = false; recompute(); });
+    // ECB currencies together (one request covers a run of dates for all of them); the others one by one
+    const ecb = [...byCur.keys()].filter((c) => FX.ECB.has(c)), ecbDays = new Set(ecb.flatMap((c) => [...byCur.get(c)]));
+    const jobs = [ecb.length && FX.ensure([...ecbDays], ecb), ...[...byCur].filter(([c]) => !FX.ECB.has(c)).map(([c, ds]) => FX.ensure([...ds], [c]))];
+    Promise.all(jobs.filter(Boolean).map((p) => p.catch(() => {}))).then(() => { fxBusy = false; recompute(); });
   }
 
   /* ---------- events of every series ---------- */
@@ -280,9 +287,31 @@
     return out;
   }
 
-  function recompute() {
+  // Sources arrive one by one: redraw once for those landing close together
+  let recomputeTimer = null;
+  function recompute() { if (!recomputeTimer) recomputeTimer = setTimeout(() => { recomputeTimer = null; recomputeNow(); }, 60); }
+  // A series' converted copy, kept until its data, the currency or the rates change
+  const shown = new WeakMap(), used = new WeakMap();
+  function displayed(s, raw) {
+    // Only rates that can change its amounts matter: its own currencies and the one shown, in the months around its
+    // events (a rate is looked for within a week); one that fell back to a far day's rate watches the whole currency
+    let u = used.get(raw);
+    if (!u) {
+      const cs = new Set(), ms = new Set();
+      const month = (t) => { const d = new Date(t * 1000); for (const k of [-1, 0, 1]) ms.add(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + k, 1)).toISOString().slice(0, 7)); };
+      for (const e of Object.values(raw.events || {})) { cs.add(s.nat(e)); for (const t of [e.start, evEnd(e)]) if (t) month(t); }
+      month(Date.now() / 1000); // a future date uses today's rate
+      u = { cs: [...cs], ms: [...ms] }; used.set(raw, u);
+    }
+    const curs = u.cs.every((c) => c === fxCur) ? [] : [fxCur, ...u.cs];
+    const near = curs.map((c) => c + u.ms.map((m) => FX.version(c, m)).join('.')).join(','), far = curs.map((c) => c + FX.version(c)).join(',');
+    const hit = shown.get(raw);
+    if (hit && hit.cur === fxCur && (hit.d.approx ? hit.far === far : hit.near === near)) return hit.d;
+    const d = display(s, raw); shown.set(raw, { cur: fxCur, near, far, d }); return d;
+  }
+  function recomputeNow() {
     const v = {}; let ok = true, approx = false;
-    for (const s of SRC) if (raws[s.id]) { const d = display(s, raws[s.id]); v[s.id] = d.s; ok = ok && d.ok; approx = approx || d.approx; }
+    for (const s of SRC) if (raws[s.id]) { const d = displayed(s, raws[s.id]); v[s.id] = d.s; ok = ok && d.ok; approx = approx || d.approx; }
     if (!Object.keys(v).length) { setStatus(); return; }
     if (ok || !views) {
       // Until a new currency's rates load, keep showing the previous one (or nothing, the very first time)
@@ -313,11 +342,19 @@
     return out;
   }
   let model = null;
+  // A series' player rows for the current filters, kept with its converted copy (a new series doesn't recount the others)
+  const rowCache = new WeakMap();
+  function rowsOf(s, v) {
+    const key = [prefs.year || '', prefs.known ? 1 : 0, prefs.finished ? 1 : 0].join('|');
+    let m = rowCache.get(v); if (!m) rowCache.set(v, (m = new Map()));
+    if (!m.has(key)) m.set(key, s.E.players(scope(s, v), { detail: true, fromStart: !!prefs.known, finished: !!prefs.finished }).filter((r) => r.events));
+    return m.get(key);
+  }
   function getModel() {
     if (model) return model;
     // Same person: same name key, one row per series, countries that agree (or one unknown); docs/people.json fixes the rest
     const lists = SRC.filter((s) => views && views[s.id] && prefs.on[s.org]).map((s) => ({ src: s.id, names: calledOf(s),
-      rows: s.E.players(scope(s, views[s.id]), { detail: true, fromStart: !!prefs.known, finished: !!prefs.finished }).filter((r) => r.events) }));
+      rows: rowsOf(s, views[s.id]) }));
     const people = People.match(lists, RULES);
     for (const p of people) {
       const rows = Object.values(p.rows);

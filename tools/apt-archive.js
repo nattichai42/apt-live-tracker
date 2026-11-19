@@ -84,6 +84,8 @@ function slim(state) {
     out.events[e.kid] = keep;
   }
   for (const [k, r] of Object.entries(state.results || {})) { const { at, ...rest } = r; out.results[k] = { ...rest, final: true }; }
+  out.aliases = state.aliases || {};
+  A.repair(out); // saved repaired (and stamped), so pages don't repair it on every load
   return A.pack(out);
 }
 
@@ -125,7 +127,7 @@ async function archive(league) {
   if (repack) {
     for (const f of fs.readdirSync(DIR).filter((x) => x.endsWith('.json') && x !== 'index.json' && x !== 'fx.json')) {
       const file = path.join(DIR, f), before = fs.statSync(file).size;
-      const st = A.unpack(JSON.parse(fs.readFileSync(file, 'utf8'))); A.repair(st); // the engine's current clean-ups
+      const st = A.unpack(JSON.parse(fs.readFileSync(file, 'utf8'))); delete st.repaired; A.repair(st); // the engine's current clean-ups
       fs.writeFileSync(file, JSON.stringify(A.pack(st)));
       console.log(`${f}: ${Math.round(before / 1024)} -> ${Math.round(fs.statSync(file).size / 1024)} KB`);
     }
