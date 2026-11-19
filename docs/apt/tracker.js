@@ -73,6 +73,53 @@
     const shared = new Set(A.filter((t) => setB.has(t))).size;
     return shared >= 2 && shared / Math.min(new Set(A).size, setB.size) >= 0.6;
   }
+  // One player under two spellings across a series' events and payouts (registration list "Cheng Yu Chung", payouts
+  // "Cheng-Yu Chung"; "Chen Rong" / "Rong Chen"): the same words in any order, or the same letters split differently,
+  // countries that don't disagree, and never two of them seen seated in one event. The spelling with payouts (else the most seen)
+  // stays; the others become aliases, so every count and timeline follows it.
+  function unifyNames(state) {
+    const seen = new Map();
+    const add = (n0, cc, w, kid) => {
+      const n = canon(state, n0), x = seen.get(n) || { cc: new Set(), w: 0, kids: new Set() };
+      if (cc) x.cc.add(cc); x.w += w; if (kid) x.kids.add(kid); seen.set(n, x);
+    };
+    // (both on one registration list is one player entering twice; both seen seated in one event is two players)
+    for (const e of Object.values(state.events || {})) for (const [n, p] of Object.entries(e.p || {})) add(n, p.cc, 1, p.reg ? null : e.kid);
+    for (const r of Object.values(state.results || {})) for (const [, n, cc] of r.rows || []) add(n, cc, 1000, null);
+    // Same words moved around the way names are (family name to the other end, or the whole name reversed, not other
+    // shuffles: "Le Tuan Anh" and "Le Anh Tuan" are two names), or the same letters split differently ("Chengxu Hu")
+    const parent = new Map(), find = (n) => { while (parent.get(n) !== n) n = parent.get(n); return n; };
+    const join = (a, b) => { const x = find(a), y = find(b); if (x !== y) parent.set(y, x); };
+    const byWords = new Map(), byLetters = new Map(), toks = new Map();
+    for (const n of seen.keys()) {
+      const t = nameTokens(n); if (!t.length) continue;
+      parent.set(n, n); toks.set(n, t.join(' '));
+      const w = t.slice().sort().join(' '), l = t.join('');
+      if (!byWords.has(w)) byWords.set(w, []); byWords.get(w).push(n);
+      if (byLetters.has(l)) join(byLetters.get(l), n); else byLetters.set(l, n);
+    }
+    const reordered = (a, b) => {
+      const x = a.split(' '), y = b.split(' ');
+      if (y.join(' ') === x.slice().reverse().join(' ')) return true;
+      for (let i = 1; i < x.length; i++) if ([...x.slice(i), ...x.slice(0, i)].join(' ') === b) return true;
+      return false;
+    };
+    for (const ns of byWords.values()) for (let i = 0; i < ns.length; i++) for (let j = i + 1; j < ns.length; j++)
+      if (toks.get(ns[i]) === toks.get(ns[j]) || reordered(toks.get(ns[i]), toks.get(ns[j]))) join(ns[i], ns[j]);
+    const groups = new Map();
+    for (const n of parent.keys()) { const g = find(n); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(n); }
+    let fixed = 0;
+    for (const names of groups.values()) {
+      if (names.length < 2) continue;
+      const ccs = new Set(names.flatMap((n) => [...seen.get(n).cc])); if (ccs.size > 1) continue; // two countries: two people
+      const kids = new Set(); let together = false;
+      for (const n of names) for (const k of seen.get(n).kids) { if (kids.has(k)) together = true; kids.add(k); }
+      if (together) continue; // in one event at once: two people
+      names.sort((a, b) => seen.get(b).w - seen.get(a).w || a.localeCompare(b));
+      for (const n of names.slice(1)) { (state.aliases || (state.aliases = {}))[n] = names[0]; fixed++; }
+    }
+    return fixed;
+  }
   // Follow renames to the current spelling
   function canon(state, n) {
     let k = 0; while (state.aliases && state.aliases[n] && k++ < 8) n = state.aliases[n];
@@ -341,6 +388,7 @@
   function repair(state) {
     for (const e of Object.values(state.events || {})) if (e.currency && !/^[A-Z]{3}$/.test(e.currency)) e.currency = curCode(e.currency);
     let fixed = finishDecided(state);
+    fixed += unifyNames(state);
     // Later-day players counted as new entries because their name was re-ordered since the flight they bagged in
     for (const e of Object.values(state.events || {})) {
       if (!isLaterDay(e.name) || !e.p || !e.firstPoll) continue;

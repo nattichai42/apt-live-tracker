@@ -195,9 +195,14 @@
   async function loadAll() {
     if (loading) return; loading = true; setStatus();
     // Live series show as soon as each arrives; the past APT series all at once
+    // Hand-made fixes to who is who (docs/people.json, see docs/people.js)
+    const fixes = fetch('../people.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => {
+      if (!j) return; RULES = People.rules(j); for (const x of RULES.problems) console.warn('people.json:', x);
+      model = null; if (views) render();
+    });
     const live = Promise.all(SRC.map((s) => loadSrc(s).then((changed) => { if (changed) recompute(); })));
     const past = addArchives().then((added) => Promise.all(added.map(loadSrc))).then((ch) => { if (ch.some(Boolean)) recompute(); });
-    await Promise.all([live, past]);
+    await Promise.all([live, past, fixes]);
     loading = false; setStatus();
   }
 
@@ -290,8 +295,14 @@
 
   /* ---------- players across series ---------- */
   // One key per name in any word order, without accents, hyphens or case: "Chen Kuan-Han" = "Kuan Han Chen"
-  const norm = (n) => String(n).replace(/[đĐ]/g, 'd').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ').filter(Boolean).sort().join(' ');
+  const norm = People.norm;
+  let RULES = People.rules(null);
+  // What docs/people.json may call a source: its id, its organiser, and a past APT series' slug (also as the live entry it was)
+  const calledOf = (s) => {
+    const slug = s.id.startsWith('apt:') ? s.id.slice(4) : s.entry && s.entry.source && s.entry.source.series;
+    const entry = slug && Series.LIST.find((x) => x.org === s.org && x.source.series === slug);
+    return [s.org, slug, entry && entry.id].filter(Boolean);
+  };
   const evOk = (sid) => { const y = prefs.year; return (num) => !y || ((evIdx[sid] || new Map()).get(String(num)) || {}).year === y; };
   // A series' state with only the picked year's events (finished / all bullets known go to the engine itself)
   function scope(s, v) {
@@ -304,27 +315,18 @@
   let model = null;
   function getModel() {
     if (model) return model;
-    const people = [], byKey = new Map();
-    for (const s of SRC) {
-      if (!views || !views[s.id] || !prefs.on[s.org]) continue;
-      for (const r of s.E.players(scope(s, views[s.id]), { detail: true, fromStart: !!prefs.known, finished: !!prefs.finished })) {
-        if (!r.events) continue;
-        const key = norm(r.name);
-        if (!byKey.has(key)) byKey.set(key, []);
-        const list = byKey.get(key);
-        // Same person: same name key, no row from this series yet, and countries that agree (or one unknown)
-        let p = list.find((x) => !x.rows[s.id] && (!x.cc || !r.cc || x.cc === r.cc));
-        if (!p) { p = { key, cc: '', rows: {} }; list.push(p); people.push(p); }
-        p.rows[s.id] = r; if (!p.cc && r.cc) p.cc = r.cc;
-      }
-    }
+    // Same person: same name key, one row per series, countries that agree (or one unknown); docs/people.json fixes the rest
+    const lists = SRC.filter((s) => views && views[s.id] && prefs.on[s.org]).map((s) => ({ src: s.id, names: calledOf(s),
+      rows: s.E.players(scope(s, views[s.id]), { detail: true, fromStart: !!prefs.known, finished: !!prefs.finished }).filter((r) => r.events) }));
+    const people = People.match(lists, RULES);
     for (const p of people) {
       const rows = Object.values(p.rows);
       const sum = (f) => rows.reduce((a, r) => a + (f(r) || 0), 0);
       const main = rows.slice().sort((a, b) => b.bullets - a.bullets)[0];
       Object.assign(p, { name: main.name, series: rows.length, events: sum((r) => r.events), bullets: sum((r) => r.bullets), buyins: sum((r) => r.buyins), prizes: sum((r) => r.prizes),
         cashes: sum((r) => r.cashes), cashedEvents: sum((r) => r.cashedEvents), wins: sum((r) => r.wins), partial: rows.some((r) => r.partial),
-        seated: rows.some((r) => r.seatedIn && r.seatedIn.length), names: [...new Set(rows.map((r) => r.name))] });
+        seated: rows.some((r) => r.seatedIn && r.seatedIn.length), names: [...new Set(rows.flatMap((r) => r.names || [r.name]))] });
+      p.keys = [...new Set(p.names.map(norm))]; // every spelling, for search
       p.net = p.prizes - p.buyins; p.itm = p.bullets ? p.cashedEvents / p.bullets : 0;
       p.fests = p.rows.triton ? new Set(p.rows.triton.ev.map((d) => String(d.num).split('@')[1])).size : 0;
     }
@@ -440,7 +442,7 @@
     $('#n-players').textContent = all.length ? nf.format(all.length) : '';
     const q = $('#players-q').value.trim().toLowerCase(), qk = norm(q);
     fillCountries($('#players-country'), all.map((p) => p.cc));
-    let rows = q ? all.filter((p) => p.names.some((n) => n.toLowerCase().includes(q)) || (qk && p.key.includes(qk))) : all;
+    let rows = q ? all.filter((p) => p.names.some((n) => n.toLowerCase().includes(q)) || (qk && p.keys.some((k) => k.includes(qk)))) : all;
     if (prefs.country) rows = rows.filter((p) => p.cc === prefs.country);
     const k = prefs.sort, dir = prefs.sortDir === 'asc' ? 1 : -1;
     rows = rows.slice().sort(k === 'name' ? (a, b) => a.name.localeCompare(b.name) * -dir : (a, b) => ((a[k] - b[k]) * dir) || (b.prizes - a.prizes) || a.name.localeCompare(b.name));

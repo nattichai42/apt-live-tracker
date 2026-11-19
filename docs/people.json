@@ -1,0 +1,5 @@
+{
+ "_about": "Fixes to who is who on the all-series page; see docs/people.js. same: names that are one person. apart: one name that is several people, each with its own series. tools/people.js lists likely cases.",
+ "same": [],
+ "apart": []
+}

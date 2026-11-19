@@ -71,15 +71,17 @@ for (const [url, ready] of PAGES) {
     await page.waitForTimeout(1500);
     await look('loaded');
     if (url) {
-      for (const tab of await page.$$('.tab[data-tab]:not([hidden])')) {
-        const name = await tab.getAttribute('data-tab');
+      // Locators, not element handles: live pages redraw while this runs
+      for (const name of await page.$$eval('.tab[data-tab]:not([hidden])', (ts) => ts.map((t) => t.dataset.tab))) {
+        const tab = page.locator(`.tab[data-tab="${name}"]`);
         if (!(await tab.isVisible())) continue;
         await tab.click(); await page.waitForTimeout(400); await look(`tab ${name}`);
         // the first thing on it that opens the panel: an event card, a finished event, a player
-        const item = await page.$(`#${name} .card, #${name} li[role="button"], #${name} .row`);
-        if (item && await item.isVisible()) {
+        const item = page.locator(`#${name} .card, #${name} li[role="button"], #${name} .row`).first();
+        if (await item.count() && await item.isVisible()) {
           await item.click(); await page.waitForTimeout(500); await look(`tab ${name}, first item opened`);
-          const close = await page.$('#sheet-close'); if (close && await close.isVisible()) { await close.click(); await page.waitForTimeout(200); }
+          const close = page.locator('#sheet-close');
+          if (await close.isVisible()) { await close.click(); await page.waitForTimeout(200); }
         }
       }
     }

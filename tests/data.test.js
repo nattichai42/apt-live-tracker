@@ -136,3 +136,49 @@ test('APT: an event with its winner paid and nobody left counts as finished', ()
   assert.equal(st.events.fd.p['Ann Lee'].st, 'end');
   assert.equal(st.events.x.phase, 'In The Money', 'no winner paid yet: still running');
 });
+
+test('people: automatic matching and the docs/people.json fixes', () => {
+  const P = require('../docs/people.js');
+  const row = (name, cc, prizes, extra) => ({ name, cc, events: 1, bullets: 1, buyins: 100, prizes, cashes: prizes ? 1 : 0, cashedEvents: prizes ? 1 : 0, wins: 0, ev: [{ num: 1, b: 1, buyin: 100, prize: prizes, pos: null }], ...extra });
+  const lists = [
+    { src: 'a', names: ['apt'], rows: [row('Chen Kuan-Han', 'TW', 50), row('Ann Lee', 'KR', 0), row('Bo Chan', 'HK', 0), row('Bo Chan', 'HK', 0)] },
+    { src: 'b', names: ['glpc'], rows: [row('Kuan Han Chen', 'TW', 10), row('Ann Lee', 'US', 5), row('Chengxu Hu', 'CN', 0), row('Bo Chan', 'HK', 1)] },
+    { src: 'triton', names: ['triton'], rows: [row('Cheng Xu Hu', 'CN', 7), row('Bo Chan', 'HK', 2)] },
+  ];
+  const find = (ps, name) => ps.filter((p) => Object.values(p.rows).some((r) => (r.names || [r.name]).includes(name)));
+  let ps = P.match(lists);
+  assert.equal(find(ps, 'Kuan Han Chen').length, 1, 'word order and hyphens: one person');
+  assert.equal(Object.keys(find(ps, 'Kuan Han Chen')[0].rows).length, 2);
+  assert.equal(find(ps, 'Ann Lee').length, 2, 'other countries: two people');
+  assert.notEqual(find(ps, 'Chengxu Hu')[0], find(ps, 'Cheng Xu Hu')[0], 'split differently: two until people.json says so');
+  ps = P.match(lists, P.rules({ same: [['Ann Lee', 'Ann Lee'], ['Chengxu Hu', 'Cheng Xu Hu']], apart: [{ name: 'Bo Chan', people: [['apt'], ['glpc', 'triton']] }] }));
+  assert.equal(find(ps, 'Ann Lee').length, 1, '"same" merges other countries');
+  assert.equal(find(ps, 'Chengxu Hu')[0], find(ps, 'Cheng Xu Hu')[0], '"same" merges other spellings');
+  const bo = find(ps, 'Bo Chan');
+  assert.equal(bo.length, 2, '"apart" splits by series');
+  const inApt = bo.find((p) => p.rows.a);
+  assert.deepEqual(Object.keys(inApt.rows), ['a']);
+  assert.equal(inApt.rows.a.bullets, 2, 'two rows of one series under one "apart" person are merged');
+  assert.deepEqual(Object.keys(bo.find((p) => !p.rows.a).rows).sort(), ['b', 'triton']);
+  assert.deepEqual(P.rules({ same: [['x']], apart: [{ name: 'y', people: [['a']] }] }).problems.length, 2, 'malformed fixes are reported');
+  // the file itself is valid
+  const json = read('people.json');
+  assert.deepEqual(P.rules(json).problems, []);
+});
+
+test('APT: one player under two spellings in a series is one player', () => {
+  A.configure({ series: 'test' });
+  const st = A.emptyState();
+  st.events = {
+    f1: { kid: 'f1', num: 69, name: 'Event #69', phase: 'Completed', start: 100, p: { 'Cheng Yu Chung': { b: 1, st: 'x', f: 100, x: [], cc: 'TW', reg: 1 } } },
+    f2: { kid: 'f2', num: 70, name: 'Event #70', phase: 'Completed', start: 200, p: { 'Le Tuan Anh': { b: 1, st: 'x', f: 200, x: [], cc: 'VN', reg: 1 }, 'Le Anh Tuan': { b: 1, st: 'x', f: 200, x: [], cc: 'VN', reg: 1 } } },
+  };
+  st.results = { 69: { rows: [[1, 'Cheng-Yu Chung', 'TW', 1000]] } };
+  A.repair(st);
+  const ps = A.players(st);
+  const c = ps.filter((p) => /chung/i.test(p.name));
+  assert.equal(c.length, 1, 'registration and payout spellings are one player');
+  assert.equal(c[0].name, 'Cheng-Yu Chung', 'the payout spelling stays');
+  assert.equal(c[0].bullets, 1, 'and its cash is not an extra bullet');
+  assert.equal(ps.filter((p) => /^Le /.test(p.name)).length, 2, '"Le Tuan Anh" and "Le Anh Tuan" are two names');
+});

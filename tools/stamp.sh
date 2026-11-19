@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Point each page at its scripts by content hash, so browsers never mix a new page with a cached old engine.
 # Run after changing any engine (docs/apt/tracker.js, docs/glpc/glpc.js, docs/triton/triton.js), docs/fx.js,
-# docs/series.js or docs/all/all.js (or any time; it is idempotent).
+# docs/series.js, docs/people.js or docs/all/all.js (or any time; it is idempotent).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 stamp() { # page, script src as the page writes it (relative to the page)
@@ -21,4 +21,5 @@ stamp docs/index.html series.js
 stamp docs/all/index.html ../apt/tracker.js
 stamp docs/all/index.html ../glpc/glpc.js
 stamp docs/all/index.html ../triton/triton.js
+stamp docs/all/index.html ../people.js
 stamp docs/all/index.html all.js

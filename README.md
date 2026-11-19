@@ -191,8 +191,20 @@ Every player and event the trackers hold, across every series in `docs/series.js
 - Each series is counted by its own engine (`players(state, { detail: true })` lists every player's events with bullets,
   buy-in and prize); the page converts the amounts to one currency at each date's rate.
 - Series don't share player ids, so a person is matched by name in any word order, ignoring accents, hyphens and case
-  ("Chen Kuan-Han" = "Kuan Han Chen"), and only when the countries agree or one is missing. About 150 players appear in more
-  than one series. Same-name players from the same country are merged, and different spellings stay apart.
+  ("Chen Kuan-Han" = "Kuan Han Chen"), and only when the countries agree or one is missing (`docs/people.js`). Same-name
+  players from the same country are merged, and different spellings stay apart, unless `docs/people.json` says otherwise:
+  - `"same": [["Chengxu Hu", "Cheng Xu Hu"], ...]`: names that are one person, merged whatever their countries.
+  - `"apart": [{ "name": "Danny Tang", "people": [["triton"], ["apt"]] }]`: one name, several people, each with the series
+    listed (an id from `docs/series.js`, a past APT series' slug, `triton`, or an organiser for all its series; series not
+    listed go with the first person).
+
+  `node tools/people.js` lists the likely cases, most prize money first: one name twice in one series, the same name with
+  other countries, the same letters split differently (usually one person), and names a letter apart (often two people). It
+  also lists fixes that no longer match anyone. Edit `docs/people.json`, push, and the page picks it up (no stamping).
+- Within one APT series, the engine already treats as one player the spellings a registration list, the seating and the
+  payouts give the same person ("Cheng Yu Chung" / "Cheng-Yu Chung", "Chen Rong" / "Rong Chen"): the same words with the family name
+  moved or the whole name reversed, or the same letters split differently, with countries that don't disagree and never
+  seated in one event together. It keeps the payout spelling. Before this, such a cash also counted an extra bullet.
 - Tracker pages open a player or event from a link: `?player=<name>`, `?event=<event id>`.
 
 ## Past APT series
