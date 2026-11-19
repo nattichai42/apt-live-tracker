@@ -38,8 +38,16 @@ function placeOf(title, start) {
 
 async function archive(slug, name, entry) {
   let state;
+  let note = null;
   if (fromState) state = JSON.parse(fs.readFileSync(fromState, 'utf8'));
-  else {
+  else if (entry && entry.source.smp) {
+    // From SoMuchPoker's calendar: rates for its dates first (a buy-in is converted to the payouts' USD)
+    await writeRates(DIR, [entry]);
+    const r = await require('./smp.js').read(entry, path.join(DIR, 'fx.json'));
+    state = r.state;
+    const all = Object.values(state.results).every((x) => x.amounts === 'all');
+    note = `results from SoMuchPoker: every paid place${all ? ' and prize' : ', prizes where published (the winner\'s otherwise)'}; ${r.events} of ${r.listed} events listed there have results`;
+  } else {
     E.configure(entry ? entry.source : { series: slug });
     state = E.emptyState();
     // Round 1 reads the list and every event; later rounds retry what failed. An engine with readPast() reads a
@@ -76,7 +84,7 @@ async function archive(slug, name, entry) {
     events: nums.filter((n) => out.results[n] && out.results[n].rows.length).length, entries: nums.reduce((a, n) => a + official(n), 0),
     players: E.players(out).length, paid: Object.values(out.results).reduce((a, r) => a + r.rows.reduce((b, row) => b + row[3], 0), 0),
     played: nums.filter((n) => official(n) > 0).length, known: nums.filter((n) => official(n) > 0 && E.watchedFromStart(out, n)).length,
-    watched: !!fromState, bytes: fs.statSync(file).size, ...(entry ? { mark: entry.mark, sub: entry.sub } : {}) };
+    watched: !!fromState, bytes: fs.statSync(file).size, ...(entry ? { mark: entry.mark, sub: entry.sub } : {}), ...(note ? { note } : {}) };
   console.log(`${info.name}: ${info.events} events paid, ${info.entries} entries, ${info.players} players, every bullet known in ${info.known} of ${info.played} played, ${Math.round(info.bytes / 1024)} KB`);
   return info;
 }

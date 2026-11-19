@@ -181,6 +181,21 @@ poller when it ends, like every watched series.
   results are winners and podiums, not every cash. GLPC VI, watched live, has the full tables.
 - GLPC V has only 27 tournaments on the tracker (11 played): the festival is only partly recorded there.
 
+### USOP stops outside Grand Loyal's tracker (SoMuchPoker)
+
+USOP (U Series of Poker) festivals that weren't run on Grand Loyal's tracker come from SoMuchPoker's event calendar
+(`tools/smp.js`, for a `docs/series.js` entry with `source: { smp: '<festival path>' }`): Taiwan 2023, Vietnam 2023,
+Hanoi 2023, Da Nang 2024, Hai Phong September 2024, Hai Phong Grand Finale 2024 and Japan Osaka 2025. Each event page's
+embedded data gives its entries, prize pool, buy-in and winner's prize; its `/payouts` page every paid place with the
+player and country, and the prize in USD where SoMuchPoker has the amounts.
+
+- Hai Phong 2024 (both) has every prize (in USD; buy-ins converted at the day's rate). Osaka 2025 and the others have
+  every place but only the winner's prize; Taiwan 2023 no amounts at all. Events with no payouts there are left out,
+  and players' bullets are a minimum (one per cash).
+- Not on SoMuchPoker with results: USOP Da Nang 2023, Taiwan 2024, 2021, and the U Series Championship (USC) Japan
+  2026 stops (schedules only). USOP Vietnam Ha Long Bay II 2026 has full payouts there, which could fill in the top-3
+  ones Grand Loyal keeps.
+
 ## Triton N. Cyprus 2026 (15–30 Nov 2026)
 
 `docs/triton/` (page at `https://<owner>.github.io/<repo>/triton/`), built on the public GraphQL API the

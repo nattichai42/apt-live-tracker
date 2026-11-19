@@ -584,7 +584,7 @@ const PART_RE = /(?<!\b(?:TO|LIVESTREAM|LIVE STREAM)\s)\b(DAY\s*\d+\s?[A-Z]?\b|F
   function slim(state) {
     const out = { v: 1, series: state.series, archive: true, updatedAt: state.updatedAt, events: {}, results: state.results || {}, feed: state.feed || [], aliases: state.aliases || {} };
     for (const e of Object.values(state.events)) {
-      if (!Object.keys(e.p || {}).length && !(e.entries > 0)) continue; // never played
+      if (!Object.keys(e.p || {}).length && !(e.entries > 0) && !(state.results || {})[e.num]) continue; // never played
       const { ids, pastRead, closed, levelAt, lastChange, regClosedAt, entriesAtFirst, rebuysAtFirst, listed, detAt, breaks, regEndN, regEndLabel, regCloseLabel, startIso, ...keep } = e;
       const p = {};
       for (const [k, x] of Object.entries(e.p || {})) { const { id, l, pend, xe, ...rest } = x; p[k] = rest; }

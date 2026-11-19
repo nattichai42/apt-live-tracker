@@ -338,7 +338,7 @@ test('Grand Loyal archives (GLPC, USOP): index and files agree, finished, payout
         const pool = Math.max(0, ...kids.map((e) => e.prizePool || 0)); if (!pool) continue;
         assert.ok(r.rows.reduce((a, x) => a + x[3], 0) <= pool * 1.5, `${f.id} #${num}: paid more than its pool`);
       }
-      for (const e of ev) assert.notEqual(FX.factor('VND', 'USD', FX.ymd(e.start)), null, `${f.id}: VND on ${FX.ymd(e.start)}`);
+      for (const e of ev) assert.notEqual(FX.factor(e.currency || 'VND', 'USD', FX.ymd(e.start)), null, `${f.id}: ${e.currency || 'VND'} on ${FX.ymd(e.start)}`);
     }
   }
 });

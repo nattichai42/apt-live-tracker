@@ -411,8 +411,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=cd5c922312"></script>
-<script src="../series.js?v=ad530c52f6"></script>
-<script src="glpc.js?v=abbce7e2eb"></script>
+<script src="../series.js?v=eb62dceb5a"></script>
+<script src="glpc.js?v=86fda164f3"></script>
 <script>
 (function () {
   'use strict';
@@ -509,7 +509,10 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
   const evShort = (e) => e ? `${tag(e.num)} ${baseOf(e.name)}${partOf(e.name) ? ' · ' + partOf(e.name) : ''}` : '';
   const dur = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm'; };
   const plural = (n, one, many) => `${nf.format(n)} ${n === 1 ? one : many}`;
-  const NATIVE_OF = () => 'VND', NATIVE_LABEL = () => 'VND', FIXED_FX = false, FX_FALLBACK = null;
+  // Each event's own currency (Grand Loyal's are VND; a USOP stop read from SoMuchPoker may be in JPY or USD)
+  // (shown as the series' currency: the one all its events share, else the series' own)
+  const NATIVE_OF = (e) => (e && e.currency) || SER.currency || 'VND', FIXED_FX = false, FX_FALLBACK = null;
+  const NATIVE_LABEL = () => { const cs = new Set(Object.values((raw && raw.events) || {}).map((e) => e.currency).filter(Boolean)); return cs.size === 1 ? [...cs][0] : SER.currency || 'VND'; };
 
   /* ---------- currency ---------- */
   // Amounts in each event's own currency, or in one picked at the top (shared by all the trackers):
@@ -599,7 +602,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     } catch (e) { console.warn('GitHub history unavailable', e); }
   }
   // A past series: its saved file, and its name and dates from the archive's index
-  let archLoaded = false;
+  let archLoaded = false, archNote = '';
   async function loadArchive() {
     try {
       const [r, idx, fx] = await Promise.all([fetch(`archive/${FEST}.json`), fetch('archive/index.json').then((x) => x.json()).catch(() => ({ series: [] })),
@@ -610,6 +613,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       raw = state = s; archLoaded = true; lastErr = null;
       const info = (idx.series || []).find((x) => x.id === FEST);
       if (info) {
+        archNote = info.note || '';
         const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
         Object.assign(SER, { name: info.name, mark: SER.mark || O.name + ' ' + info.place, sub: `${fmt(info.start)} – ${fmt(info.end)}` });
         Series.fillBrand(SER); document.title = info.name;
@@ -651,7 +655,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const dot = $('#dot'), txt = $('#status-text');
     if (MODE !== 'live') {
       dot.className = 'dot' + (lastErr ? ' err' : '');
-      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : 'Past series · ' + ((O.archive && O.archive.note) || 'as saved'));
+      txt.textContent = lastErr || (!archLoaded ? 'Loading…' : 'Past series · ' + (archNote || (O.archive && O.archive.note) || 'as saved'));
       return;
     }
     const iv = Number(prefs.interval);

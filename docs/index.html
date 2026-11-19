@@ -154,7 +154,7 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   <footer>Data from each organiser's public live pages, saved by pollers on GitHub. Not affiliated with the organisers.</footer>
 </div>
 
-<script src="series.js?v=ad530c52f6"></script>
+<script src="series.js?v=eb62dceb5a"></script>
 <script>
 (function () {
   'use strict';
@@ -276,7 +276,8 @@ h2 .count { color: var(--dim); font: 500 14px var(--sans); margin-left: 6px; }
   function render() {
     const groups = { live: [], soon: [], past: [] };
     const archived = new Set(tritonPast.map((t) => t.id.slice(3)));
-    for (const s of SERIES) if (!(s.source && archived.has(s.source.festival))) groups[status(s)].push(s);
+    // (a past-only series shows as its archive's banner, or not at all)
+    for (const s of SERIES) if (!s.past && !(s.source && archived.has(s.source.festival))) groups[status(s)].push(s);
     // A series in docs/series.js that has since been archived shows once, as its archive banner
     const archivedAs = new Set(seriesPast.map((a) => a.org + ':' + a.slug)), isArchived = (x) => archivedAs.has(x.org + ':' + x.source.series);
     for (const k of ['live', 'soon', 'past']) groups[k] = groups[k].filter((x) => !isArchived(x));
