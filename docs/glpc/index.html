@@ -224,7 +224,9 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 .gtable { width: 100%; border-collapse: collapse; margin: 8px 0 4px; background: var(--card); border-radius: var(--r); overflow: hidden; font-size: 12.5px; }
 .gtable th, .gtable td { padding: 8px 6px; text-align: right; border-top: 1px solid var(--line); white-space: nowrap; }
 .gtable th:first-child, .gtable td:first-child { padding-left: 12px; } .gtable th:last-child, .gtable td:last-child { padding-right: 12px; }
-@media (max-width: 420px) { .gtable { font-size: 11.5px; } }
+@media (max-width: 420px) { .gtable { font-size: 11.5px; } .gtable th, .gtable td { padding: 8px 4px; } .gtable th:first-child, .gtable td:first-child { padding-left: 10px; } .gtable th:last-child, .gtable td:last-child { padding-right: 10px; } }
+/* a table still too wide for the screen scrolls sideways instead of widening the panel */
+#sheet-games-wrap { overflow-x: auto; }
 .gtable th { font-weight: 500; color: var(--dim); font-size: 11px; border-top: 0; }
 .gtable th:first-child, .gtable td:first-child { text-align: left; }
 .gtable td:first-child { color: var(--fg2); font-weight: 600; }

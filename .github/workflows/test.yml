@@ -1,0 +1,34 @@
+name: Tests
+# On every change to the pages, engines, tools or poller: the offline data checks (series list, archives, packing,
+# exchange rates), then every page in a phone-sized browser against the live data branches.
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', 'tools/**', 'poller/**', 'tests/**', 'package.json', '.github/workflows/test.yml']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Data checks
+        run: npm test
+      - name: Install Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Every page on a phone
+        run: npm run test:pages

@@ -69,10 +69,23 @@ began and bust + re-entry faster than one poll. Chip counts on the site are not 
 4. Nothing to start by hand. The *Poll series* workflow (`.github/workflows/poll.yml`) runs every 15 minutes and starts a
    poller for each series in its dates. Each poller job polls for ~5 h 45 min. When it starts, it queues the next run
    of its series, which waits in that series' concurrency group and takes over the moment it ends. The schedule is only a
-   backup. Queueing stops two days after the series ends, or once every event has finished.
+   backup. Queueing stops two days after the series ends, or once its last day has come and every event has finished;
+   that last run archives it (see "When a series ends").
 5. Open `https://<owner>.github.io/<repo>/` (home).
 
 To pause everything, disable the workflow in the Actions tab.
+
+## Tests
+
+The *Tests* workflow runs on every push to main that touches the site, tools or poller, and on pull requests:
+
+- `npm test` (`tests/data.test.js`, offline, no dependencies): the series list is complete and shares no id, branch or
+  storage key; when polling starts, stops and counts as over; `poller/ctl.js` answers; every APT archive file is in its
+  index, in the current packed form and convertible to USD from `fx.json` alone; Triton's `all.json` gives exactly the
+  players and timelines of its festival files; engine rules such as a paid winner finishing an event.
+- `npm run test:pages` (`tests/pages.test.js`, Playwright): every page at phone width (375 px), live ones against the
+  data branches. It fails on a script error, NaN / undefined in the text, or anything wider than the screen, after
+  opening each tab, its first event and first player. Locally: `npm i --no-save playwright && npx playwright install chromium`.
 
 ## Changing the engine
 

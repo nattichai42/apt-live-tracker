@@ -1,0 +1,9 @@
+{
+  "name": "apt-live-tracker",
+  "private": true,
+  "description": "Live poker series trackers (static pages in docs/, pollers in poller/)",
+  "scripts": {
+    "test": "node --test tests/data.test.js",
+    "test:pages": "node --test tests/pages.test.js"
+  }
+}
