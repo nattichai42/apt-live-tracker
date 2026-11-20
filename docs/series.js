@@ -107,12 +107,12 @@
       name: 'GLPC IV', tag: "IV", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-04-17', end: '2026-04-27',
       link: 'https://grandloyal.vn/series',
       title: 'Grand Loyal Poker Championships IV', mark: 'GLPC IV', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'IV',
-      source: { series: 'glpc-iv', seriesUrl: 'https://grandloyal.vn/series', from: '2026-04-17', to: '2026-04-28' } },
+      source: { series: 'glpc-iv', seriesUrl: 'https://grandloyal.vn/series', from: '2026-04-17', to: '2026-04-28', smpPayouts: '/events-calendar/glpc/2026/grand-loyal-poker-championship-iv-2026' } },
     { id: 'glpc-v', org: 'glpc', branch: 'glpc-v-data', past: true,
       name: 'GLPC V', tag: "V", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-07-29', end: '2026-08-09',
       link: 'https://grandloyal.vn/series',
       title: 'Grand Loyal Poker Championships V', mark: 'GLPC V', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'V',
-      source: { series: 'glpc-v', seriesUrl: 'https://grandloyal.vn/series', from: '2026-07-29', to: '2026-08-10' } },
+      source: { series: 'glpc-v', seriesUrl: 'https://grandloyal.vn/series', from: '2026-07-29', to: '2026-08-10', smpPayouts: '/events-calendar/glpc/2026/grand-loyal-poker-championship-v-2026' } },
     { id: 'usop-taiwan-2023', org: 'usop', branch: 'usop-taiwan-2023-data', past: true,
       name: 'USOP Taiwan 2023', tag: "Taiwan '23", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2023-02-10', end: '2023-02-19',
       link: 'https://somuchpoker.com/events-calendar/usop/2023/u-series-of-poker-usop-poker2u-2023-taiwan-series',
@@ -172,7 +172,7 @@
       name: 'GLPC VI', tag: 'VI', place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-11-18', end: '2026-11-29',
       link: 'https://grandloyal.vn/series/121',
       title: 'Grand Loyal Poker Championships VI', mark: 'GLPC VI', sub: 'Grand Loyal · Vietnam', art: 'glpc', watermark: 'VI',
-      source: { series: 'glpc-vi', seriesUrl: 'https://grandloyal.vn/series/121', from: '2026-11-18', to: '2026-11-30' } },
+      source: { series: 'glpc-vi', seriesUrl: 'https://grandloyal.vn/series/121', from: '2026-11-18', to: '2026-11-30', smpPayouts: '/events-calendar/glpc/2026/grand-loyal-poker-championship-vi-2026' } },
   ];
 
   const today = (tz) => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch { return new Date().toISOString().slice(0, 10); } };

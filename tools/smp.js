@@ -115,8 +115,10 @@ function mergeInto(gl, smp) {
     if (s1 && g1 && s1[3] > 0 && g1[3] > 0 && kidsOf(num).length) ratios.push(g1[3] / s1[3]);
   }
   ratios.sort((a, b) => a - b);
-  const rate = ratios.length ? ratios[ratios.length >> 1] : null;
-  if (!rate) throw new Error('no event paid on both: no rate to convert SoMuchPoker\'s USD');
+  // (no event paid on both: the day's exchange rate, from the archive's rates)
+  const first = Object.values(smp.events).map((e) => e.start).filter(Boolean).sort((a, b) => a - b)[0];
+  const rate = ratios.length ? ratios[ratios.length >> 1] : first ? FX.factor('USD', 'VND', FX.ymd(first)) : null;
+  if (!rate) throw new Error('no event paid on both and no exchange rate: SoMuchPoker\'s USD not converted');
   let merged = 0, added = 0;
   for (const [num, r] of Object.entries(smp.results)) {
     const kids = kidsOf(num), g = gl.results[num];

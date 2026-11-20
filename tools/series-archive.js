@@ -65,11 +65,14 @@ async function archive(slug, name, entry) {
   E.repair(state);
   if (entry && entry.source.smpPayouts) {
     // The tracker keeps a finished event's top few places: SoMuchPoker's payouts fill in every place
-    const smp = require('./smp.js');
-    const r = await smp.read({ ...entry, source: { ...entry.source, smp: entry.source.smpPayouts } }, path.join(DIR, 'fx.json'));
-    const m = smp.mergeInto(state, r.state);
-    note = `players and counts from Grand Loyal; payouts from SoMuchPoker in ${m.merged + m.added} events (every paid place), Grand Loyal's top places elsewhere`;
-    console.log(`  SoMuchPoker payouts: ${m.merged} events filled in, ${m.added} added, at ${m.rate} VND/USD`);
+    // (when the poller archives a series it watched, SoMuchPoker being down mustn't stop it: the tracker's own payouts stay)
+    try {
+      const smp = require('./smp.js');
+      const r = await smp.read({ ...entry, source: { ...entry.source, smp: entry.source.smpPayouts } }, path.join(DIR, 'fx.json'));
+      const m = smp.mergeInto(state, r.state);
+      note = `players and counts from Grand Loyal; payouts from SoMuchPoker in ${m.merged + m.added} events (every paid place), Grand Loyal's elsewhere`;
+      console.log(`  SoMuchPoker payouts: ${m.merged} events filled in, ${m.added} added, at ${m.rate} VND/USD`);
+    } catch (e) { console.warn(`  SoMuchPoker payouts not merged: ${e.message}`); }
   }
   const out = E.slim(state);
   if (!E.players(out).length) throw new Error('no players on record (the site has only its schedule): not saved');

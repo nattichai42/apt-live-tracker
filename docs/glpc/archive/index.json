@@ -9,16 +9,17 @@
    "end": "2026-08-09",
    "tz": "Asia/Ho_Chi_Minh",
    "currency": "VND",
-   "events": 8,
-   "entries": 3679,
-   "players": 798,
-   "paid": 10706000000,
-   "played": 11,
+   "events": 35,
+   "entries": 4987,
+   "players": 1030,
+   "paid": 59359383000,
+   "played": 34,
    "known": 0,
    "watched": false,
-   "bytes": 241687,
+   "bytes": 277985,
    "mark": "GLPC V",
-   "sub": "Grand Loyal · Vietnam"
+   "sub": "Grand Loyal · Vietnam",
+   "note": "players and counts from Grand Loyal; payouts from SoMuchPoker in 30 events (every paid place), Grand Loyal's elsewhere"
   },
   {
    "id": "glpc-iv",
@@ -31,14 +32,15 @@
    "currency": "VND",
    "events": 51,
    "entries": 7454,
-   "players": 1081,
-   "paid": 31764737240,
+   "players": 1129,
+   "paid": 63906915240,
    "played": 67,
    "known": 0,
    "watched": false,
-   "bytes": 566348,
+   "bytes": 579276,
    "mark": "GLPC IV",
-   "sub": "Grand Loyal · Vietnam"
+   "sub": "Grand Loyal · Vietnam",
+   "note": "players and counts from Grand Loyal; payouts from SoMuchPoker in 47 events (every paid place), Grand Loyal's elsewhere"
   },
   {
    "id": "glpc-iii",
@@ -61,5 +63,5 @@
    "sub": "Grand Loyal · Vietnam"
   }
  ],
- "updatedAt": 1795119895
+ "updatedAt": 1795138659
 }

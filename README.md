@@ -201,6 +201,10 @@ player and country, and the prize in USD where SoMuchPoker has the amounts.
   ("Dinh Hai Le" = "Le Dinh Hai"; 93-96% are). Amounts are the tracker's VND where it has the place, else
   SoMuchPoker's USD at the rate the two imply for first prizes (26,371 and 26,110 VND/USD). Payouts now add up to
   the prize pool in 76 of 80 and 56 of 59 events.
+- The same for GLPC IV and V (SoMuchPoker's GLPC tour): 353 -> 976 paid places for IV (payouts match the pool in 46
+  of 47 events); V gains the 24 events Grand Loyal's tracker doesn't have (11 -> 35). GLPC VI gets it when its poller
+  archives it (SoMuchPoker being down, or without results yet, leaves Grand Loyal's own payouts; the merge only warns).
+  GLPC III isn't on SoMuchPoker: its results stay Grand Loyal's top places.
 
 ## Triton N. Cyprus 2026 (15–30 Nov 2026)
 
