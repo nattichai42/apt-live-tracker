@@ -12,11 +12,11 @@
    "events": 70,
    "entries": 6496,
    "players": 1014,
-   "paid": 43606900,
+   "paid": 47231775,
    "played": 70,
    "known": 70,
    "watched": false,
-   "bytes": 521111,
+   "bytes": 521148,
    "sub": "The Final Horse · 2026"
   },
   {
@@ -31,11 +31,11 @@
    "events": 32,
    "entries": 981,
    "players": 171,
-   "paid": 865644000,
+   "paid": 893344000,
    "played": 32,
    "known": 31,
    "watched": false,
-   "bytes": 117097,
+   "bytes": 117100,
    "sub": "The Rising Horse · 2026"
   },
   {
@@ -50,13 +50,13 @@
    "events": 82,
    "entries": 8958,
    "players": 1271,
-   "paid": 81853620,
+   "paid": 85130070,
    "played": 84,
    "known": 84,
    "watched": false,
-   "bytes": 715499,
+   "bytes": 715511,
    "sub": "The Horse Awakens · 2026"
   }
  ],
- "updatedAt": 1795205280
+ "updatedAt": 1795206339
 }

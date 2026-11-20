@@ -150,11 +150,14 @@ ZSOP (zodiacseriesofpoker.com; Taipei, Jeju) runs on Gods of Poker's software, s
 - Bounties: in knockout (PKO) events the site records the bounty money each purchase won (`knockOutAmount`), cashed or
   not, while the payouts show only those of players who cashed. The engine keeps them per player in `state.bounties`
   (event number -> player -> amount) and a place's prize is then its cash alone, so nothing counts twice; `players()`
-  adds them to prizes (not cashes, so ITM is unchanged) and timelines show "Bounties won". Fixed and mystery bounties
-  are recorded nowhere, so they stay out of prizes. Gods of Poker's 7 past series have no knockout events with
-  recorded bounties (only fixed and mystery ones), so nothing changes there.
-- Net across ZSOP is about −20%: fees ~11%, fixed and mystery bounties ~5-8%, Main Events' payout tables a few
-  points short of their pools, satellites (their seats aren't prizes) ~2%.
+  adds them to prizes (not cashes, so ITM is unchanged) and timelines show "Bounties won". A payout's `amount` is what the
+  player was paid, bounties included, and its `payoutAmount` the place's prize: mystery bounties (envelopes, drawn in
+  the money) are only in `amount` (`bountyAmount` stays 0), so a place's prize is `payoutAmount` plus the larger of
+  `bountyAmount` and `amount - payoutAmount`. Left out: fixed bounties won by players who busted before the money in
+  series that don't record them per purchase (Taipei II: NT$0.39M of NT$8.47M bounty money). Gods of Poker's 7 past
+  series record neither (no knockout events, and their payouts' amounts carry no bounties), so nothing changes there.
+- Net across ZSOP: −17% (Taipei), −5% (Jeju), −20% (Taipei II): fees ~10-12%, Main Events' payout tables a few points
+  short of their pools, satellites (their seats aren't prizes) ~2%.
 - Not live yet: ZSOP had no next series listed on 20 Nov 2026. When it has, add it to `docs/series.js` with `org: 'zsop'`.
 
 ## Royal Poker Tour (`docs/rop/`)

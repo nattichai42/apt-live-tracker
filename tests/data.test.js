@@ -306,6 +306,10 @@ test('ZSOP/GOP: knockout bounties are credited to whoever won them (prizes, not 
   ev.players.forEach((r) => { r.knockOutAmount = 0; });
   const st2 = Z.emptyState(); await Z.pollOnce(st2, { fetchFn });
   assert.deepEqual(st2.bounties, {}); assert.equal(st2.results[5].rows[0][3], 5500);
+  // Mystery bounties: only in a payout's amount (its bountyAmount stays 0)
+  ev.payouts = [{ position: 1, payoutAmount: 4000, amount: 6500, bountyAmount: 0, winner: { player: { id: 'a', description: 'Ann Lee' } } }];
+  const st3 = Z.emptyState(); await Z.pollOnce(st3, { fetchFn });
+  assert.equal(st3.results[5].rows[0][3], 6500, 'envelopes won are in the prize');
 });
 
 test('docs/gop/index.html and docs/zsop/index.html are the APT page made by tools/stamp.sh (edit the APT page, then run it)', () => {

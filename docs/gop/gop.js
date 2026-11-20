@@ -159,9 +159,12 @@
       const w = p.winner || {}, pl = w.player || {};
       const name = pl.id ? clean(pl.description || [pl.firstname, pl.lastname].filter(Boolean).join(' ')) : null;
       if (pl.id) state.people[pl.id] = state.people[pl.id] || [name, String(w.countryCode || '').toUpperCase()];
-      // [place, player, prize, the bounties in it]
-      const bounty = Math.round(Number(p.bountyAmount) || 0);
-      return [Number(p.position), pl.id || null, Math.round(Number(p.payoutAmount ?? p.amount) || 0) + bounty, bounty];
+      // [place, player, prize, the bounties in it]. payoutAmount is the place's prize; amount is what the player was paid,
+      // bounties included: knockout bounties are also in bountyAmount, mystery bounties (envelopes drawn in the money)
+      // only in amount
+      const cash = Math.round(Number(p.payoutAmount ?? p.amount) || 0);
+      const bounty = Math.max(0, Math.round(Number(p.bountyAmount) || 0), Math.round((Number(p.amount) || 0) - cash));
+      return [Number(p.position), pl.id || null, cash + bounty, bounty];
     }).sort((a, b) => a[0] - b[0]);
     if (!e.firstPoll) e.firstPoll = Math.min(now, e.start || now); // the records are complete from the first look
     e.lastPoll = now; e.polls = (e.polls || 0) + 1;
