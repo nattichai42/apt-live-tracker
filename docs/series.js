@@ -56,6 +56,7 @@
   // storage: browser key of the page's saved copy (defaults to the id).
   // past: a series from before the site tracked it, known only from its archive (never polled; tools/series-archive.js).
   // source.smp: read from SoMuchPoker's event calendar instead of the organiser's tracker (tools/smp.js).
+  // source.smpPayouts: the tracker's festival, with SoMuchPoker's payouts put in (its full places for the tracker's top few).
   const LIST = [
     { id: 'apt-taipei-2026', org: 'apt', branch: 'data', storage: 'apt-live-state-v1',
       name: 'APT Championship Taipei 2026', tag: "Championship '26", place: 'Taipei', tz: 'Asia/Taipei', currency: 'TWD', start: '2026-11-12', end: '2026-11-29',
@@ -161,12 +162,12 @@
       name: 'USOP Vietnam May 2026', tag: "May '26", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-05-19', end: '2026-06-01',
       link: 'https://grandloyal.vn/series',
       title: 'USOP Vietnam 2026 (May)', mark: 'USOP Vietnam', sub: 'May · 2026', art: 'usop', watermark: '2026',
-      source: { series: 'usop-vietnam-2026-may', seriesUrl: 'https://grandloyal.vn/series', from: '2026-05-19', to: '2026-06-02' } },
+      source: { series: 'usop-vietnam-2026-may', seriesUrl: 'https://grandloyal.vn/series', from: '2026-05-19', to: '2026-06-02', smpPayouts: '/events-calendar/usop/2026/usop-vietnam-halong-bay-2026' } },
     { id: 'usop-vietnam-2026-aug', org: 'usop', branch: 'usop-vietnam-2026-aug-data', past: true,
       name: 'USOP Vietnam Aug 2026', tag: "Aug '26", place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-08-27', end: '2026-09-09',
       link: 'https://grandloyal.vn/series',
       title: 'USOP Vietnam 2026 (August)', mark: 'USOP Vietnam', sub: 'August · 2026', art: 'usop', watermark: '2026',
-      source: { series: 'usop-vietnam-2026-aug', seriesUrl: 'https://grandloyal.vn/series', from: '2026-08-27', to: '2026-09-10' } },
+      source: { series: 'usop-vietnam-2026-aug', seriesUrl: 'https://grandloyal.vn/series', from: '2026-08-27', to: '2026-09-10', smpPayouts: '/events-calendar/usop/2026/usop-vietnam-series-2026' } },
     { id: 'glpc-vi', org: 'glpc', branch: 'glpc-data', storage: 'glpc-live-state-v1',
       name: 'GLPC VI', tag: 'VI', place: 'Vietnam', tz: 'Asia/Ho_Chi_Minh', currency: 'VND', start: '2026-11-18', end: '2026-11-29',
       link: 'https://grandloyal.vn/series/121',

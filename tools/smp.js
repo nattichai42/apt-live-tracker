@@ -93,3 +93,59 @@ async function read(entry, ratesFile) {
   return { state, events: n, listed: hrefs.length };
 }
 module.exports = { read, money };
+
+/**
+ * Put SoMuchPoker's payouts into a festival read from Grand Loyal's tracker (GLPC engine state, VND), where the
+ * tracker keeps only a finished event's top few places and its leaderboard ranks follow the chips when play stopped
+ * (a deal or the final hand can order the top places differently). For each event on both:
+ *   - places and players from SoMuchPoker; a player matched to the event's entrant of the same name (any word order,
+ *     or SoMuchPoker's name being part of the tracker's: "Arjun Agrawal" / "Agrawal Arjun Pulak"), else as published
+ *   - amounts: the tracker's VND where it has that place, else SoMuchPoker's USD at the rate the two give for the
+ *     events both pay (the median of first prizes), to the nearest 1,000 VND
+ * Events only SoMuchPoker has join as results-only events; the tracker's others (satellites) stay as they were.
+ * Returns { merged, added, rate }.
+ */
+function mergeInto(gl, smp) {
+  const People = require('../docs/people.js');
+  const words = (n) => People.norm(n).split(' ').filter(Boolean);
+  const kidsOf = (num) => Object.values(gl.events).filter((e) => e.num === num);
+  const ratios = [];
+  for (const [num, r] of Object.entries(smp.results)) {
+    const g = gl.results[num], s1 = r.rows.find((x) => x[0] === 1), g1 = g && g.rows.find((x) => x[0] === 1);
+    if (s1 && g1 && s1[3] > 0 && g1[3] > 0 && kidsOf(num).length) ratios.push(g1[3] / s1[3]);
+  }
+  ratios.sort((a, b) => a - b);
+  const rate = ratios.length ? ratios[ratios.length >> 1] : null;
+  if (!rate) throw new Error('no event paid on both: no rate to convert SoMuchPoker\'s USD');
+  let merged = 0, added = 0;
+  for (const [num, r] of Object.entries(smp.results)) {
+    const kids = kidsOf(num), g = gl.results[num];
+    const vndAt = new Map(((g && g.rows) || []).map((x) => [x[0], x[3]]));
+    const vnd = (pos, usd) => (vndAt.has(pos) ? vndAt.get(pos) : Math.round((usd * rate) / 1000) * 1000);
+    if (!kids.length) {
+      // Only on SoMuchPoker: a results-only event, in VND
+      const se = Object.values(smp.events).find((e) => e.num === num); if (!se) continue;
+      const e = { ...se, kid: se.kid, currency: 'VND', buyin: Math.round((se.buyin * (se.currency === 'USD' ? rate : 1)) / 1000) * 1000,
+        prizePool: Math.round((se.prizePool * (se.currency === 'USD' ? rate : 1)) / 1000) * 1000, src: 'somuchpoker' };
+      gl.events[e.kid] = e;
+      gl.results[num] = { at: smp.updatedAt, final: true, src: 'somuchpoker', rows: r.rows.map(([pos, n, cc, usd]) => [pos, n, cc, vnd(pos, usd)]) };
+      added++; continue;
+    }
+    // The event's entrants, to name each place as the tracker does
+    const entrants = new Map();
+    for (const e of kids) for (const [k, p] of Object.entries(e.p || {})) entrants.set(k, p.cc || '');
+    const exact = new Map(), list = [...entrants.keys()].map((k) => [k, new Set(words(k))]);
+    for (const [k] of list) { const n = People.norm(k); exact.set(n, exact.has(n) ? null : k); }
+    const nameOf = (n) => {
+      const hit = exact.get(People.norm(n)); if (hit) return hit;
+      const w = words(n); if (w.length < 2) return null;
+      const sub = list.filter(([, set]) => w.every((x) => set.has(x)));
+      return sub.length === 1 ? sub[0][0] : null;
+    };
+    gl.results[num] = { at: (g && g.at) || smp.updatedAt, final: true, src: 'somuchpoker',
+      rows: r.rows.map(([pos, n, cc, usd]) => { const k = nameOf(n); return [pos, k || n, cc || (k && entrants.get(k)) || '', vnd(pos, usd)]; }) };
+    merged++;
+  }
+  return { merged, added, rate: Math.round(rate) };
+}
+module.exports.mergeInto = mergeInto;

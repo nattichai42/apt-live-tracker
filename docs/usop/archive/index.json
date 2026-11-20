@@ -9,16 +9,17 @@
    "end": "2026-09-09",
    "tz": "Asia/Ho_Chi_Minh",
    "currency": "VND",
-   "events": 90,
-   "entries": 7610,
-   "players": 742,
-   "paid": 64582248404,
-   "played": 92,
+   "events": 95,
+   "entries": 7757,
+   "players": 790,
+   "paid": 140569009404,
+   "played": 95,
    "known": 0,
    "watched": false,
-   "bytes": 596514,
+   "bytes": 618085,
    "mark": "USOP Vietnam",
-   "sub": "August · 2026"
+   "sub": "August · 2026",
+   "note": "players and counts from Grand Loyal; payouts from SoMuchPoker in 62 events (every paid place), Grand Loyal's top places elsewhere"
   },
   {
    "id": "usop-vietnam-2026-may",
@@ -30,15 +31,16 @@
    "tz": "Asia/Ho_Chi_Minh",
    "currency": "VND",
    "events": 99,
-   "entries": 9994,
-   "players": 954,
-   "paid": 106905190750,
+   "entries": 9933,
+   "players": 978,
+   "paid": 188015033750,
    "played": 101,
    "known": 1,
    "watched": false,
-   "bytes": 780368,
+   "bytes": 803268,
    "mark": "USOP Vietnam",
-   "sub": "May · 2026"
+   "sub": "May · 2026",
+   "note": "players and counts from Grand Loyal; payouts from SoMuchPoker in 79 events (every paid place), Grand Loyal's top places elsewhere"
   },
   {
    "id": "usop-hanoi-2025",
@@ -208,5 +210,5 @@
    "note": "results from SoMuchPoker: every paid place, prizes where published (the winner's otherwise); 2 of 4 events listed there have results"
   }
  ],
- "updatedAt": 1795121214
+ "updatedAt": 1795138241
 }

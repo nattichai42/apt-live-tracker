@@ -193,8 +193,14 @@ player and country, and the prize in USD where SoMuchPoker has the amounts.
   every place but only the winner's prize; Taiwan 2023 no amounts at all. Events with no payouts there are left out,
   and players' bullets are a minimum (one per cash).
 - Not on SoMuchPoker with results: USOP Da Nang 2023, Taiwan 2024, 2021, and the U Series Championship (USC) Japan
-  2026 stops (schedules only). USOP Vietnam Ha Long Bay II 2026 has full payouts there, which could fill in the top-3
-  ones Grand Loyal keeps.
+  2026 stops (schedules only).
+- USOP Vietnam May and August 2026 (Ha Long Bay, on Grand Loyal's tracker) get SoMuchPoker's payouts put in
+  (`source.smpPayouts`, `mergeInto()` in `tools/smp.js`): 1,248 and 995 paid places instead of the tracker's 405 and
+  286. Places and players are SoMuchPoker's (the tracker's leaderboard ranks follow the chips when play stopped, and
+  had 1st and 2nd swapped in about half the events), named as the tracker's entrant when it's the same person
+  ("Dinh Hai Le" = "Le Dinh Hai"; 93-96% are). Amounts are the tracker's VND where it has the place, else
+  SoMuchPoker's USD at the rate the two imply for first prizes (26,371 and 26,110 VND/USD). Payouts now add up to
+  the prize pool in 76 of 80 and 56 of 59 events.
 
 ## Triton N. Cyprus 2026 (15–30 Nov 2026)
 
