@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Point each page at its scripts by content hash, so browsers never mix a new page with a cached old engine.
-# Run after changing any engine (docs/apt/tracker.js, docs/gop/gop.js, docs/rop/rop.js, docs/glpc/glpc.js, docs/triton/triton.js),
+# Run after changing any engine (docs/apt/tracker.js, docs/gop/gop.js, docs/zsop/zsop.js, docs/rop/rop.js, docs/glpc/glpc.js, docs/triton/triton.js),
 # docs/fx.js, docs/series.js, docs/people.js, docs/all/all.js or docs/apt/index.html (or any time; it is idempotent).
-# It also makes docs/gop/index.html and docs/rop/index.html from the APT page: edit the APT page, never the copies.
+# It also makes docs/gop/index.html, docs/zsop/index.html and docs/rop/index.html from the APT page: edit the APT page, never the copies.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 stamp() { # page, script src as the page writes it (relative to the page)
@@ -14,22 +14,24 @@ stamp() { # page, script src as the page writes it (relative to the page)
   grep -q "${src}?v=${h}" "$page" && echo "$page -> ${src}?v=${h}"
 }
 stamp docs/apt/index.html tracker.js
-# Gods of Poker and the Royal Poker Tour use the APT page (their engines give it the APT engine's state): each page is
-# the APT page with data-org="<org>" and its engine after APT's
-org_page() { # org, engine file, page title
+# Gods of Poker, ZSOP and the Royal Poker Tour use the APT page (their engines give it the APT engine's state): each
+# page is the APT page with data-org="<org>" and its engine after APT's (ZSOP's after GOP's, which it is made from)
+org_page() { # org, engine file(s) as the page writes them (space-separated, in load order), page title
+  local scripts="" s
+  for s in $2; do scripts="$scripts\\
+<script src=\"$s\"></script>"; done
   sed -e "s#^<html lang=\"en\">\$#<html lang=\"en\" data-org=\"$1\">#" \
       -e "s#^<title>[^<]*</title>\$#<title>$3</title>#" \
-      -e "s#^<script src=\"tracker\\.js\\(?v=[0-9a-f]*\\)\\{0,1\\}\"></script>\$#<script src=\"../apt/tracker.js\"></script>\\
-<script src=\"$2\"></script>#" \
+      -e "s#^<script src=\"tracker\\.js\\(?v=[0-9a-f]*\\)\\{0,1\\}\"></script>\$#<script src=\"../apt/tracker.js\"></script>$scripts#" \
       -e '2i<!-- Made by tools/stamp.sh from docs/apt/index.html: edit that page, not this one -->' \
       docs/apt/index.html
 }
-for o in "gop gop.js Gods of Poker Live Tracker" "rop rop.js Royal Poker Tour Live Tracker"; do
-  set -- $o; org=$1 js=$2; shift 2
+for o in "gop|gop.js|Gods of Poker Live Tracker" "zsop|../gop/gop.js zsop.js|Zodiac Series of Poker Live Tracker" "rop|rop.js|Royal Poker Tour Live Tracker"; do
+  IFS='|' read -r org js title <<< "$o"
   mkdir -p "docs/$org"
-  org_page "$org" "$js" "$*" > "docs/$org/index.html"
+  org_page "$org" "$js" "$title" > "docs/$org/index.html"
   stamp "docs/$org/index.html" ../apt/tracker.js
-  stamp "docs/$org/index.html" "$js"
+  for s in $js; do stamp "docs/$org/index.html" "$s"; done
 done
 stamp docs/glpc/index.html glpc.js
 # USOP runs on Grand Loyal's tracker: its page is the GLPC page with data-org="usop" and GLPC's engine
@@ -39,11 +41,12 @@ sed -e 's#^<html lang="en">$#<html lang="en" data-org="usop">#' \
     docs/glpc/index.html > docs/usop/index.html
 stamp docs/usop/index.html ../glpc/glpc.js
 stamp docs/triton/index.html triton.js
-for page in docs/apt/index.html docs/gop/index.html docs/rop/index.html docs/glpc/index.html docs/usop/index.html docs/triton/index.html docs/all/index.html; do stamp "$page" ../fx.js; stamp "$page" ../series.js; done
+for page in docs/apt/index.html docs/gop/index.html docs/zsop/index.html docs/rop/index.html docs/glpc/index.html docs/usop/index.html docs/triton/index.html docs/all/index.html; do stamp "$page" ../fx.js; stamp "$page" ../series.js; done
 stamp docs/index.html series.js
 # The all-series page uses every engine
 stamp docs/all/index.html ../apt/tracker.js
 stamp docs/all/index.html ../gop/gop.js
+stamp docs/all/index.html ../zsop/zsop.js
 stamp docs/all/index.html ../rop/rop.js
 stamp docs/all/index.html ../glpc/glpc.js
 stamp docs/all/index.html ../triton/triton.js

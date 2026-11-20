@@ -225,29 +225,72 @@ test('GOP: bullets are purchases, counted once across flights, holding tables an
     .then(() => { assert.deepEqual(Object.keys(s2.events), ['x1']); });
 });
 
-test('GOP archive: index and files agree, every played event adds up, rates for every event', () => {
-  const G = require('../docs/gop/gop.js');
-  const ix = read('gop/archive/index.json');
-  assert.ok(ix.series.length > 0);
-  const files = fs.readdirSync(path.join(DOCS, 'gop/archive')).filter((f) => f.endsWith('.json') && !['index.json', 'fx.json'].includes(f));
-  assert.deepEqual(files.map((f) => f.slice(0, -5)).sort(), ix.series.map((s) => s.id).sort());
-  FX.seed(read('gop/archive/fx.json'));
-  for (const f of ix.series) {
-    for (const k of ['id', 'name', 'place', 'tag', 'start', 'end', 'tz', 'currency']) assert.ok(f[k], `${f.id}: no ${k}`);
-    const st = read(`gop/archive/${f.id}.json`); G.repair(st);
-    const ev = Object.values(st.events);
-    assert.ok(ev.every((e) => e.phase === 'Completed' && e.polls), `${f.id}: every event read and finished`);
-    assert.ok(f.known >= f.played - 2, `${f.id}: every bullet known in only ${f.known} of ${f.played} events`);
-    assert.ok(G.players(st).length > 0);
-    for (const e of ev) assert.notEqual(FX.factor(e.currency, 'USD', FX.ymd(e.start)), null, `${f.id}: ${e.currency} on ${FX.ymd(e.start)}`);
+test('GOP and ZSOP archives: index and files agree, every played event adds up, rates for every event', () => {
+  for (const org of ['gop', 'zsop']) {
+    const G = require(`../docs/${org}/${org}.js`);
+    const ix = read(`${org}/archive/index.json`);
+    assert.ok(ix.series.length > 0, `${org}: archive`);
+    const files = fs.readdirSync(path.join(DOCS, `${org}/archive`)).filter((f) => f.endsWith('.json') && !['index.json', 'fx.json'].includes(f));
+    assert.deepEqual(files.map((f) => f.slice(0, -5)).sort(), ix.series.map((s) => s.id).sort());
+    FX.seed(read(`${org}/archive/fx.json`));
+    for (const f of ix.series) {
+      for (const k of ['id', 'name', 'place', 'tag', 'start', 'end', 'tz', 'currency']) assert.ok(f[k], `${f.id}: no ${k}`);
+      const st = read(`${org}/archive/${f.id}.json`); G.repair(st);
+      assert.equal(st.org, org, `${f.id}: org`);
+      const ev = Object.values(st.events);
+      assert.ok(ev.every((e) => e.phase === 'Completed' && e.polls), `${f.id}: every event read and finished`);
+      assert.ok(f.known >= f.played - 2, `${f.id}: every bullet known in only ${f.known} of ${f.played} events`);
+      assert.ok(G.players(st).length > 0);
+      for (const e of ev) assert.notEqual(FX.factor(e.currency, 'USD', FX.ymd(e.start)), null, `${f.id}: ${e.currency} on ${FX.ymd(e.start)}`);
+      if (org === 'zsop') {
+        // ZSOP's own codes: the Zodiac events Z1-Z12, none of them a satellite
+        const labels = Object.values(st.labels || {});
+        assert.ok(labels.filter((l) => /^Z\d+/.test(l)).length >= 10, `${f.id}: Zodiac events labelled (${labels.join(' ')})`);
+        for (const [n, l] of Object.entries(st.labels)) {
+          assert.equal(G.numLabel(Number(n), st), /^\d/.test(l) ? '#' + l : l);
+          if (/^Z\d/.test(l)) assert.ok(!ev.some((e) => e.num === Number(n) && e.sat), `${f.id}: ${l} isn't a satellite`);
+        }
+        assert.ok(ev.some((e) => e.sat), `${f.id}: satellites known`);
+      }
+    }
   }
 });
 
-test('docs/gop/index.html is the APT page made by tools/stamp.sh (edit the APT page, then run it)', () => {
+test('ZSOP: a series list grouped by day, its own event codes and satellites; GOP keeps its numbers', async () => {
+  const Z = require('../docs/zsop/zsop.js').configure({ series: 'test' }), G = require('../docs/gop/gop.js');
+  assert.equal(Z.SITE, 'https://zodiacseriesofpoker.com'); assert.equal(G.SITE, 'https://godsofpoker.com');
+  G.configure({ series: 'gop-x' }); Z.configure({ series: 'test' });
+  assert.equal(G.SERIES, 'gop-x', 'configuring ZSOP leaves GOP alone');
+  for (const [n, later] of [['High Roller Single Day 6 Max', false], ['NLH Day 8 Handed', false], ['Main Event Day 2', true], ['Zodiac Rooster Starter Final Day', true]]) assert.equal(Z.isLaterDay(n), later, n);
+  const t0 = '2026-09-03T11:00:00';
+  const ev = (kid, n, title, extra) => ({ kholdem_id: kid, eventNumber: n, title, startTime: t0, currency: 'NT$', totalBuyin: 10000, totalEntries: 0, phase: { code: 'scheduled' }, status: {}, ...extra });
+  const list = { festival: { title: 'The Test Horse', subtitle: 'ZSOP Taipei 2026', slug: 'test', timezone: 'Asia/Taipei', currency: 'NT$', start_date: '2026-09-03T02:00:00.000Z', end_date: '2026-09-14T16:00:00.000Z' },
+    events: { '2026-09-03T00:00:00': [ev('s1', 1, 'S1 - Milestone Sat to Rooster Starter', { satellite: true }), ev('z1', 2, 'Z1 - Zodiac Rooster Starter', { isSummary: true }), ev('z1a', 2, 'Z1 - Zodiac Rooster Starter Day 1A', { satellite: false })],
+      '2026-09-04T00:00:00': [ev('z1f', 2, 'Z1 -  Zodiac Rooster Starter Final Day'), ev('x', 0, 'QQPK x ZSOP Exclusive'), ev('p', 3, '1 - PLO')] } };
+  // a SvelteKit data file: node 0 the layout, node 1 the page (flattened)
+  const flat = (o) => { const out = []; const add = (v) => { const i = out.length; out.push(null); out[i] = v && typeof v === 'object' ? (Array.isArray(v) ? v.map(add) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, add(x)]))) : v; return i; }; add(o); return out; };
+  const fetchFn = async (u) => ({ ok: /\/series\/test\//.test(u), status: 404, json: async () => ({ type: 'data', nodes: [{ type: 'data', data: flat({}) }, { type: 'data', data: flat(list) }] }) });
+  const st = Z.emptyState();
+  await Z.pollOnce(st, { fetchFn });
+  assert.equal(st.org, 'zsop');
+  assert.deepEqual(Object.keys(st.events).sort(), ['p', 's1', 'x', 'z1a', 'z1f'], 'the summary left out');
+  assert.equal(st.events.z1a.name, 'Zodiac Rooster Starter Day 1A', 'the code is the label, not part of the name');
+  assert.equal(st.events.z1a.currency, 'TWD');
+  assert.ok(st.events.s1.sat && !st.events.z1a.sat, 'satellites as the list says');
+  assert.equal(Z.numLabel(st.events.z1f.num, st), 'Z1'); assert.equal(Z.numLabel(st.events.p.num, st), '#1'); assert.equal(Z.numLabel(st.events.x.num, st), '');
+  assert.equal(st.festival.subtitle, 'ZSOP Taipei 2026');
+  assert.equal(G.numLabel(12), '#12');
+});
+
+test('docs/gop/index.html and docs/zsop/index.html are the APT page made by tools/stamp.sh (edit the APT page, then run it)', () => {
   const strip = (f, drop) => fs.readFileSync(path.join(DOCS, f), 'utf8').split('\n').filter((l) => !drop.some((re) => re.test(l)));
-  const common = [/^<html /, /^<title>/, /^<script src="[^"]*(tracker|gop)\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/];
-  assert.deepEqual(strip('gop/index.html', common), strip('apt/index.html', common));
-  assert.match(fs.readFileSync(path.join(DOCS, 'gop/index.html'), 'utf8'), /<html lang="en" data-org="gop">/);
+  const common = [/^<html /, /^<title>/, /^<script src="[^"]*(tracker|gop|zsop)\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/];
+  for (const org of ['gop', 'zsop']) {
+    assert.deepEqual(strip(`${org}/index.html`, common), strip('apt/index.html', common));
+    assert.match(fs.readFileSync(path.join(DOCS, `${org}/index.html`), 'utf8'), new RegExp(`<html lang="en" data-org="${org}">`));
+  }
+  // ZSOP's engine is made from GOP's: GOP's loads first
+  assert.match(fs.readFileSync(path.join(DOCS, 'zsop/index.html'), 'utf8'), /gop\/gop\.js[^\n]*\n<script src="zsop\.js/);
 });
 
 test('RPT: watched live, a new seat is a re-entry and a bust is timed by the poll that sees it', async () => {

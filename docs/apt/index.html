@@ -337,6 +337,20 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       <li>Satellites and side events Gods of Poker leaves unnumbered are shown without a number.</li>
     </ul>
     </div>
+    <div data-only="zsop" hidden>
+    <h4>Where the data comes from</h4>
+    <ul>
+      <li>The Zodiac Series of Poker runs on Gods of Poker's software, which publishes complete records for every event: each bullet bought (with its time), each bust (with its time, table and seat) and the payouts. A poller on GitHub reads the events being played about every half minute and saves its record every couple of minutes; this page loads that record and refreshes it every minute (the site doesn't let other pages read it directly).</li>
+      <li>So bullets, re-entries and busts are exact, for past series too: nothing is inferred from seats changing.</li>
+      <li>Times are the venue's local time.</li>
+    </ul>
+    <h4>Event cards</h4>
+    <ul>
+      <li>Events go by ZSOP's own codes: Z1 to Z12 are the twelve Zodiac events (one trophy each), H the High Rollers, S the satellites and #1, #2, ... the side events. "Z6H4" is both a Zodiac event and a High Roller.</li>
+      <li>A bullet counts in the flight where it was bought. A later day (Day 2, Final Day) shows players carried over from the flights.</li>
+      <li>Prizes include bounties won, so a bounty event's prizes add up to more than its prize pool.</li>
+    </ul>
+    </div>
     <div data-only="rop" hidden>
     <h4>Where the data comes from</h4>
     <ul>
@@ -425,8 +439,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 </aside>
 
 <script src="../fx.js?v=cd5c922312"></script>
-<script src="../series.js?v=eb62dceb5a"></script>
-<script src="tracker.js?v=bcf744ec7c"></script>
+<script src="../series.js?v=edc9b56b3c"></script>
+<script src="tracker.js?v=62cbc985c5"></script>
 <script>
 (function () {
   'use strict';
@@ -442,8 +456,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     link: `${E.SITE}/series/${FEST}` } : Series.pick(ORG, params.get('s'));
   const T = E.configure(SER.source);
   for (const x of document.querySelectorAll('[data-only]')) x.hidden = x.dataset.only !== ORG;
-  // "#36"; an engine may hide numbers it made up (GOP's unnumbered events)
-  const hash = (n) => (T.numLabel ? T.numLabel(n) : '#' + n);
+  // "#36"; an engine may hide numbers it made up (GOP's unnumbered events) or show the site's own codes (ZSOP's "Z1")
+  const hash = (n) => (T.numLabel ? T.numLabel(n, raw) : '#' + n);
   const withNum = (n, text) => [hash(n), text].filter(Boolean).join(' ');
   const $ = (s) => document.querySelector(s);
   const LS_STATE = Series.storageKey(SER), LS_PREFS = O.prefs;

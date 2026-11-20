@@ -17,7 +17,7 @@ const REPO = process.env.REPO || process.env.GITHUB_REPOSITORY || (() => {
 })();
 const BADTEXT = /.{0,40}(\bNaN\b|\bundefined\b|\bInfinity\b|\[object Object\]).{0,20}/;
 const first = (f, list) => { try { return JSON.parse(fs.readFileSync(path.join(DOCS, f), 'utf8'))[list][0].id; } catch { return null; } };
-const aptPast = first('apt/archive/index.json', 'series'), gopPast = first('gop/archive/index.json', 'series'), ropPast = first('rop/archive/index.json', 'series'), usopPast = first('usop/archive/index.json', 'series'), glpcPast = first('glpc/archive/index.json', 'series'), tritonPast = first('triton/archive/index.json', 'festivals');
+const aptPast = first('apt/archive/index.json', 'series'), gopPast = first('gop/archive/index.json', 'series'), zsopPast = first('zsop/archive/index.json', 'series'), ropPast = first('rop/archive/index.json', 'series'), usopPast = first('usop/archive/index.json', 'series'), glpcPast = first('glpc/archive/index.json', 'series'), tritonPast = first('triton/archive/index.json', 'festivals');
 
 // [url, what shows it has loaded]
 const PAGES = [
@@ -25,6 +25,7 @@ const PAGES = [
   ['apt/', '#done-count'],
   aptPast && [`apt/?f=${aptPast}`, '#done-count'],
   gopPast && [`gop/?f=${gopPast}`, '#done-count'],
+  zsopPast && [`zsop/?f=${zsopPast}`, '#done-count'],
   ropPast && [`rop/?f=${ropPast}`, '#done-count'],
   ['glpc/', '#done-count'],
   glpcPast && [`glpc/?f=${glpcPast}`, '#done-count'],

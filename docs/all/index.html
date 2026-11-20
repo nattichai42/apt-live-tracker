@@ -26,6 +26,7 @@
   --violet: #6d28d9; --violet-soft: rgba(109, 40, 217, .1);
   --crimson: #b91c1c; --crimson-soft: rgba(185, 28, 28, .1);
   --emerald: #047857; --emerald-soft: rgba(4, 120, 87, .1);
+  --indigo: #4338ca; --indigo-soft: rgba(67, 56, 202, .1);
   --ok: var(--teal2); --bust: var(--rose); --panel: var(--card); --accent: var(--teal);
   --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --head: 'Afacad', 'Inter', ui-sans-serif, sans-serif;
@@ -43,6 +44,7 @@
   --violet: #b79cf5; --violet-soft: rgba(183, 156, 245, .15);
   --crimson: #f28b82; --crimson-soft: rgba(242, 139, 130, .15);
   --emerald: #5fd3a6; --emerald-soft: rgba(95, 211, 166, .15);
+  --indigo: #a5b4fc; --indigo-soft: rgba(165, 180, 252, .15);
   color-scheme: dark; --head-bg: rgba(11, 13, 18, .92);
 }
 :root[data-theme="dark"] .chart .tip { box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
@@ -269,12 +271,13 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
 /* All series */
 .scope { margin-bottom: 14px; }
-.src-chips { display: inline-flex; gap: 6px; }
+.src-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .chip.src { font-weight: 600; }
 .chip.src[aria-pressed="true"].apt { background: var(--sky-soft); border-color: var(--sky); color: var(--sky); }
 .chip.src[aria-pressed="true"].usop { background: var(--emerald-soft); border-color: var(--emerald); color: var(--emerald); }
 .chip.src[aria-pressed="true"].rop { background: var(--crimson-soft); border-color: var(--crimson); color: var(--crimson); }
 .chip.src[aria-pressed="true"].gop { background: var(--violet-soft); border-color: var(--violet); color: var(--violet); }
+.chip.src[aria-pressed="true"].zsop { background: var(--indigo-soft); border-color: var(--indigo); color: var(--indigo); }
 .chip.src[aria-pressed="true"].glpc { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
 .chip.src[aria-pressed="true"].triton { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
 .stags { display: inline-flex; gap: 4px; flex-wrap: wrap; }
@@ -283,6 +286,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 .stag.usop { color: var(--emerald); background: var(--emerald-soft); }
 .stag.rop { color: var(--crimson); background: var(--crimson-soft); }
 .stag.gop { color: var(--violet); background: var(--violet-soft); }
+.stag.zsop { color: var(--indigo); background: var(--indigo-soft); }
 .stag.glpc { color: var(--amber); background: var(--amber-soft); }
 .stag.triton { color: var(--gold); background: var(--gold-soft); }
 .elist li { display: block; padding: 0; }
@@ -420,12 +424,13 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
 <script src="../fx.js?v=cd5c922312"></script>
 <script src="../people.js?v=7b9c1f8d7e"></script>
-<script src="../series.js?v=eb62dceb5a"></script>
-<script src="../apt/tracker.js?v=bcf744ec7c"></script>
-<script src="../gop/gop.js?v=f664ddb4fb"></script>
+<script src="../series.js?v=edc9b56b3c"></script>
+<script src="../apt/tracker.js?v=62cbc985c5"></script>
+<script src="../gop/gop.js?v=e972c49acc"></script>
+<script src="../zsop/zsop.js?v=52a5ac6460"></script>
 <script src="../rop/rop.js?v=186b07bb4f"></script>
 <script src="../glpc/glpc.js?v=86fda164f3"></script>
 <script src="../triton/triton.js?v=421b8f312a"></script>
-<script src="all.js?v=8f40c3784f"></script>
+<script src="all.js?v=aeb759a761"></script>
 </body>
 </html>

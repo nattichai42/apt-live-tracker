@@ -39,6 +39,11 @@
     gop: { name: 'GOP', full: 'Gods of Poker', engine: 'gop/gop.js', needs: ['apt/tracker.js'], global: 'GOPTracker', page: 'gop/', prefs: 'gop-live-prefs-v1',
       poll: { minInterval: 30, maxInterval: 90, budget: 0.3, publishEvery: 2 },
       archive: { tool: 'tools/series-archive.js', dir: 'gop/archive/', list: 'series', key: 'series', note: "Gods of Poker's complete records: every bullet, bust and payout" } },
+    // Zodiac Series of Poker (Taipei, Jeju): Gods of Poker's software, so GOP's engine made for its site (docs/zsop/zsop.js)
+    // and the APT page; events go by ZSOP's own codes (Z1-Z12 Zodiac events, H High Rollers, S satellites)
+    zsop: { name: 'ZSOP', full: 'Zodiac Series of Poker', engine: 'zsop/zsop.js', needs: ['apt/tracker.js', 'gop/gop.js'], global: 'ZSOPTracker', page: 'zsop/', prefs: 'zsop-live-prefs-v1',
+      poll: { minInterval: 30, maxInterval: 90, budget: 0.3, publishEvery: 2 },
+      archive: { tool: 'tools/series-archive.js', dir: 'zsop/archive/', list: 'series', key: 'series', note: "ZSOP's complete records: every bullet, bust and payout" } },
     // Royal Poker Tour (Vietnam): standings and payouts per event; re-entries and bust times only from watching live
     // (a new seat id is a re-entry). Its engine builds on the APT engine too
     rop: { name: 'RPT', full: 'Royal Poker Tour', engine: 'rop/rop.js', needs: ['apt/tracker.js'], global: 'ROPTracker', page: 'rop/', prefs: 'rop-live-prefs-v1',
@@ -52,7 +57,7 @@
   // id: never changes (links, browser storage). branch: where the poller saves (one per series).
   // start/end: first and last day in the venue's time zone (tz). place: the clock the page shows times in.
   // tag: short name next to the organiser ("APT Taipei '26"). source: what the engine needs to find the series.
-  // Banner (home page): title, mark, sub, art (apt | gop | rop | glpc | usop | triton | tone), watermark.
+  // Banner (home page): title, mark, sub, art (apt | gop | zsop | rop | glpc | usop | triton | tone), watermark.
   // storage: browser key of the page's saved copy (defaults to the id).
   // past: a series from before the site tracked it, known only from its archive (never polled; tools/series-archive.js).
   // source.smp: read from SoMuchPoker's event calendar instead of the organiser's tracker (tools/smp.js).

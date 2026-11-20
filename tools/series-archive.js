@@ -32,7 +32,7 @@ const ymdIn = (t, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 
 // "GOP Incheon 2026 II" -> place "Incheon II", tag "Incheon II '26"; "RPT Championship IV" (2026) -> "Championship IV '26"
 function placeOf(title, start) {
   const yr = (title.match(/\b(20\d\d)\b/) || [])[1] || String(start || '').slice(0, 4);
-  const place = title.replace(new RegExp(`^(${O.name}|GOP|RPT)\\s+`, 'i'), '').replace(/\b20\d\d\b/, '').replace(/\s+/g, ' ').replace(/^[-–\s]+|[-–\s]+$/g, '').trim();
+  const place = title.replace(new RegExp(`^(${O.name}|GOP|RPT|ZSOP)\\s+`, 'i'), '').replace(/\b20\d\d\b/, '').replace(/\s+/g, ' ').replace(/^[-–\s]+|[-–\s]+$/g, '').trim();
   return { place, tag: `${place} '${yr.slice(2)}` };
 }
 
@@ -88,14 +88,16 @@ async function archive(slug, name, entry) {
     // no entry count on record: the bullets seen
     return counted || kids.reduce((a, e) => a + Object.values(e.p || {}).reduce((x, p) => x + (p.b || 0), 0), 0);
   };
-  const title = f.title || f.name || name || (entry && entry.name) || slug;
+  // (ZSOP names a series and gives its place in a subtitle: "The Final Horse", "ZSOP Taipei 2026 II")
+  const title = f.subtitle && f.title ? `${f.subtitle}: ${f.title}` : f.title || f.name || name || (entry && entry.name) || slug;
   const start = entry ? entry.start : ymdIn(Math.min(...starts), tz), end = entry ? entry.end : ymdIn(Math.max(...starts), tz);
-  const { place, tag } = entry ? { place: entry.place, tag: entry.tag } : placeOf(title, start);
+  const { place, tag } = entry ? { place: entry.place, tag: entry.tag } : placeOf(f.subtitle || title, start);
+  const sub = entry ? entry.sub : f.subtitle && f.title ? `${f.title} · ${start.slice(0, 4)}` : undefined;
   const info = { id: slug, name: title, place, tag, start, end, tz, currency: (entry && entry.currency) || (ev[0] && ev[0].currency) || 'USD',
     events: nums.filter((n) => out.results[n] && out.results[n].rows.length).length, entries: nums.reduce((a, n) => a + official(n), 0),
     players: E.players(out).length, paid: Object.values(out.results).reduce((a, r) => a + r.rows.reduce((b, row) => b + row[3], 0), 0),
     played: nums.filter((n) => official(n) > 0).length, known: nums.filter((n) => official(n) > 0 && E.watchedFromStart(out, n)).length,
-    watched: !!fromState, bytes: fs.statSync(file).size, ...(entry ? { mark: entry.mark, sub: entry.sub } : {}), ...(note ? { note } : {}) };
+    watched: !!fromState, bytes: fs.statSync(file).size, ...(entry ? { mark: entry.mark } : {}), ...(sub ? { sub } : {}), ...(note ? { note } : {}) };
   console.log(`${info.name}: ${info.events} events paid, ${info.entries} entries, ${info.players} players, every bullet known in ${info.known} of ${info.played} played, ${Math.round(info.bytes / 1024)} KB`);
   return info;
 }

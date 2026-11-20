@@ -1,0 +1,62 @@
+{
+ "series": [
+  {
+   "id": "the-final-horse",
+   "name": "ZSOP Taipei 2026 II: The Final Horse",
+   "place": "Taipei II",
+   "tag": "Taipei II '26",
+   "start": "2026-09-03",
+   "end": "2026-09-14",
+   "tz": "Asia/Taipei",
+   "currency": "TWD",
+   "events": 70,
+   "entries": 6496,
+   "players": 1014,
+   "paid": 47141650,
+   "played": 70,
+   "known": 70,
+   "watched": false,
+   "bytes": 508320,
+   "sub": "The Final Horse · 2026"
+  },
+  {
+   "id": "the-rising-horse",
+   "name": "ZSOP Jeju 2026: The Rising Horse",
+   "place": "Jeju",
+   "tag": "Jeju '26",
+   "start": "2026-06-04",
+   "end": "2026-06-15",
+   "tz": "Asia/Seoul",
+   "currency": "KRW",
+   "events": 32,
+   "entries": 981,
+   "players": 171,
+   "paid": 905544000,
+   "played": 32,
+   "known": 31,
+   "watched": false,
+   "bytes": 114812,
+   "sub": "The Rising Horse · 2026"
+  },
+  {
+   "id": "the-horse-awakens",
+   "name": "ZSOP Taipei 2026: The Horse Awakens",
+   "place": "Taipei",
+   "tag": "Taipei '26",
+   "start": "2026-03-12",
+   "end": "2026-03-23",
+   "tz": "Asia/Taipei",
+   "currency": "TWD",
+   "events": 82,
+   "entries": 8958,
+   "players": 1271,
+   "paid": 85664995,
+   "played": 84,
+   "known": 84,
+   "watched": false,
+   "bytes": 692536,
+   "sub": "The Horse Awakens · 2026"
+  }
+ ],
+ "updatedAt": 1795203492
+}

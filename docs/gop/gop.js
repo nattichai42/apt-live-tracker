@@ -19,7 +19,12 @@
   'use strict';
   if (!APT) throw new Error('gop.js needs apt/tracker.js loaded first');
 
-  const SITE = 'https://godsofpoker.com';
+  // One engine per site on this software: Gods of Poker's (the default export) and others made with make()
+  // (docs/zsop/zsop.js). site: its address; org: the organiser in docs/series.js; labels: event numbers are the site's
+  // own codes at the start of each title ("Z1 - ...", "H2 - ...") rather than its event numbers
+  function make(opts) {
+  opts = opts || {};
+  const SITE = opts.site || 'https://godsofpoker.com', ORG = opts.org || 'gop', LABELS = !!opts.labels;
   const BROWSER_POLL = false; // no CORS: pages read the poller's saved state
   const FEED_CAP = 6000;
   let SERIES = 'taipei-2027';
@@ -48,7 +53,7 @@
   }
 
   function emptyState() {
-    return { v: 1, org: 'gop', series: SERIES, updatedAt: 0, listAt: 0, festival: null, events: {}, results: {}, feed: [], aliases: {}, names: {}, people: {} };
+    return { v: 1, org: ORG, series: SERIES, updatedAt: 0, listAt: 0, festival: null, events: {}, results: {}, feed: [], aliases: {}, names: {}, people: {} };
   }
 
   /* ---------- fetching ---------- */
@@ -71,10 +76,13 @@
 
   /* ---------- event metadata ---------- */
   const CUR = { 'NT$': 'TWD', '₩': 'KRW', '$': 'USD', '₱': 'PHP', 'HK$': 'HKD', '¥': 'JPY', 'S$': 'SGD', 'RM': 'MYR', '฿': 'THB', '₫': 'VND', '€': 'EUR' };
-  const curOf = (t, fest) => (/^[A-Z]{3}$/.test(t.seriesCurrency || '') ? t.seriesCurrency : CUR[t.currency] || (fest && fest.currency) || 'USD');
+  const code = (c) => (/^[A-Z]{3}$/.test(c || '') ? c : CUR[c] || null);
+  const curOf = (t, fest) => code(t.seriesCurrency) || code(t.festivalCurrency) || code(t.currency) || code(fest && fest.currency) || 'USD';
+  // A site's own code at the start of a title ("Z1 - Zodiac Rooster Starter", "Z6H4 -  Zodiac Snake", "12 - NLH 6-Max")
+  const LABEL = /^([A-Z]{0,3}\d+(?:[A-Z]{1,3}\d+)*)\s+-\s+/;
   const isHolding = (title) => /ITM HOLDING|\(Flight \w+ - ITM\)/i.test(title || '');
   // Holding tables are later days too (players already in the money, carried over): APT's isLaterDay() knows the name
-  const nameOf = (t) => { const n = clean(t.title); return isHolding(n) && !/ITM Holding/i.test(n) ? n + ' - ITM Holding' : n; };
+  const nameOf = (t) => { const n = clean(t.title).replace(LABELS ? LABEL : /^$/, ''); return isHolding(n) && !/ITM Holding/i.test(n) ? n + ' - ITM Holding' : n; };
 
   // Phase in the APT engine's words, from GOP's status and counts
   function phaseOf(e, t, now) {
@@ -94,6 +102,7 @@
   function mergeMeta(e, t, fest, now) {
     const tz = t.timezone || (fest && fest.timezone) || 'UTC';
     e.title = clean(t.title); e.name = nameOf(t);
+    if (LABELS) { const m = e.title.match(LABEL); if (m) e.label = m[1]; else delete e.label; }
     e.number = String(t.eventNumber || '0');
     e.start = zoned(t.startTime, tz) || e.start || null;
     e.regOpen = zoned(t.regOpen, tz); e.regClose = zoned(t.regClose, tz);
@@ -103,7 +112,9 @@
     e.paidPlaces = Number(t.totalPayouts) || 0;
     if (t.totalEntries != null) e.entries = Number(t.totalEntries);
     if (t.totalPlayers != null) e.remaining = Number(t.totalPlayers);
-    e.sat = /satellite|\bseats?\b/i.test(e.title);
+    // (the series list says which events are satellites; an event's own page doesn't)
+    if (t.satellite != null) e.satFlag = !!t.satellite;
+    e.sat = !!e.satFlag || /satellite|\bseats?\b/i.test(e.title) || /\bSat\b/.test(e.title);
     e.single = !!t.isSingleDay;
     e.gopPhase = (t.phase && t.phase.code) || '';
     e.phase = phaseOf(e, t, now);
@@ -111,10 +122,13 @@
 
   function mergeList(state, d, now) {
     const f = d.festival || d.series || {};
-    state.festival = { title: clean(f.title), slug: f.slug, start: f.start_date, dates: f.date, timezone: f.timezone, currency: f.currency, complete: !!f.isComplete, events: f.total_events };
+    state.festival = { title: clean(f.title), subtitle: clean(f.subtitle) || undefined, slug: f.slug, start: f.start_date, end: f.end_date || undefined, dates: f.date, timezone: f.timezone,
+      currency: code(f.currency) || f.currency, complete: f.isComplete != null ? !!f.isComplete : !!(f.end_date && Date.parse(f.end_date) / 1000 < now), events: f.total_events };
     // Not the summaries (an event's totals over its flights) nor GOP's leftovers marked "DO NOT USE" (a duplicate of a
     // real flight, which would otherwise take that flight's bullets)
-    const listed = (((d.events || {}).events) || []).filter((t) => t && t.kholdem_id && !t.isSummary && !/do not use/i.test(t.title || ''));
+    // (the events as one list, or grouped by day)
+    const ev = d.events, all = Array.isArray(ev) ? ev : ev && Array.isArray(ev.events) ? ev.events : ev && typeof ev === 'object' ? Object.values(ev).filter(Array.isArray).flat() : [];
+    const listed = all.filter((t) => t && t.kholdem_id && !t.isSummary && !/do not use/i.test(t.title || ''));
     for (const t of listed) {
       const e = state.events[t.kholdem_id] || (state.events[t.kholdem_id] = { kid: t.kholdem_id, p: {}, polls: 0 });
       mergeMeta(e, t, state.festival, now);
@@ -251,6 +265,7 @@
       }
     }
     state.results = results;
+    if (LABELS) { const labels = {}; for (const e of all) if (e.label && !(e.num in labels)) labels[e.num] = e.label; state.labels = labels; }
     feed.sort((a, b) => a.t - b.t);
     state.feed = feed.slice(-FEED_CAP);
     return state;
@@ -318,9 +333,9 @@
   }
   // A finished series as a small file: the rows and payouts it was built from, and the feed, are left out
   function slim(state) {
-    const out = { v: 1, org: 'gop', series: state.series, archive: true, festival: state.festival, updatedAt: state.updatedAt, events: {}, results: {}, feed: [], aliases: state.aliases || {} };
+    const out = { v: 1, org: ORG, series: state.series, archive: true, festival: state.festival, updatedAt: state.updatedAt, events: {}, results: {}, feed: [], aliases: state.aliases || {}, ...(state.labels ? { labels: state.labels } : {}) };
     for (const e of Object.values(state.events)) {
-      const { q, pay, seats, polls, closed, doneAt, regOpen, gopPhase, title, number, paidPlaces, chips, ...keep } = e;
+      const { q, pay, seats, polls, closed, doneAt, regOpen, gopPhase, title, number, paidPlaces, chips, satFlag, ...keep } = e;
       const p = {};
       for (const [k, x] of Object.entries(e.p || {})) { const { id, chips: c, ...rest } = x; p[k] = rest; }
       out.events[e.kid] = { ...keep, p, polls: polls ? 1 : 0, phase: 'Completed' }; // the series is over (a part never played reads as paused)
@@ -328,10 +343,15 @@
     for (const [k, r] of Object.entries(state.results || {})) out.results[k] = { ...r, final: true };
     return out;
   }
-  const numLabel = (n) => (Number(n) > SYNTH ? '' : '#' + n);
+  // An event number as shown: "#12"; nothing for one of ours; the site's own code where it has them ("Z1", "#12")
+  const numLabel = (n, state) => {
+    const l = state && state.labels && state.labels[n];
+    if (l) return /^\d/.test(l) ? '#' + l : l;
+    return Number(n) > SYNTH || (LABELS && state && state.labels) ? '' : '#' + n;
+  };
   // Finished series, for tools/series-archive.js: [{ slug, name }]
   const finished = async (fetchFn) => (((await getData(fetchFn, `${SITE}/series/__data.json`)).festivals) || [])
-    .filter((f) => f.isComplete && f.production !== false).map((f) => ({ slug: f.slug, name: clean(f.title) }));
+    .filter((f) => (f.isComplete != null ? f.isComplete : f.end_date && Date.parse(f.end_date) < Date.now()) && f.production !== false && !f.hidden).map((f) => ({ slug: f.slug, name: clean(f.title) }));
 
   const shared = ['players', 'playerTimeline', 'liveEvents', 'eventPlayers', 'completedEvents', 'upcoming', 'watchedFromStart', 'eventFinished',
     'isLaterDay', 'baseName', 'canon', 'similarNames', 'unflatten', 'ACTIVE'];
@@ -345,4 +365,8 @@
     return api;
   };
   return api;
+  }
+  const gop = make({});
+  gop.make = make;
+  return gop;
 });

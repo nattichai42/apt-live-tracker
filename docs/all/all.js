@@ -34,6 +34,7 @@
   const ADAPT = {
     apt: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     gop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
+    zsop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     rop: { name: (e, E) => E.baseName(e.name), isLater: (e, E) => E.isLaterDay(e.name), laterCovers: true, nat: (e, s) => e.currency || s.currency },
     glpc: { name: (e, E) => E.baseName(e.name), isLater: (e) => !!e.laterDay },
     usop: { name: (e, E) => E.baseName(e.name), isLater: (e) => !!e.laterDay },
@@ -286,7 +287,7 @@
       const win = res && res.rows.find((x) => x[0] === 1);
       const finished = E.eventFinished(v, num);
       const [n0, fest] = String(num).split('@');
-      out.set(num, { src: s.id, num, kid: (c && c.kid) || last.kid, name: c ? cleanName(c.name) : nameOf(last), label: /^\d/.test(n0) ? '#' + n0 : n0, fest: s.all ? fest || '' : s.tag,
+      out.set(num, { src: s.id, num, kid: (c && c.kid) || last.kid, name: c ? cleanName(c.name) : nameOf(last), label: E.numLabel && !s.all ? E.numLabel(n0, v) : /^\d/.test(n0) ? '#' + n0 : n0, fest: s.all ? fest || '' : s.tag,
         start: first.start || 0, end: (c && c.finished) || Math.max(...kids.map((e) => evEnd(e) || 0)), buyin: Math.max(0, ...kids.map((e) => e.buyin || 0)),
         entries: entries || 0, pool: Math.max(0, ...kids.map((e) => e.prizePool || 0)) || (res ? res.rows.reduce((a, r) => a + r[3], 0) : 0),
         paid: res ? res.rows.length : 0, finished, known: E.watchedFromStart(v, num),
@@ -528,7 +529,7 @@
   const linkTo = (key, k, v) => { const pg = SRC_BY[key].page; return withRepo(pg + (pg.includes('?') ? '&' : '?') + k + '=' + encodeURIComponent(v)); };
   const evHref = (e) => linkTo(e.src, 'event', e.kid);
   const playerHref = (key, name) => linkTo(key, 'player', name);
-  const evTitle = (e) => `${e.label} ${e.name}`;
+  const evTitle = (e) => [e.label, e.name].filter(Boolean).join(" ");
   function eventRow(e, right, sub) {
     const li = el('li'), a = el('a'); a.href = evHref(e);
     a.appendChild(el('div', 'when', e.start ? fDate.format(new Date(e.start * 1000)) : ''));

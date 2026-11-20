@@ -24,6 +24,7 @@ copying one of that organiser's and changing:
   - GLPC: `{ series, seriesUrl, from, to }` (the tournaments listed between those dates)
   - Triton: `{ festival: '<festival id from tritonpoker.plus/festival/<id>>', series }`
   - Gods of Poker: `{ series: '<slug from godsofpoker.com/series/<slug>>' }`
+  - ZSOP: `{ series: '<slug from zodiacseriesofpoker.com/series/<slug>>' }`
   - Royal Poker Tour: `{ series: '<festival slug, as in api.royal-poker.com/api/v1/public/series-groups>' }`
 
 Then run `tools/stamp.sh` and push. The *Poll series* workflow starts polling it the day before it starts, and stops two days after it
@@ -128,6 +129,25 @@ and the payouts. So nothing is inferred from seats changing, and past series are
 - `node tools/series-archive.js --org gop` saves every finished series (`--only <slug>`, `--force`, `--rates`); the poller archives
   a watched series itself when it ends (`--series <id> --from-state`). Rates for their dates are in `docs/gop/archive/fx.json`
   (`tools/rates.js`, shared with the APT archive).
+
+## Zodiac Series of Poker (`docs/zsop/`)
+
+ZSOP (zodiacseriesofpoker.com; Taipei, Jeju) runs on Gods of Poker's software, so it has the same complete records.
+
+- `docs/gop/gop.js` exports `make({ site, org, labels })` as well as GOP's own engine; `docs/zsop/zsop.js` is that engine
+  made for ZSOP's site (load `apt/tracker.js`, then `gop/gop.js`, then `zsop/zsop.js`). The differences it handles: the
+  series list comes grouped by day, the series list (not the event page) says which events are satellites, and festivals
+  have no "complete" flag (a festival is finished once its end date has passed).
+- Events go by ZSOP's own codes at the start of each title: Z1-Z12 the Zodiac events, H High Rollers, S satellites, 1, 2,
+  ... side events ("Z6H4" is both). ZSOP's event numbers only group an event's flights and days, so the engine keeps
+  them as numbers, takes the code off the name, and keeps `labels` (number -> code) in the state; `numLabel(num, state)`
+  shows "Z1" or "#12", and nothing for an event without a code.
+- A series has a name and a subtitle ("The Final Horse", "ZSOP Taipei 2026 II"): its archive is named after both and
+  placed by the subtitle.
+- `node tools/series-archive.js --org zsop` saves every finished series, as for GOP. In the three 2026 series purchases add up
+  to the official entries in all 186 played events. Prizes include bounties won, so a bounty event's prizes add up to more
+  than its prize pool; a Main Event's payout table can add up to less than the pool shown (ZSOP's own figures).
+- Not live yet: ZSOP had no next series listed on 20 Nov 2026. When it has, add it to `docs/series.js` with `org: 'zsop'`.
 
 ## Royal Poker Tour (`docs/rop/`)
 
