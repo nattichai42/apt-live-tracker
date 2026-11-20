@@ -151,9 +151,10 @@ ZSOP (zodiacseriesofpoker.com; Taipei, Jeju) runs on Gods of Poker's software, s
   not, while the payouts show only those of players who cashed. The engine keeps them per player in `state.bounties`
   (event number -> player -> amount) and a place's prize is then its cash alone, so nothing counts twice; `players()`
   adds them to prizes (not cashes, so ITM is unchanged) and timelines show "Bounties won". A payout's `amount` is what the
-  player was paid, bounties included, and its `payoutAmount` the place's prize: mystery bounties (envelopes, drawn in
-  the money) are only in `amount` (`bountyAmount` stays 0), so a place's prize is `payoutAmount` plus the larger of
-  `bountyAmount` and `amount - payoutAmount`. Left out: fixed bounties won by players who busted before the money in
+  player was paid, bounties included, and its `payoutAmount` the place's prize: ticket bonuses (`ticketBonusAmount`: mystery
+  bounty envelopes, drawn in the money; a fixed-bounty event's bounties won by players who cashed; small bonuses) are
+  in `amount` but not `bountyAmount`, so a place's prize is the larger of `amount` and `payoutAmount + bountyAmount +
+  ticketBonusAmount`, and only `bountyAmount` comes off it where knockout bounties are credited per purchase. Left out: fixed bounties won by players who busted before the money in
   series that don't record them per purchase (Taipei II: NT$0.39M of NT$8.47M bounty money). Gods of Poker's 7 past
   series record neither (no knockout events, and their payouts' amounts carry no bounties), so nothing changes there.
 - Net across ZSOP: −17% (Taipei), −5% (Jeju), −20% (Taipei II): fees ~10-12%, Main Events' payout tables a few points
