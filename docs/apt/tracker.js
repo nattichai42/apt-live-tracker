@@ -637,7 +637,7 @@
     } : null;
     const res = resultsByName(state, keep);
     const map = new Map();
-    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], untracked: 0, unknown: false }), map.get(n));
+    const get = (n) => map.get(n) || (map.set(n, { name: n, cc: '', nums: new Map(), bullets: 0, busts: 0, seatedIn: [], lastBust: 0, cashes: [], ko: [], untracked: 0, unknown: false }), map.get(n));
     const knownCache = new Map();
     const known = (num) => { if (!knownCache.has(num)) knownCache.set(num, watchedFromStart(state, num)); return knownCache.get(num); };
     for (const e of Object.values(state.events)) {
@@ -663,29 +663,40 @@
         }
       }
     }
+    // Bounties won (state.bounties: event number -> player -> amount; GOP's software in knockout events): prizes, not cashes
+    for (const [numS, b] of Object.entries(state.bounties || {})) {
+      if (keep && !keep(numS)) continue;
+      for (const [n0, amt] of Object.entries(b)) {
+        const r = get(canon(state, n0)), num = Number(numS);
+        r.ko.push({ num, prize: amt });
+        if (!r.nums.has(num)) { const ev = byNum.get(num); r.nums.set(num, { num, bullets: 1, buyin: ev ? ev.buyin : 0, tracked: false }); r.bullets += 1; r.untracked += 1; }
+      }
+    }
     // A player only seen as a carry-over (later day) entered a flight we did not track: count one bullet
     for (const r of map.values()) for (const k of r.nums.values()) if (k.bullets === 0) { k.bullets = 1; k.tracked = false; r.bullets += 1; r.untracked += 1; }
     const out = [];
     for (const r of map.values()) {
       let buyins = 0; for (const k of r.nums.values()) buyins += k.bullets * (k.buyin || 0);
-      const prizes = r.cashes.reduce((s, c) => s + c.prize, 0);
+      const bounties = r.ko.reduce((s, c) => s + c.prize, 0);
+      const prizes = r.cashes.reduce((s, c) => s + c.prize, 0) + bounties;
       const cashedNums = new Set(r.cashes.map((c) => c.num));
       const entered = r.nums.size;
       out.push({ name: r.name, cc: r.cc, events: entered, bullets: r.bullets, reentries: Math.max(0, r.bullets - entered), busts: r.busts,
-        buyins, prizes, net: prizes - buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
+        buyins, prizes, bounties, net: prizes - buyins, cashes: r.cashes.length, itm: r.bullets ? cashedNums.size / r.bullets : 0, itmEvent: entered ? cashedNums.size / entered : 0, // ITM per bullet; per event too
         seatedIn: r.seatedIn, lastBust: r.lastBust || null, partial: r.untracked > 0 || r.unknown,
         cashedEvents: cashedNums.size, wins: r.cashes.filter((c) => c.pos === 1).length,
-        ...(opts.detail ? { ev: detailOf(r.nums.values(), r.cashes, (k) => k.bullets * (k.buyin || 0)) } : {}) });
+        ...(opts.detail ? { ev: detailOf(r.nums.values(), r.cashes, (k) => k.bullets * (k.buyin || 0), r.ko) } : {}) });
     }
     out.sort((a, b) => b.prizes - a.prizes || b.bullets - a.bullets || a.name.localeCompare(b.name));
     return out;
   }
 
-  // opts.detail: each player's events as [{ num, b: bullets, buyin, prize, pos }] (for the all-series page)
-  function detailOf(nums, cashes, buyinOf) {
+  // opts.detail: each player's events as [{ num, b: bullets, buyin, prize, pos, ko: bounties in the prize }] (for the all-series page)
+  function detailOf(nums, cashes, buyinOf, ko) {
     const out = new Map();
     for (const k of nums) out.set(String(k.num), { num: k.num, b: k.bullets, buyin: buyinOf(k), prize: 0, pos: null });
     for (const c of cashes) { const d = out.get(String(c.num)); if (!d) continue; d.prize += c.prize; if (d.pos == null || c.pos < d.pos) d.pos = c.pos; }
+    for (const c of ko || []) { const d = out.get(String(c.num)); if (!d) continue; d.prize += c.prize; d.ko = (d.ko || 0) + c.prize; }
     return [...out.values()];
   }
 
@@ -757,12 +768,16 @@
       }
       items.push({ ...cashTime(state, num, name, r, info), k: 'cash', num, ev: cashEv, pos, prize, amt: prize });
     }
+    for (const [numS, b] of Object.entries(state.bounties || {})) for (const [n, amt] of Object.entries(b)) if (canon(state, n) === name) {
+      const num = Number(numS), info = numInfo(num);
+      items.push({ ...cashTime(state, num, name, { at: info.lastPoll || info.start }, info), k: 'bounty', num, ev: baseName(info.name), prize: amt, amt });
+    }
     // Seen only as a carry-over into a later day: count the one bullet from the flight we did not watch
     for (const [num, info] of nums) if (info.bullets === 0) {
       info.bullets = 1;
       items.push({ t: info.start || 0, approx: true, k: 'buyin', num, ev: info.name, amt: -info.buyin });
     }
-    const order = { buyin: 0, seen: 1, carry: 1, reentry: 2, bust: 3, end: 4, cash: 5 };
+    const order = { buyin: 0, seen: 1, carry: 1, reentry: 2, bust: 3, end: 4, bounty: 5, cash: 6 };
     items.sort((a, b) => (a.t || 0) - (b.t || 0) || order[a.k] - order[b.k]);
     let bank = 0;
     for (const it of items) { if (it.amt) bank += it.amt; it.bank = bank; }

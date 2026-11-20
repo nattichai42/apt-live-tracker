@@ -645,6 +645,7 @@
       if (!d.e.finished) { sub.append(' · '); sub.appendChild(el('b', 'bag', 'running')); }
       const right = el('div', 'right');
       if (d.pos) { right.appendChild(el('b', 'gold', ord(d.pos))); right.append(short(d.prize)); }
+      else if (d.ko) { right.appendChild(el('b', 'gold', short(d.ko))); right.append('bounties'); }
       else { right.appendChild(el('b', 'neg', '−' + short(d.buyin))); right.append(d.e.finished ? 'no cash' : ''); }
       ul.appendChild(eventRow(d.e, right, sub));
     }

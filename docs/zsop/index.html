@@ -441,8 +441,8 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
 
 <script src="../fx.js?v=cd5c922312"></script>
 <script src="../series.js?v=edc9b56b3c"></script>
-<script src="../apt/tracker.js?v=62cbc985c5"></script>
-<script src="../gop/gop.js?v=e972c49acc"></script>
+<script src="../apt/tracker.js?v=c5a19dd26b"></script>
+<script src="../gop/gop.js?v=8da48d8ae9"></script>
 <script src="zsop.js?v=52a5ac6460"></script>
 <script>
 (function () {
@@ -1037,6 +1037,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       case 'bust': return `Busted · ${ev}`;
       case 'reentry': return `Re-entered (bullet ${it.b}) · ${ev}`;
       case 'cash': return `${ord(it.pos)} place · ${ev}`;
+      case 'bounty': return `Bounties won · ${ev}`;
       case 'end': return `In at the end · ${ev}`;
       case 'carry': return `Carried over · ${ev}`;
       case 'buyin': return `Bought in (not watched) · ${ev}`;
@@ -1224,6 +1225,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       const k = String(it.num), r = byNum.get(k) || { name: it.ev || '', spent: 0, prize: 0, bullets: 0, cashed: false };
       if (it.amt < 0) { r.spent -= it.amt; r.bullets++; }
       if (it.k === 'cash') { r.prize += it.prize || 0; r.cashed = true; }
+      if (it.k === 'bounty') r.prize += it.prize || 0;
       if (!r.name && it.ev) r.name = it.ev;
       byNum.set(k, r);
     }

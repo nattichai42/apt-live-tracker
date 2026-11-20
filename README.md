@@ -147,6 +147,14 @@ ZSOP (zodiacseriesofpoker.com; Taipei, Jeju) runs on Gods of Poker's software, s
 - `node tools/series-archive.js --org zsop` saves every finished series, as for GOP. In the three 2026 series purchases add up
   to the official entries in all 186 played events. Prizes include bounties won, so a bounty event's prizes add up to more
   than its prize pool; a Main Event's payout table can add up to less than the pool shown (ZSOP's own figures).
+- Bounties: in knockout (PKO) events the site records the bounty money each purchase won (`knockOutAmount`), cashed or
+  not, while the payouts show only those of players who cashed. The engine keeps them per player in `state.bounties`
+  (event number -> player -> amount) and a place's prize is then its cash alone, so nothing counts twice; `players()`
+  adds them to prizes (not cashes, so ITM is unchanged) and timelines show "Bounties won". Fixed and mystery bounties
+  are recorded nowhere, so they stay out of prizes. Gods of Poker's 7 past series have no knockout events with
+  recorded bounties (only fixed and mystery ones), so nothing changes there.
+- Net across ZSOP is about −20%: fees ~11%, fixed and mystery bounties ~5-8%, Main Events' payout tables a few
+  points short of their pools, satellites (their seats aren't prizes) ~2%.
 - Not live yet: ZSOP had no next series listed on 20 Nov 2026. When it has, add it to `docs/series.js` with `org: 'zsop'`.
 
 ## Royal Poker Tour (`docs/rop/`)

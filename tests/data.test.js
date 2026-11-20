@@ -282,6 +282,32 @@ test('ZSOP: a series list grouped by day, its own event codes and satellites; GO
   assert.equal(G.numLabel(12), '#12');
 });
 
+test('ZSOP/GOP: knockout bounties are credited to whoever won them (prizes, not cashes), never twice', async () => {
+  const Z = require('../docs/zsop/zsop.js').configure({ series: 'ko' });
+  const flat = (o) => { const out = []; const add = (v) => { const i = out.length; out.push(null); out[i] = v && typeof v === 'object' ? (Array.isArray(v) ? v.map(add) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, add(x)]))) : v; return i; }; add(o); return out; };
+  const page = (o) => ({ ok: true, status: 200, json: async () => ({ type: 'data', nodes: [{ type: 'data', data: flat({}) }, { type: 'data', data: flat(o) }] }) });
+  const now = Date.now(), iso = (m) => new Date(now - m * 60000).toISOString();
+  const base = { kholdem_id: 'k1', eventNumber: 5, title: '7 - NLH Bounty (PKO)', startTime: iso(300).slice(0, 19), currency: 'NT$', totalBuyin: 3000, totalEntries: 3, totalPrizePool: 4000, phase: { code: 'champion' }, status: {} };
+  const row = (id, name, ko, busted) => ({ player: { id, description: name }, subscription: { referenceId: 'ref-' + id, date: iso(290) }, countryCode: 'tw', busted, elimination: busted ? { date: iso(100) } : null, knockOutAmount: ko });
+  const ev = { ...base, players: [row('a', 'Ann Lee', 1500, false), row('b', 'Bo Chen', 500, true), row('c', 'Cy Wu', 0, true)],
+    payouts: [{ position: 1, payoutAmount: 4000, bountyAmount: 1500, winner: { player: { id: 'a', description: 'Ann Lee' } } }] };
+  const fetchFn = async (u) => (/\/series\/ko\//.test(u) ? page({ festival: { title: 'KO', slug: 'ko', timezone: 'Asia/Taipei', currency: 'NT$' }, events: { d: [base] } }) : page({ event: ev }));
+  const st = Z.emptyState();
+  await Z.pollOnce(st, { fetchFn });
+  assert.deepEqual(st.bounties, { 5: { 'Ann Lee': 1500, 'Bo Chen': 500 } });
+  assert.deepEqual(st.results[5].rows.map((r) => [r[1], r[3]]), [['Ann Lee', 4000]], "a place's prize is its cash; its bounties are counted once, with the others");
+  const by = Object.fromEntries(Z.players(st, { detail: true }).map((p) => [p.name, p]));
+  assert.equal(by['Ann Lee'].prizes, 5500); assert.equal(by['Ann Lee'].cashes, 1);
+  assert.equal(by['Bo Chen'].prizes, 500); assert.equal(by['Bo Chen'].cashes, 0, 'a bounty is not a cash');
+  assert.equal(by['Bo Chen'].ev[0].ko, 500);
+  assert.ok(Z.playerTimeline(st, 'Bo Chen').some((it) => it.k === 'bounty' && it.amt === 500));
+  const sl = Z.slim(st); assert.deepEqual(sl.bounties, st.bounties, 'archives keep them');
+  // Where the site records no bounties per purchase, a place's prize keeps the bounties paid with it
+  ev.players.forEach((r) => { r.knockOutAmount = 0; });
+  const st2 = Z.emptyState(); await Z.pollOnce(st2, { fetchFn });
+  assert.deepEqual(st2.bounties, {}); assert.equal(st2.results[5].rows[0][3], 5500);
+});
+
 test('docs/gop/index.html and docs/zsop/index.html are the APT page made by tools/stamp.sh (edit the APT page, then run it)', () => {
   const strip = (f, drop) => fs.readFileSync(path.join(DOCS, f), 'utf8').split('\n').filter((l) => !drop.some((re) => re.test(l)));
   const common = [/^<html /, /^<title>/, /^<script src="[^"]*(tracker|gop|zsop)\.js/, /^<!-- Made by tools\/stamp\.sh/, /^<script src="\.\.\/(fx|series)\.js/];

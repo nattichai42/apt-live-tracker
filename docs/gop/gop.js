@@ -149,15 +149,19 @@
       const name = clean(pl.description || [pl.firstname, pl.lastname].filter(Boolean).join(' ')) || 'Unknown';
       const cc = String(r.countryCode || '').toUpperCase();
       state.people[pl.id] = [name, cc];
+      // [player, purchase, bought, busted at, table, seat, chips, bounty money won with it (knockout events: every
+      // knockout, the player cashed or not)]
       rows.push([pl.id, sub.referenceId || r.id, sec(sub.date) || e.start || now, r.busted ? (sec(r.elimination && r.elimination.date) || -1) : 0,
-        r.busted ? null : r.tableIndex ?? null, r.busted ? null : r.seatIndex ?? null, r.busted ? 0 : Number(r.chipsCount) || 0]);
+        r.busted ? null : r.tableIndex ?? null, r.busted ? null : r.seatIndex ?? null, r.busted ? 0 : Number(r.chipsCount) || 0, Math.round(Number(r.knockOutAmount) || 0)]);
     }
     e.q = rows;
     e.pay = (t.payouts || []).filter((p) => p && p.position != null).map((p) => {
       const w = p.winner || {}, pl = w.player || {};
       const name = pl.id ? clean(pl.description || [pl.firstname, pl.lastname].filter(Boolean).join(' ')) : null;
       if (pl.id) state.people[pl.id] = state.people[pl.id] || [name, String(w.countryCode || '').toUpperCase()];
-      return [Number(p.position), pl.id || null, Math.round((Number(p.payoutAmount ?? p.amount) || 0) + (Number(p.bountyAmount) || 0))];
+      // [place, player, prize, the bounties in it]
+      const bounty = Math.round(Number(p.bountyAmount) || 0);
+      return [Number(p.position), pl.id || null, Math.round(Number(p.payoutAmount ?? p.amount) || 0) + bounty, bounty];
     }).sort((a, b) => a[0] - b[0]);
     if (!e.firstPoll) e.firstPoll = Math.min(now, e.start || now); // the records are complete from the first look
     e.lastPoll = now; e.polls = (e.polls || 0) + 1;
@@ -217,7 +221,7 @@
     }
     const byNum = new Map();
     for (const e of all) { if (!byNum.has(e.num)) byNum.set(e.num, []); byNum.get(e.num).push(e); }
-    const results = {}, feed = [];
+    const results = {}, bounties = {}, feed = [];
     for (const [num, kids] of byNum) {
       // Flights first (a holding table can open before the flight it holds), then later days
       const order = kids.slice().sort((a, b) => APT.isLaterDay(a.name) - APT.isLaterDay(b.name) || (a.start || 0) - (b.start || 0));
@@ -247,6 +251,13 @@
         e.seated = e.phase === 'Completed' ? 0 : alive;
         if (e.phase === 'Completed') { const last = Math.max(0, ...e.q.map((r) => r[3])); e.lastPoll = Math.max(last, e.start || 0) || e.lastPoll; }
       }
+      // Bounties won (knockout events, where the site records them per purchase: the payouts only show those of
+      // players who cashed). A purchase carried into a later day shows its total so far: its largest figure counts
+      const ko = new Map();
+      for (const e of kids) for (const r of e.q || []) if (r[7] > 0) { const k = r[0] + '\u0001' + r[1]; ko.set(k, Math.max(ko.get(k) || 0, r[7])); }
+      const won = {};
+      for (const [k, amt] of ko) { const pid = k.split('\u0001')[0], n = keyOf(state, pid); won[n] = (won[n] || 0) + amt; }
+      if (Object.keys(won).length) bounties[num] = won;
       // Payouts: the part listing the most paid winners (the last day lists every place, flights' early cashes included).
       // GOP sometimes pays a second profile of an entrant (same name, maybe in another word order): credit the entrant
       const src = kids.filter((e) => e.pay && e.pay.length).sort((a, b) => b.pay.filter((r) => r[1]).length - a.pay.filter((r) => r[1]).length)[0];
@@ -260,11 +271,14 @@
           if (twin) { state.names[pid] = keyOf(state, twin); return twin; }
           return pid;
         };
-        const rows = src.pay.filter((r) => r[1] && r[2] > 0).map(([pos, pid0, prize]) => { const pid = payee(pid0); return [pos, keyOf(state, pid), (state.people[pid] || [])[1] || '', prize]; });
+        // (bounties recorded per purchase are counted there, so a place's prize is then its cash alone)
+        const cash = (r) => r[2] - (bounties[num] ? r[3] || 0 : 0);
+        const rows = src.pay.filter((r) => r[1] && cash(r) > 0).map((r) => { const pid = payee(r[1]); return [r[0], keyOf(state, pid), (state.people[pid] || [])[1] || '', cash(r)]; });
         if (rows.length) results[num] = { at: src.lastPoll || now, rows, final: kids.every((e) => e.phase === 'Completed') && rows.length >= src.pay.length };
       }
     }
     state.results = results;
+    state.bounties = bounties;
     if (LABELS) { const labels = {}; for (const e of all) if (e.label && !(e.num in labels)) labels[e.num] = e.label; state.labels = labels; }
     feed.sort((a, b) => a.t - b.t);
     state.feed = feed.slice(-FEED_CAP);
@@ -333,7 +347,8 @@
   }
   // A finished series as a small file: the rows and payouts it was built from, and the feed, are left out
   function slim(state) {
-    const out = { v: 1, org: ORG, series: state.series, archive: true, festival: state.festival, updatedAt: state.updatedAt, events: {}, results: {}, feed: [], aliases: state.aliases || {}, ...(state.labels ? { labels: state.labels } : {}) };
+    const out = { v: 1, org: ORG, series: state.series, archive: true, festival: state.festival, updatedAt: state.updatedAt, events: {}, results: {}, feed: [], aliases: state.aliases || {}, ...(state.labels ? { labels: state.labels } : {}),
+      ...(state.bounties && Object.keys(state.bounties).length ? { bounties: state.bounties } : {}) };
     for (const e of Object.values(state.events)) {
       const { q, pay, seats, polls, closed, doneAt, regOpen, gopPhase, title, number, paidPlaces, chips, satFlag, ...keep } = e;
       const p = {};
