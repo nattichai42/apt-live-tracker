@@ -567,6 +567,14 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
       const f = fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000));
       out.results[num] = f === 1 ? r : { ...r, rows: r.rows.map((row) => [row[0], row[1], row[2], Math.round(row[3] * f), ...row.slice(4)]) };
     }
+    // Bounties won (state.bounties: GOP's software), at the same rate as their event's results
+    if (src.bounties) {
+      out.bounties = {};
+      for (const [num, b] of Object.entries(src.bounties)) {
+        const info = byNum.get(String(num)), f = info ? fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000)) : 1;
+        out.bounties[num] = f === 1 ? b : Object.fromEntries(Object.entries(b).map(([n, v]) => [n, Math.round(v * f)]));
+      }
+    }
     return { s: ok ? out : src, ok, approx };
   }
   // Rebuild what's shown from raw (after new data or a currency change), loading missing rates if needed
@@ -1164,6 +1172,7 @@ details.notes ul { padding-left: 18px; margin: 4px 0; }
     const out = { ...src, events: {}, results: {} };
     for (const [k, e] of Object.entries(src.events || {})) if (ok(e.num)) out.events[k] = e;
     for (const [n, r] of Object.entries(src.results || {})) if (ok(n)) out.results[n] = r;
+    if (src.bounties) out.bounties = Object.fromEntries(Object.entries(src.bounties).filter(([n]) => ok(n)));
     return out;
   }
   function syncFilters() {

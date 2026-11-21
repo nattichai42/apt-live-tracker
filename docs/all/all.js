@@ -246,6 +246,14 @@
       const f = fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000));
       out.results[num] = f === 1 ? r : { ...r, rows: r.rows.map((row) => [row[0], row[1], row[2], Math.round(row[3] * f), ...row.slice(4)]) };
     }
+    // Bounties won (state.bounties: GOP's software), at the same rate as their event's results
+    if (src.bounties) {
+      out.bounties = {};
+      for (const [num, b] of Object.entries(src.bounties)) {
+        const info = byNum.get(String(num)), f = info ? fac(info.from, FX.ymd(info.end || src.updatedAt || Date.now() / 1000)) : 1;
+        out.bounties[num] = f === 1 ? b : Object.fromEntries(Object.entries(b).map(([n, v]) => [n, Math.round(v * f)]));
+      }
+    }
     return { s: out, ok, approx };
   }
   function needRates() {
@@ -348,6 +356,7 @@
     const ok = evOk(s.id), out = { ...v, events: {}, results: {} };
     for (const [k, e] of Object.entries(v.events || {})) if (ok(e.num)) out.events[k] = e;
     for (const [n, r] of Object.entries(v.results || {})) if (ok(n)) out.results[n] = r;
+    if (v.bounties) out.bounties = Object.fromEntries(Object.entries(v.bounties).filter(([n]) => ok(n)));
     return out;
   }
   let model = null;
